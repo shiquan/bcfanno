@@ -3,9 +3,9 @@
      (C) shiquan@genomics.cn
 
      @ MIT
- */
-#ifndef _VCF_ANNO_H
-#define _VCF_ANNO_H
+*/
+#ifndef _VCF_SYNC_ANNO_READERS_H
+#define _VCF_SYNC_ANNO_READERS_H
 
 #define REPLACE_MISSING  0 // replace only missing values
 #define REPLACE_ALL      1 // replace both missing and existing values
@@ -20,7 +20,7 @@ typedef struct _anno_col_t
     int number; // one of BCF_VL_* types
     char *hdr_key;
     int (*setter)(struct _args_t *, bcf1_t *, struct _anno_col_t *, void *);
-    
+
 }
 anno_col_t;
 
@@ -81,7 +81,7 @@ typedef struct _anno_api
     char *dynlib_path;
     anno_col_t *cols;
     int ncols;
-    
+
 }
 anno_api_t;
 
@@ -113,6 +113,7 @@ extern "C" {
      * determine which of the readers are set.
      */
     int anno_sr_next_line(anno_srs_t *readers);
+
 #define anno_sr_has_line(readers, i) (readers)->has_line[i]
 #define anno_sr_get_line(readers, i) ((readers)->has_line[i] ? ((readers)->readers[i].buffer[0]) : NULL)
 #define anno_sr_region_done(readers, i) (!(readers)->has_line[i] && !(readers)->readers[i].nbuffer ? 1 : 0)
@@ -126,7 +127,8 @@ extern "C" {
      */
     int anno_sr_seek(anno_srs_t *readers, const char *seq, int pos);
 
-    
+
+
 #ifdef __cplusplus
 }
 #endif

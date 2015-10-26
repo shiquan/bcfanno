@@ -82,7 +82,7 @@ static int *init_filters(bcf_hdr_t *hdr, const char *filters, int *nfilters)
         if ( *tmp==',' || !*tmp )
         {
             out = (int*) realloc(out, (nout+1)*sizeof(int));
-            if ( tmp-prev==1 && *prev=='.' )
+	    if ( tmp-prev==1 && *prev=='.' )
                 out[nout] = -1;
             else
             {
@@ -1058,7 +1058,7 @@ void bcf_sr_regions_destroy(bcf_sr_regions_t *reg)
         {
             free(reg->seq_names[i]);
             free(reg->regs[i].regs);
-        }
+	}
     }
     free(reg->regs);
     free(reg->seq_names);
@@ -1254,4 +1254,3 @@ void bcf_sr_regions_flush(bcf_sr_regions_t *reg)
     while ( !bcf_sr_regions_next(reg) ) reg->missed_reg_handler(reg, reg->missed_reg_data);
     return;
 }
-
