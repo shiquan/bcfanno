@@ -11,19 +11,6 @@
 #define REPLACE_ALL      1 // replace both missing and existing values
 #define REPLACE_EXISTING 2 // replace only if tgt is not missing
 
-struct _args_t;
-
-typedef struct _anno_col_t
-{
-    int icol;
-    int replace; // REPLACE_*
-    int number; // one of BCF_VL_* types
-    char *hdr_key;
-    int (*setter)(struct _args_t *, bcf1_t *, struct _anno_col_t *, void *);
-
-}
-anno_col_t;
-
 typedef struct
 {
 }
