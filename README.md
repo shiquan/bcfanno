@@ -1,4 +1,4 @@
-ANNOVCF
+VCFANNO
 ----------
 
-ANNOVCF was designed to annotate VCF/BCF files by using local and online databases. The early propose was design an efficient standalone program, wrote in C language.   
+VCFANNO was designed to annotate VCF/BCF files by using local and online databases. The early propose was design an efficient standalone program, wrote in C language.   
