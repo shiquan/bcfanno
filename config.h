@@ -35,10 +35,12 @@ extern int has_hgvs;
 
 extern void config_release();
 
-#define safe_free(x) do                                                 \
+#define safe_free(p) do                                                 \
     {                                                                   \
-        void **_px = (void**)&(x);                                      \
-        if (_px==NULL || *_px == NULL) error("[error] double free %s, %d", __FUNCTION__, __LINE__); \
+        void **_pp = (void**)&(p);                                      \
+        if (_pp==NULL || *_pp == NULL) { \
+	    error("[error] double free %s, %d", __FUNCTION__, __LINE__); \
+	}								\
         free(*_px);                                                     \
         *_px = NULL;                                                    \
     } while(0)

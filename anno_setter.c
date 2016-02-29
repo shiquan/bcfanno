@@ -34,7 +34,9 @@ void init_columns(anno_cols_t *acols, char *rules, bcf_hdr_t *header_out)
             col->setter = acols->type == anno_file_is_vcf ? vcf_setter_id : anno_setter_id;
             col->hdr_key = strdup(str.s);
         }
-        else if (!strcasecmp("INFO", str.s) || !strcasecmp("FORMAT", str.s) ) fprintf(stderr, "[warning] do not support annotate all INFO/FORMAT fields. todo INFO/TAG instead\n");
+        else if (!strcasecmp("INFO", str.s) || !strcasecmp("FORMAT", str.s) ) {
+	    fprintf(stderr, "[warning] do not support annotate all INFO/FORMAT fields. todo INFO/TAG instead\n");
+	}
         else if (!strncasecmp("FORMAT/", str.s, 7) || !strncasecmp("FMT/", str.s, 4))
         {
             char *key = str.s + (!strncasecmp("FMT", str.s, 4) ? 4 : 7);
