@@ -12,14 +12,20 @@ struct configs anno_config_file = { .path_string=NULL, .summary=NULL, .anno=NULL
 /* annotate with HGVS* tags */
 int has_hgvs = 0;
 
-#define ignore_free(x) do                       \
-    {                                           \
-        if (x!= NULL) { \
-	    free((void*)x);			\
-	}\
-	x = NULL;				\
-    } while(0)
+/* #define ignore_free(x) do                       \ */
+/*     {                                           \ */
+/*         if (x!= NULL) { \ */
+/* 	    free((void*)x);			\ */
+/* 	}\ */
+/* 	x = NULL;				\ */
+/*     } while(0) */
 
+void safe_release(void *p, rel_func func)
+{
+    check_double_free(p);
+    func(p);
+    ignore_free(p);
+}
 static void config_hgvs_release()
 {
     if ( anno_config_file.anno == NULL ) return;
@@ -29,25 +35,28 @@ static void config_hgvs_release()
     ignore_free( anno_config_file.anno->columns);
     ignore_free( anno_config_file.anno);
 }
-static void config_summary_release(struct summary *summary)
+static void config_summary_release(void *_summary)
 {
-    if ( summary != NULL ) {
+    struct summary * summary = (struct summary*)( _summary);
+    /* if ( summary != NULL ) { */
         ignore_free(summary->name);
         ignore_free(summary->version);
         ignore_free(summary->author);
         ignore_free(summary->ref_version);
         ignore_free(summary->path);
-    }
+    /* } */
+
     ignore_free(summary);
 }
-static void config_api_release(struct vcf_sql_api *api)
+static void config_api_release(void *_api)
 {
+    struct vcf_sql_api *api = (struct vcf_sql_api *)_api;
     if ( api != NULL ) {
         ignore_free(api->vfile);
         ignore_free(api->dynlib);
         ignore_free(api->columns);
         if ( api->has_summary ) {
-           config_summary_release(api->summary);
+	    safe_release(api->summary, config_summary_release);
         }
     }
 }
@@ -55,21 +64,23 @@ void config_release()
 {
     ignore_free( anno_config_file.path_string);
     config_hgvs_release();
-    config_summary_release( anno_config_file.summary);
+
+    safe_release(anno_config_file.summary,config_summary_release);
+
     int i;
-    for (i = 0; i< anno_config_file.n_apis; ++i)
-        config_api_release(&anno_config_file.apis[i]);
+
+    for (i = 0; i< anno_config_file.n_apis; ++i) {
+        safe_release(&anno_config_file.apis[i],config_api_release);
+    }
     ignore_free(anno_config_file.apis);
 }
-
-#undef ignore_free
 
 static char *skip_comments(const char *json_file)
 {
     FILE *fp;
     fp = fopen(json_file, "rb");
     if ( fp == NULL ) {
-        fprintf(stderr, "%s\n", strerror(errno));
+	clear_errno();
         return NULL;
     }
     char *json;
@@ -87,6 +98,7 @@ static char *skip_comments(const char *json_file)
         len += temp;
     }
     fclose(fp);
+    check_mem(json);
     json[len]='\0';
     for ( i=0; i<len-1; ++i )
     {
@@ -101,6 +113,8 @@ static char *skip_comments(const char *json_file)
 	for (;json[i] == '\0' || json[i] == '\t'|| json[i] == ' '; i++);
 	json[j] = json[i];
     }
+    for (; j<len; ++j)
+	json[j] = '\0';
     for ( i=j=0; i<len; ++i,++j )
     {
     	for (;json[i] == '\n' && i+1<len && json[i+1] == '\n'; i++);
@@ -109,7 +123,6 @@ static char *skip_comments(const char *json_file)
     len = j+1;
     memset(json+len, 0, max-len);
     return json;
-
 }
 
 static enum api_type check_api_type (char *str)
@@ -133,11 +146,12 @@ static int load_readers(const kson_t *s)
     anno_config_file.summary->version = NULL;
     anno_config_file.summary->ref_version = NULL;
     anno_config_file.summary->path = NULL;
+    check_mem(s);
     const kson_node_t *root = s->root;
-
+    check_mem(root);
     int i;
 
-#define BRANCH(__node, __key, __hand, __func)	do {	\
+#define BRANCH(__node, __key, __hand, __func)	\
 	if ( __node ) {					\
 	    if (!strcmp((__node)->key, __key)) {	\
 		if ((__node)->v.str == NULL) {		\
@@ -145,23 +159,32 @@ static int load_readers(const kson_t *s)
 		} else {				\
 		    __hand = __func((__node)->v.str);	\
 		}					\
+		continue;				\
 	    }						\
 	}						\
-    } while(0)
+	while(0)
 
     for (i = 0; i<root->n; ++i) {
 
 	const kson_node_t *node = kson_by_index(root, i);
         if ( node == NULL) continue;
+	check_mem(node->key);
         struct summary * const summary = anno_config_file.summary;
 
-        BRANCH(node, "ANNO_THREAD", anno_config_file.n_theads, atoi);
-        BRANCH(node, "AUTHOR", summary->author, strdup);
-        BRANCH(node, "ID", summary->name, strdup);
-        BRANCH(node, "REF", summary->ref_version, strdup);
-
-        if (!strcmp(node->key, "HGVS")) {
-	    assert(has_hgvs == 0);
+        BRANCH(node, "threads", anno_config_file.n_theads, atoi);
+        BRANCH(node, "author", summary->author, strdup);
+        BRANCH(node, "id", summary->name, strdup);
+        BRANCH(node, "ref", summary->ref_version, strdup);		
+	BRANCH(node, "version", summary->version, strdup);
+	
+        if (!strcmp(node->key, "hgvs")) {
+	    if (node->type != KSON_TYPE_BRACE) {
+		error("Wrong format! hgvs configure should looks like this: hgvs:{}\n");
+	    }
+	    if (has_hgvs != 0) {
+		warnings("More than 1 hgvs configure! skip it ...");
+		continue;
+	    }
             has_hgvs = 1;
             anno_config_file.anno = (struct anno_data_file*)malloc(sizeof(struct anno_data_file));
             struct anno_data_file * const anno =  anno_config_file.anno;
@@ -175,39 +198,46 @@ static int load_readers(const kson_t *s)
             for (i = 0; i < node->n; ++i) {
                 const kson_node_t *node1 = kson_by_index(node, i);
 		if ( node1==NULL)
-		    error("empty HGVS configure !!\n");
+		    error("empty HGVS configure !!");
 	
-                BRANCH(node, "refgene", anno->refgene_file_path, strdup);
-                BRANCH(node, "trans_file", anno->transcripts_list, strdup);
-                BRANCH(node, "genes_file", anno->genes_list, strdup);
-                BRANCH(node, "intron_edge", anno->intron_edge, atoi);
-                BRANCH(node, "columns", anno->columns, strdup);
-                //warnings("[%s] %s is not a pre-defined element. skip it ..", __FUNCTION__, node->key);
+                BRANCH(node1, "refgene", anno->refgene_file_path, strdup);
+                BRANCH(node1, "trans_list", anno->transcripts_list, strdup);
+                BRANCH(node1, "genes_list", anno->genes_list, strdup);
+                BRANCH(node1, "intron_edge", anno->intron_edge, atoi);
+                BRANCH(node1, "columns", anno->columns, strdup);
+                warnings("%s is not a pre-defined element. skip it ..", node1->key);
             }
             if (anno->refgene_file_path == NULL) {
                 config_release();
-                error("Cannot find refgene file in the HGVS configure!\n");
+                error("Cannot find refgene file in the HGVS configure!");
             }
             if (anno->columns == NULL) {
-                warnings("Do you use a right configure file ?? No tags columns in HGVS configure, HGVS variants name will not be annotated. \n");
+                warnings("Do you use a right configure file ?? No tags columns in HGVS configure, HGVS variants name will not be annotated.");
                 config_hgvs_release();
             }
             //continue; // only accept one node
         }
 
-        if (!strcmp(node->key, "API")) {
-	    assert(node->type == KSON_TYPE_BRACKET);
+        if (!strcmp(node->key, "api")) {
+	    if (node->type != KSON_TYPE_BRACKET) {
+		error("Wrong format! api configure should looks like this: api:[{},{}]");
+	    }
+	    if (node->n == 0) {
+		warnings("empty apis");
+		continue;
+	    }
+            
             anno_config_file.apis = (struct vcf_sql_api*)calloc(node->n, sizeof(struct vcf_sql_api));
 	    anno_config_file.n_apis = 0;
-	    
-            long i, j;
+	    check_mem(anno_config_file.apis);
+	    long i, j;
             for (i = 0; i < (long)node->n; ++i) {
-		//const kson_node_t *node1 = kson_by_index(node, i);
+
 		const kson_node_t *node1 = node->v.child[i];
                 if ( node1==NULL) continue;
 		struct vcf_sql_api * const api = &anno_config_file.apis[anno_config_file.n_apis++];
 		for (j = 0; j < (long)node1->n; ++j) {
-		    fprintf(stderr, "n: %llu\ti:%ld\n", node1->n, j);
+		    debug_print("n: %llu\ti:%ld\n", node1->n, j);
 		    const kson_node_t *node2 = kson_by_index(node1, j);
 		    BRANCH(node2, "type", api->type, check_api_type);
 		    BRANCH(node2, "file", api->vfile, strdup);
@@ -234,6 +264,7 @@ static int load_readers(const kson_t *s)
 
 static void debug_configure_summary(struct summary *summary)
 {
+    check_mem(summary);
     if ( summary->name != NULL )
         printf ("[summary] name : %s\n", summary->name);
     if ( summary->version != NULL)
@@ -263,7 +294,6 @@ void debug_configure_file()
 	if ( anno->columns )
 	    printf("[hgvs] columns: %s\n", anno->columns);
     }
-
     for (i=0; i<anno_config_file.n_apis; i++) {
 	struct vcf_sql_api *api = &anno_config_file.apis[i];
 	if (api->type == api_is_vcf && api->vfile) {
@@ -275,7 +305,7 @@ void debug_configure_file()
 	    printf( "[api] %s\n", api->dynlib);
 	    printf( "[api] columns: %s\n", api->columns);
 	} 
-    }    
+    }
 }
 
 int load_config(const char *json_file)
@@ -285,16 +315,16 @@ int load_config(const char *json_file)
     const char *json = skip_comments(json_file);
     if (json==NULL) return 1;
     anno_config_file.path_string = strdup(json_file);
-    fprintf(stderr, "[debug] %s\n", json);
+    fprintf(stderr, "configure file:\n%s\n", json);
     kson = kson_parse(json);
     safe_free(json);
-    if ( !kson ) {
-        fprintf(stderr, "[%s] can not parse %s\n", __FUNCTION__, json_file);
-        exit(-1);
-    }
+    if ( !kson )
+        error("Can not parse %s\n", json_file);
     int n;
     n= load_readers(kson);
-    if (n < 0) error("Failed to load file from %s\n", json_file);
+    if (n < 0) {
+	debug_print("Failed to load file from %s\n", json_file);
+    }
     debug_configure_file();
     config_release();
     kson_destroy(kson);
