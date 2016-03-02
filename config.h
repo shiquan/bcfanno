@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "kson.h"
 //#include "anno_setter.h"
 
 #define DEFAULT_INTRON_EDGE 30
@@ -30,20 +29,27 @@ struct vcf_sql_api {
     //    enum api_error_num;
 };
 
+struct anno_data_file {
+    char * refgene_file_path;
+    char * transcripts_list;
+    char * genes_list;
+    char * columns;
+    int intron_edge;
+};
+
+struct configs {
+    const char *path_string;
+    struct summary * summary;
+    struct anno_data_file *anno;
+    int n_theads;
+    int n_apis;
+    struct vcf_sql_api * apis;
+};
+
 extern struct configs anno_config_file;
 extern int has_hgvs;
 
 extern void config_release();
-
-#define safe_free(p) do                                                 \
-    {                                                                   \
-        void **_pp = (void**)&(p);                                      \
-        if (_pp==NULL || *_pp == NULL) { \
-	    error("[error] double free %s, %d", __FUNCTION__, __LINE__); \
-	}								\
-        free(*_px);                                                     \
-        *_px = NULL;                                                    \
-    } while(0)
 
 extern int load_config(const char *json);
 

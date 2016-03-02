@@ -1,18 +1,11 @@
 /*  load configure file and check the apis */
-#include "cache.h"
-#include "variant_names.h"
+//#include "cache.h"
+//#include "variant_names.h"
+#include "anno.h"
 #include "config.h"
+#include "kson.h"
 //#include "anno_setter.h"
 //#include <htslib/vcf.h>
-
-struct configs {
-    const char *path_string;
-    struct summary * summary;
-    struct anno_data_file *anno;
-    int n_theads;
-    int n_apis;
-    struct vcf_sql_api * apis;
-};
 
 struct configs anno_config_file = { .path_string=NULL, .summary=NULL, .anno=NULL, .n_apis=0};
 
@@ -30,10 +23,10 @@ int has_hgvs = 0;
 static void config_hgvs_release()
 {
     if ( anno_config_file.anno == NULL ) return;
-    ignore_free( anno_config_file.anno->file_path);
-    ignore_free( anno_config_file.anno->transcript_list);
+    ignore_free( anno_config_file.anno->refgene_file_path);
+    ignore_free( anno_config_file.anno->transcripts_list);
     ignore_free( anno_config_file.anno->genes_list);
-    ignore_free( anno_config_file.anno->column);
+    ignore_free( anno_config_file.anno->columns);
     ignore_free( anno_config_file.anno);
 }
 static void config_summary_release(struct summary *summary)
@@ -172,11 +165,11 @@ static int load_readers(const kson_t *s)
             has_hgvs = 1;
             anno_config_file.anno = (struct anno_data_file*)malloc(sizeof(struct anno_data_file));
             struct anno_data_file * const anno =  anno_config_file.anno;
-            anno->file_path = NULL;
-            anno->transcript_list = NULL;
+            anno->refgene_file_path = NULL;
+            anno->transcripts_list = NULL;
             anno->genes_list = NULL;
             anno->intron_edge = DEFAULT_INTRON_EDGE;
-            anno->column = NULL;
+            anno->columns = NULL;
 
             int i;
             for (i = 0; i < node->n; ++i) {
@@ -184,18 +177,18 @@ static int load_readers(const kson_t *s)
 		if ( node1==NULL)
 		    error("empty HGVS configure !!\n");
 	
-                BRANCH(node, "refgene", anno->file_path, strdup);
-                BRANCH(node, "trans_file", anno->transcript_list, strdup);
+                BRANCH(node, "refgene", anno->refgene_file_path, strdup);
+                BRANCH(node, "trans_file", anno->transcripts_list, strdup);
                 BRANCH(node, "genes_file", anno->genes_list, strdup);
                 BRANCH(node, "intron_edge", anno->intron_edge, atoi);
-                BRANCH(node, "columns", anno->column, strdup);
+                BRANCH(node, "columns", anno->columns, strdup);
                 //warnings("[%s] %s is not a pre-defined element. skip it ..", __FUNCTION__, node->key);
             }
-            if (anno->file_path == NULL) {
+            if (anno->refgene_file_path == NULL) {
                 config_release();
                 error("Cannot find refgene file in the HGVS configure!\n");
             }
-            if (anno->column == NULL) {
+            if (anno->columns == NULL) {
                 warnings("Do you use a right configure file ?? No tags columns in HGVS configure, HGVS variants name will not be annotated. \n");
                 config_hgvs_release();
             }
@@ -261,14 +254,14 @@ void debug_configure_file()
     if ( anno_config_file.anno ) {
 	struct anno_data_file *anno = anno_config_file.anno;
 	printf("[hgvs] intron edge: %u\n", anno->intron_edge);
-	if ( anno->file_path )
-	    printf("[hgvs] file path: %s\n", anno->file_path);
-	if ( anno->transcript_list )
-	    printf("[hgvs] transcript list: %s\n", anno->transcript_list);
+	if ( anno->refgene_file_path )
+	    printf("[hgvs] file path: %s\n", anno->refgene_file_path);
+	if ( anno->transcripts_list )
+	    printf("[hgvs] transcript list: %s\n", anno->transcripts_list);
 	if ( anno->genes_list )
 	    printf("[hgvs] genes list: %s\n", anno->genes_list);
-	if ( anno->column )
-	    printf("[hgvs] column: %s\n", anno->column);
+	if ( anno->columns )
+	    printf("[hgvs] columns: %s\n", anno->columns);
     }
 
     for (i=0; i<anno_config_file.n_apis; i++) {
