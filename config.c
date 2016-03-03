@@ -38,15 +38,11 @@ static void config_hgvs_release()
 static void config_summary_release(void *_summary)
 {
     struct summary * summary = (struct summary*)( _summary);
-    /* if ( summary != NULL ) { */
-        ignore_free(summary->name);
-        ignore_free(summary->version);
-        ignore_free(summary->author);
-        ignore_free(summary->ref_version);
-        ignore_free(summary->path);
-    /* } */
-
-    ignore_free(summary);
+    ignore_free(summary->name);
+    ignore_free(summary->version);
+    ignore_free(summary->author);
+    ignore_free(summary->ref_version);
+    ignore_free(summary->path);
 }
 static void config_api_release(void *_api)
 {
@@ -64,13 +60,13 @@ void config_release()
 {
     ignore_free( anno_config_file.path_string);
     config_hgvs_release();
-
-    safe_release(anno_config_file.summary,config_summary_release);
+    //config_summary_release(anno_config_file.summary);
+    safe_release((void*)anno_config_file.summary,config_summary_release);
 
     int i;
 
     for (i = 0; i< anno_config_file.n_apis; ++i) {
-        safe_release(&anno_config_file.apis[i],config_api_release);
+        config_api_release(&anno_config_file.apis[i]);
     }
     ignore_free(anno_config_file.apis);
 }
@@ -161,8 +157,7 @@ static int load_readers(const kson_t *s)
 		}					\
 		continue;				\
 	    }						\
-	}						\
-	while(0)
+	}
 
     for (i = 0; i<root->n; ++i) {
 
@@ -229,10 +224,9 @@ static int load_readers(const kson_t *s)
             
             anno_config_file.apis = (struct vcf_sql_api*)calloc(node->n, sizeof(struct vcf_sql_api));
 	    anno_config_file.n_apis = 0;
-	    check_mem(anno_config_file.apis);
+
 	    long i, j;
             for (i = 0; i < (long)node->n; ++i) {
-
 		const kson_node_t *node1 = node->v.child[i];
                 if ( node1==NULL) continue;
 		struct vcf_sql_api * const api = &anno_config_file.apis[anno_config_file.n_apis++];
