@@ -20,7 +20,7 @@ int has_hgvs = 0;
 /* 	x = NULL;				\ */
 /*     } while(0) */
 
-void safe_release(void *p, rel_func func)
+void safe_release(void const *p, rel_func func)
 {
     check_double_free(p);
     func(p);
@@ -35,7 +35,7 @@ static void config_hgvs_release()
     ignore_free( anno_config_file.anno->columns);
     ignore_free( anno_config_file.anno);
 }
-static void config_summary_release(void *_summary)
+static void config_summary_release(void const *_summary)
 {
     struct summary * summary = (struct summary*)( _summary);
     ignore_free(summary->name);
@@ -44,7 +44,7 @@ static void config_summary_release(void *_summary)
     ignore_free(summary->ref_version);
     ignore_free(summary->path);
 }
-static void config_api_release(void *_api)
+static void config_api_release(void const *_api)
 {
     struct vcf_sql_api *api = (struct vcf_sql_api *)_api;
     if ( api != NULL ) {
@@ -121,7 +121,7 @@ static char *skip_comments(const char *json_file)
     return json;
 }
 
-static enum api_type check_api_type (char *str)
+static enum api_type check_api_type (char const *str)
 {
     if (!strcmp(str, "vcf")) {
         return api_is_vcf;

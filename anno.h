@@ -61,7 +61,7 @@
 
 typedef void (* rel_func)(void*);
 
-extern void safe_release(void * p, rel_func func);
+extern void safe_release(void const * p, rel_func func);
 
 /* ref: http://c.learncodethehardway.org/book/ex20.html */
 #define str_errno() (errno == 0 ? "None" : strerror(errno))
