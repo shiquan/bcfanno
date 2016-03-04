@@ -1,0 +1,15 @@
+{
+    "id":"mac-test v1",
+    "author":"shiquan@genomics.cn",
+    "threads":1,
+    "ref":"hg19", // hg19, hg38
+    "hgvs": {
+	"refgene":"",
+	"trans_list":"",
+	"genes_list":"",
+	"columns":"",
+    },
+    "api": [
+	{},
+    ],
+}
