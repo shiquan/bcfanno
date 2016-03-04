@@ -124,10 +124,14 @@ struct region {
     uint32_t stop;
 };
 
+#define clear_all(x) (x ＝ 0)
+#define clear_flag(x, n) (x &= ~(n))
+
 #define REFGENE_PRASE_BIN    1
 #define REFGENE_PRASE_NAME1  2
 #define REFGENE_PRASE_REG    4
-#define REFGENE_PRASE_EXONS  8
+#define REFGENE_PRASE_STRAND 8
+#define REFGENE_PRASE_EXONS  (1<<4 | 8)
 #define REFGENE_PRASE_ALL (REFGENE_PRASE_BIN | REFGENE_PRASE_NAME1 | REFGENE_PRASE_REG| REFGENE_PRASE_EXONS)
 
 struct refgene_entry {
@@ -135,21 +139,32 @@ struct refgene_entry {
     int n_buffer;
     int m_buffer;
     int prase_flag;
+    
     int bin; // see USCS bin scheme for details, be used to check regions
+    
     const char *name1; // gene name
     const char *name2; // rna name usually
-    int rid; // chromosome id, should be one of contigs in the VCF header
+
+    int rid; // chromosome id, should be one of contigs in the VCF header, -1
+    
     int strand; // strand_plus, strand_minus, strand_unknown
     uint32_t exon_begin; // exon region begin from xxx
     uint32_t exon_end; // exon end to xxx, remember exon contains cds and utr
     uint32_t cds_start; // cds region start position, 5'UTR is exon_begin to cds_start-1.
     uint32_t cds_stop; // 3'UTR is cds_end+1 to exon_end in plus strand
     int total_exons; // exon number
-
+    struct region *exons;
+    struct region *cds;
 };
+
 struct hgvs_annos {
+    const char *columns;
     struct refgene_file refgene;
     struct refrna_file refrna;
 };
+
+extern void extract_refgene(struct refgene_entry *entry, int type);
+extern bcf1_t *hgvs_anno_local(struct refgene_entry *entry, bcf1_t *line);
+
 
 #endif
