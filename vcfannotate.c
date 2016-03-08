@@ -30,14 +30,6 @@ struct _args_t;
 #define REPLACE_EXISTING 2  // replace only if tgt is not missing
 #define SET_OR_APPEND    3  // set new value if missing or non-existent, append otherwise
 
-typedef struct _annot_col_t
-{
-    int icol, replace, number;  // number: one of BCF_VL_* types
-    char *hdr_key;
-    int (*setter)(struct _args_t *, bcf1_t *, struct _annot_col_t *, void*);
-}
-annot_col_t;
-
 // Logic of the filters: include or exclude sites which match the filters?
 #define FLT_INCLUDE 1
 #define FLT_EXCLUDE 2
