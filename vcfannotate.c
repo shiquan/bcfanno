@@ -29,6 +29,7 @@ struct _args_t;
 #define REPLACE_ALL      1  // replace both missing and existing values
 #define REPLACE_EXISTING 2  // replace only if tgt is not missing
 #define SET_OR_APPEND    3  // set new value if missing or non-existent, append otherwise
+
 typedef struct _annot_col_t
 {
     int icol, replace, number;  // number: one of BCF_VL_* types
