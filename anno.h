@@ -240,4 +240,6 @@ extern void extract_refgene(struct refgene_entry *entry, int type);
 extern int local_setter_hgvs_func(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 
+extern void init_columns(anno_cols_t *cols, char *string, bcf_hdr_t *header);
+
 #endif
