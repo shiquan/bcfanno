@@ -16,7 +16,6 @@
 #include <htslib/khash_str2int.h>
 #include <htslib/tbx.h>
 #include <htslib/faidx.h>
-
 #include "plugin.h"
 
 /* memory handle macros */

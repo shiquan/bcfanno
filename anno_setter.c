@@ -1,8 +1,14 @@
-#include "anno_setter.h"
+#include "anno.h"
 #include "vcmp.h"
 
+struct annot_cols {
+    annot_col *cols;
+    int n_cols;
+    int type;
+    const char *columns;
+}
 
-void init_columns(anno_cols_t *acols, char *rules, bcf_hdr_t *header_out)
+void init_columns(struct annot_col *acols, char *rules, bcf_hdr_t *header_out)
 {
     if ( rules==NULL) return;
     acols->columns = strdup(rules);
@@ -11,10 +17,18 @@ void init_columns(anno_cols_t *acols, char *rules, bcf_hdr_t *header_out)
     int i = -1;
     while (*ss)
     {
-	if ( *se && *se!=',' ) { se++; continue;}
+	if ( *se && *se!=',' ) {
+	    se++;
+	    continue;
+	}
 	int replace = REPLACE_ALL;
-	if ( *ss=='+') { replace == REPLACE_MISSING; ss++; }
-	else if (*ss=='-') { replace == REPLACE_EXISTING; ss++; }
+	if ( *ss=='+') {
+	    replace == REPLACE_MISSING;
+	    ss++;
+	} else if (*ss=='-') {
+	    replace == REPLACE_EXISTING;
+	    ss++;
+	}
 	i++;
 	str.l = 0;
 	kputsn(ss, se-ss, &str); // empty skip
@@ -24,37 +38,35 @@ void init_columns(anno_cols_t *acols, char *rules, bcf_hdr_t *header_out)
                   !strcasecmp("REF", str.s) || !strcasecmp("ALT", str.s) ||
                   !strcasecmp("FILTER", str.s) || !strcasecmp("QUAL", str.s)
             ); // skip, for consistent with vcfannotate.c only
-        else if ( !strcasecmp("ID", str.s) )
-        {
+        else if ( !strcasecmp("ID", str.s) ) {
 	    acols->ncols++;
-            acols->cols = (anno_col_t*) realloc(acols->cols, sizeof(anno_col_t*)*acols->ncols);
-            anno_col_t *col = &acols->cols[acols->ncols-1];
+            acols->cols = (struct annot_col*) realloc(acols->cols, sizeof(struct annot_col*)*acols->ncols);
+            struct annot_col *col = &acols->cols[acols->ncols-1];
             col->icol = i;
             col->replace = replace;
             col->setter = acols->type == anno_file_is_vcf ? vcf_setter_id : anno_setter_id;
             col->hdr_key = strdup(str.s);
-        }
-        else if (!strcasecmp("INFO", str.s) || !strcasecmp("FORMAT", str.s) ) {
-	    fprintf(stderr, "[warning] do not support annotate all INFO/FORMAT fields. todo INFO/TAG instead\n");
-	}
-        else if (!strncasecmp("FORMAT/", str.s, 7) || !strncasecmp("FMT/", str.s, 4))
-        {
+        } else if (!strcasecmp("INFO", str.s) || !strcasecmp("FORMAT", str.s) ) {
+	    error("do not support annotate all INFO/FORMAT fields. todo INFO/TAG instead\n");
+	} else if (!strncasecmp("FORMAT/", str.s, 7) || !strncasecmp("FMT/", str.s, 4) {
             char *key = str.s + (!strncasecmp("FMT", str.s, 4) ? 4 : 7);
-            if (!strcasecmp("GT", key) ) error("It is not allowed to change GT tag.");
+            if (!strcasecmp("GT", key) ) {
+		error("It is not allowed to change GT tag.");
+	    }
             bcf_hrec_t *hrec = bcf_hdr_get_hrec(acols.header, BCF_HL_FMT, "ID", key, NULL);
             tmp.l = 0;
             bcf_hrec_format(hrec, &tmp);
             bcf_hdr_append(header_out, tmp.s);
             bcf_hdr_sync(header_out);
             int hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, key);
-            acols->ncols++; acols->cols = (anno_col_t*) realloc(acols->cols, sizeof(anno_col_t)*acols->ncols);
-            anno_col_t *col = &acols->cols[acols->ncols-1];
+            acols->ncols++;
+	    acols->cols = (struct annot_col*) realloc(acols->cols, sizeof(struct annot_col)*acols->ncols);
+            struct annot_col *col = &acols->cols[acols->ncols-1];
             col->icol = -1;
             col->replace = replace;
             col->hdr_key = strdup(key);
-            switch ( bcf_hdr_id2type(header_out, BCF_HL_FMT, hdr_id) )
-            {
-                case BCF_HT_INT:  col->setter = acols->type == anno_file_is_vcf ? vcf_setter_format_int ? anno_setter_format_int; break;
+            switch ( bcf_hdr_id2type(header_out, BCF_HL_FMT, hdr_id) ) {
+		case BCF_HT_INT:  col->setter = acols->type == anno_file_is_vcf ? vcf_setter_format_int ? anno_setter_format_int; break;
                 case BCF_HT_REAL: col->setter = acols->type == anno_file_is_vcf ? vcf_setter_format_real ? anno_setter_format_real; break;
                 case BCF_HT_STR:  col->setter = acols->type == anno_file_is_vcf ? vcf_setter_format_str ? anno_setter_format_str; break;
                 default : error("The type of %s not recognised (%d)\n", str.s, bcf_hdr_id2type(args->hdr_out, BCF_HL_FMT, hdr_id));
@@ -77,8 +89,8 @@ void init_columns(anno_cols_t *acols, char *rules, bcf_hdr_t *header_out)
             }
 
             acols->ncols++;
-            acols->cols = (anno_col_t*) realloc(acols->cols, sizeof(anno_col_t)*acols->ncols);
-            anno_col_t *col = &acols->cols[acols->ncols-1];
+            acols->cols = (struct annot_col*) realloc(acols->cols, sizeof(struct annot_col)*acols->ncols);
+            struct annot_col *col = &acols->cols[acols->ncols-1];
             col->icol = i;
             col->replace = replace;
             col->hdr_key = strdup(str.s);
@@ -100,7 +112,7 @@ void init_columns(anno_cols_t *acols, char *rules, bcf_hdr_t *header_out)
 }
 
 
-int anno_setter_id(anno_setters_t *handler, bcf1_t *line, anno_col_t *col, void *data)
+int anno_setter_id(anno_setters_t *handler, bcf1_t *line, struct annot_col *col, void *data)
 {
     anno_line_t *tab = (anno_line_t*)data;
     if ( tab->cols[col->icol] && tab->cols[col->icol][0]=='.' && !tab->cols[col->icol][1])
