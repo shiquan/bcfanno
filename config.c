@@ -7,7 +7,7 @@
 //#include "anno_setter.h"
 //#include <htslib/vcf.h>
 
-struct configs anno_config_file = { .path_string=NULL, .summary=NULL, .anno=NULL, .n_apis=0};
+struct configs anno_config_file = ANNOCONFIG_INIT;
 
 /* annotate with HGVS* tags */
 int has_hgvs = 0;

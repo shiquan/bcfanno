@@ -18,6 +18,25 @@
 #include <htslib/faidx.h>
 #include "plugin.h"
 
+#define ANNOTCOLS_PACK_INIT { NULL, 0, 0, NULL }
+
+/* annot line also defined in plugin.h for compile dynamic library */
+#ifndef ANNOT_LINE_FLAG
+#define ANNOT_LINE_FLAG
+
+struct annot_line {
+    char **cols;
+    int ncols, mcols;
+    char **als;
+    kstring_t line;
+    //int rid, start, end;
+};
+
+typedef annot_line annot_line_t;
+
+#endif
+
+
 /* memory handle macros */
 
 #define LINE_CACHE 1024
@@ -101,11 +120,24 @@ struct anno_option {
 
 typedef struct annot_col annot_col_t;
 
+struct annot_cols_pack {
+    struct annot_col *cols;
+    int ncols;
+    int type;
+    char *columns;
+};
+struct sql_connects {
+    void *connect;
+    int idx; // col index 
+};
 /* anno_handler is adapt form args_t struct in vcfannotation.c */
 struct anno_handler {
     bcf_srs_t *files;
     bcf_hdr_t *hdr, *hdr_out;
 
+    //int vcf_anno_count;
+    int sql_anno_count;
+    struct sql_connects *connects;
     /* filter tag, usually in FORMAT field */
     filter_t *filter;
     char *filter_str;
@@ -115,9 +147,12 @@ struct anno_handler {
     annot_line_t *alines; // buffered annotation lines
     int nalines, malines;
     int ref_idx, alt_idx, from_idx, to_idx; // -1 for not present
-    struct annot_col *cols;
-    int ncols;
+    //struct annot_col *cols;
+    //int ncols;
 
+    struct annot_cols_pack *cols;
+    int n_files_connects;
+    
     int mtmpi, mtmpf, mtmps;
     int mtmpi2, mtmpf2, mtmps2;
     int mtmpi3, mtmpf3, mtmps3;
@@ -128,8 +163,7 @@ struct anno_handler {
     
 };
 
-struct annot_col
-{
+struct annot_col {
     int icol, replace, number;  // number: one of BCF_VL_* types
     char *hdr_key;
     int (*setter)(struct anno_handler *, bcf1_t *, struct annot_col *, void*);
@@ -240,5 +274,6 @@ extern int local_setter_hgvs_func(struct anno_handler *hand, bcf1_t *line, annot
 extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 
 extern void init_columns(anno_cols_t *cols, char *string, bcf_hdr_t *header);
+
 
 #endif

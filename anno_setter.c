@@ -1,14 +1,18 @@
 #include "anno.h"
 #include "vcmp.h"
 
-struct annot_cols {
-    annot_col *cols;
-    int n_cols;
-    int type;
-    const char *columns;
-}
 
-void init_columns(struct annot_col *acols, char *rules, bcf_hdr_t *header_out)
+
+struct annot_cols_pack {
+    annot_col *cols;
+    int ncols;
+    int type;
+    char *columns;
+};
+
+struct annot_cols_pack * annopacks;
+
+void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_out)
 {
     if ( rules==NULL) return;
     acols->columns = strdup(rules);

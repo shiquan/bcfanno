@@ -7,6 +7,8 @@
 
 #define DEFAULT_INTRON_EDGE 30
 
+#define ANNOCONFIG_INIT { NULL, NULL, NULL, 0, 0, NULL }
+
 enum api_type { api_is_vcf, api_is_sql, api_is_unknown };
 
 //enum api_error_num { api_is_unreach, api_fail_open, api_fail_index };
@@ -30,16 +32,16 @@ struct vcf_sql_api {
 };
 
 struct anno_data_file {
-    char * refgene_file_path;
-    char * transcripts_list;
-    char * genes_list;
-    char * columns;
+    char *refgene_file_path;
+    char *transcripts_list;
+    char *genes_list;
+    char *columns;
     int intron_edge;
 };
 
 struct configs {
     const char *path_string;
-    struct summary * summary;
+    struct summary *summary;
     struct anno_data_file *anno;
     int n_theads;
     int n_apis;

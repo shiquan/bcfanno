@@ -12,16 +12,22 @@
 #include <htslib/khash_str2int.h>
 #include <dlfcn.h>
 
+#ifndef ANNOT_LINE_FLAG
+#define ANNOT_LINE_FLAG
 /*
  * try to convert any data from SQL into annot_line struct and annotated by core_annotate()
  */
-typedef struct annot_line {
+struct annot_line {
     char **cols;
     int ncols, mcols;
     char **als;
     kstring_t line;
     //int rid, start, end;
-} annot_line_t;
+};
+
+typedef annot_line annot_line_t;
+
+#endif
 
 /** 
  * Plugin API:
@@ -44,7 +50,7 @@ typedef struct annot_line {
  *      - called after all lines have been processed to clean up 
  */
 
-typedef int (*dl_init_func)(int, char**, bcf_hdr_t *, bcf_hdr_t *);
+typedef int (*dl_init_func)(int, char**, bcf_hdr_t *, bcf_hdr_t *); 
 typedef char * (*dl_about_func)(void);
 typedef int (*dl_test_func)(void);
 typedef annot_line_t * (*dl_process_func)(annot_line_t *anno);
@@ -64,7 +70,7 @@ struct plugin_functions {
 /* }; */
 
 extern void *dlopen_plugin(const char *fname);
-
+extern int load_plugin(const char *fname, int exit_on_error, struct plugin_functions *plugin);
 
 
 #endif

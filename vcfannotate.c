@@ -4,9 +4,9 @@
 //#include "filter.h"
 //#include "convert.h"
 
-struct _args_t;
+/* struct _args_t; */
 
-/* typedef struct _rm_tag_t */
+/* Typedef struct _rm_tag_t */
 /* { */
 /*     char *key; */
 /*     int hdr_id; */
@@ -79,7 +79,7 @@ struct _args_t;
 /* } */
 /* hand_t; */
 
-char *msprintf(const char *fmt, ...);
+//char *msprintf(const char *fmt, ...);
 
 /*
 void remove_id(hand_t *hand, bcf1_t *line, rm_tag_t *tag)
@@ -1108,11 +1108,9 @@ int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *
 /*         } */
 /*         return; */
 /*     } */
-
 /*     hand->nsample_map = bcf_hdr_nsamples(dst); */
 /*     hand->sample_map  = (int*) malloc(sizeof(int)*hand->nsample_map); */
 /*     for (i=0; i<hand->nsample_map; i++) hand->sample_map[i] = -1; */
-
 /*     int nsamples = 0; */
 /*     char **samples = hts_readlist(hand->sample_names, hand->sample_is_file, &nsamples); */
 /*     for (i=0; i<nsamples; i++) */
