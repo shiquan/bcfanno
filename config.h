@@ -14,10 +14,10 @@ enum api_type { api_is_vcf, api_is_sql, api_is_unknown };
 //enum api_error_num { api_is_unreach, api_fail_open, api_fail_index };
 
 struct summary {
-    const char *  name;
-    const char *  version;
-    const char *  author;
-    const char *  ref_version;
+    const char *name;
+    const char *version;
+    const char *author;
+    const char *ref_version;
     char *path; // ip address or environment path
 };
 
@@ -49,6 +49,7 @@ struct configs {
 };
 
 extern struct configs anno_config_file;
+
 extern int has_hgvs;
 
 extern void config_release();

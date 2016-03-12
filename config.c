@@ -132,7 +132,6 @@ static enum api_type check_api_type (char const *str)
     }
 }
 
-
 static int load_readers(const kson_t *s)
 {
     assert(anno_config_file.summary == NULL);
@@ -245,14 +244,9 @@ static int load_readers(const kson_t *s)
             //continue;
         }
         // filter fields
-
     }
-
-
 #undef BRANCH
-
     // check all the api or file reachable
-
     return 0;    
 }
 
@@ -270,8 +264,7 @@ static void debug_configure_summary(struct summary *summary)
 }
 void debug_configure_file()
 {
-    int i;
-    
+    int i;    
     if ( anno_config_file.path_string )
         printf("path string : %s\n", anno_config_file.path_string);
     if ( anno_config_file.summary )
@@ -304,7 +297,6 @@ void debug_configure_file()
 
 int load_config(const char *json_file)
 {
-
     kson_t *kson = 0;
     const char *json = skip_comments(json_file);
     if (json==NULL) return 1;
@@ -320,7 +312,7 @@ int load_config(const char *json_file)
 	debug_print("Failed to load file from %s\n", json_file);
     }
     debug_configure_file();
-    config_release();
+    //config_release();
     kson_destroy(kson);
     return 0;
 }

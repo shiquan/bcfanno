@@ -1,16 +1,7 @@
 #include "anno.h"
 #include "vcmp.h"
+#include "plugin.h"
 
-
-
-struct annot_cols_pack {
-    annot_col *cols;
-    int ncols;
-    int type;
-    char *columns;
-};
-
-struct annot_cols_pack * annopacks;
 
 void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_out)
 {

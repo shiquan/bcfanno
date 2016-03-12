@@ -113,46 +113,84 @@ extern void safe_release(void const * p, rel_func func);
 	fprintf(stderr, "[debug] func:%s, line:%d, errno:%s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
     } while(0)
 
-struct anno_option {
+struct anno_option
+{
     htsFile *out_fn;
     int output_type, n_threads;
 };
 
 typedef struct annot_col annot_col_t;
 
-struct annot_cols_pack {
-    struct annot_col *cols;
-    int ncols;
-    int type;
-    char *columns;
+/* struct annot_cols_pack */
+/* { */
+/*     annot_col_t *cols; */
+/*     int ncols; */
+/*     int type; */
+/*     char *columns; */
+/* }; */
+
+typedef struct
+{
+    uint32_t start, end; // 0 for init
+}
+region1_t;
+
+struct region
+{
+    region1_t *regs;
+    int n, m, c;
 };
-struct sql_connects {
+
+struct sql_connect
+{
     void *connect;
-    int idx; // col index 
+    int idx; // index id
+    char *column;
+    int ncols;
+    annot_col_t *cols;
+    int nbuffers, mbuffer;
+    annot_line_t *buffers;
+    /* kstring_t line; */
+    /* char *fname; */
+    /* char **als; // parsed alleles  */
+    /* kstring_t als_str; */
+    /* int nals, mals;   */
+    /* int als_type;  // alleles type, VCF_SNP or VCF_INDEL */
+    
+    struct region *regs; // in memory cached regions
+    /* void *seq_hash; */
+    /* char **seq_names; */
+    /* int nseqs; */
+    int iseq; // current position: chr name index to names[]
+    int start, end;
+    int prev_seq, prev_start;
+};
+
+struct sql_connect_readers
+{
+    struct sql_connect *connects;
+    int nreaders;
 };
 /* anno_handler is adapt form args_t struct in vcfannotation.c */
-struct anno_handler {
+struct anno_handler
+{
+    int vcf_anno_count;
+    int sql_anno_count;
     bcf_srs_t *files;
     bcf_hdr_t *hdr, *hdr_out;
-
-    //int vcf_anno_count;
-    int sql_anno_count;
-    struct sql_connects *connects;
+    struct annot_cols_pack *cols;
+    struct sql_connect_readers *connects;
     /* filter tag, usually in FORMAT field */
     filter_t *filter;
     char *filter_str;
     int filter_logic;
 
     vcmp_t *vcmp;  // for matching annotation and VCF lines by allele
-    annot_line_t *alines; // buffered annotation lines
-    int nalines, malines;
-    int ref_idx, alt_idx, from_idx, to_idx; // -1 for not present
+    //annot_line_t *alines; // buffered annotation lines
+    //int nalines, malines;
+    //int ref_idx, alt_idx, from_idx, to_idx; // -1 for not present
     //struct annot_col *cols;
     //int ncols;
-
-    struct annot_cols_pack *cols;
-    int n_files_connects;
-    
     int mtmpi, mtmpf, mtmps;
     int mtmpi2, mtmpf2, mtmps2;
     int mtmpi3, mtmpf3, mtmps3;
@@ -160,13 +198,13 @@ struct anno_handler {
     float *tmpf, *tmpf2, *tmpf3;
     char *tmps, *tmps2, **tmpp, **tmpp2;
     kstring_t tmpks;
-    
 };
 
-struct annot_col {
+struct annot_col
+{
     int icol, replace, number;  // number: one of BCF_VL_* types
     char *hdr_key;
-    int (*setter)(struct anno_handler *, bcf1_t *, struct annot_col *, void*);
+    int (*setter)(struct anno_handler *, bcf1_t *, annot_col_t *, void*);
 };
 
 extern int setter_filter(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);

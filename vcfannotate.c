@@ -1210,7 +1210,6 @@ int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *
 /*     void *skip_fmt = NULL, *skip_info = NULL; */
 /*     if ( hand->tgts_is_vcf ) */
 /*         hand->columns = columns_complement(hand->columns, &skip_info, &skip_fmt); */
-
 /*     kstring_t str = {0,0,0}, tmp = {0,0,0}; */
 /*     char *ss = hand->columns, *se = ss; */
 /*     hand->ncols = 0; */
@@ -1670,16 +1669,13 @@ int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *
 /*             } */
 /*             break; */
 /*         } */
-
 /*         if ( i<hand->nalines ) */
 /*         { */
 /*             // there is a matching line */
 /*             for (j=0; j<hand->ncols; j++) */
 /*                 if ( hand->cols[j].setter(hand,line,&hand->cols[j],&hand->alines[i]) ) */
 /*                     error("fixme: Could not set %s at %s:%d\n", hand->cols[j].hdr_key,bcf_seqname(hand->hdr,line),line->pos+1); */
-
 /*         } */
-
 /*         if ( hand->mark_sites ) */
 /*         { */
 /*             // ideally, we'd like to be far more general than this in future, see https://github.com/samtools/bcftools/issues/87 */
