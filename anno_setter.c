@@ -3,12 +3,12 @@
 #include "plugin.h"
 
 
-void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_out)
+anno_col_t * init_columns(char *rules, bcf_hdr_t *header_out, int *ncols, int type)
 {
-    if ( rules==NULL) return;
-    acols->columns = strdup(rules);
+    assert(rules != NULL);
     char *ss = rules, *se = ss;
-    cols->n = 0;
+    *ncols = 0;
+    anno_col_t *cols = NULL;
     int i = -1;
     while (*ss)
     {
@@ -34,9 +34,9 @@ void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_
                   !strcasecmp("FILTER", str.s) || !strcasecmp("QUAL", str.s)
             ); // skip, for consistent with vcfannotate.c only
         else if ( !strcasecmp("ID", str.s) ) {
-	    acols->ncols++;
-            acols->cols = (struct annot_col*) realloc(acols->cols, sizeof(struct annot_col*)*acols->ncols);
-            struct annot_col *col = &acols->cols[acols->ncols-1];
+	    *ncols++;
+            cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)* (*ncols));
+            struct annot_col *col = &cols[*ncols-1];
             col->icol = i;
             col->replace = replace;
             col->setter = acols->type == anno_file_is_vcf ? vcf_setter_id : anno_setter_id;
@@ -54,9 +54,9 @@ void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_
             bcf_hdr_append(header_out, tmp.s);
             bcf_hdr_sync(header_out);
             int hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, key);
-            acols->ncols++;
-	    acols->cols = (struct annot_col*) realloc(acols->cols, sizeof(struct annot_col)*acols->ncols);
-            struct annot_col *col = &acols->cols[acols->ncols-1];
+            *ncols++;
+	    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(*ncols));
+            struct annot_col *col = &cols[*ncols-1];
             col->icol = -1;
             col->replace = replace;
             col->hdr_key = strdup(key);
@@ -66,11 +66,11 @@ void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_
                 case BCF_HT_STR:  col->setter = acols->type == anno_file_is_vcf ? vcf_setter_format_str ? anno_setter_format_str; break;
                 default : error("The type of %s not recognised (%d)\n", str.s, bcf_hdr_id2type(args->hdr_out, BCF_HL_FMT, hdr_id));
             }
-        }
-        else
-        {
-            if ( !strncasecmp("INFO/", str.s, 5) ) { memmove(str.s, str.s+5, str.l-4); }
-            int hdr_id = bcf_hdr_id2int(args->hdr_out, BCF_DT_ID, str.s);
+	    } else if (!strncasecmp("INFO/HGVS", str.s, 9) || !strncasecmp("HGVS", str.s, 4)){
+		
+	    } else {
+		if ( !strncasecmp("INFO/", str.s, 5) ) { memmove(str.s, str.s+5, str.l-4); }
+		int hdr_id = bcf_hdr_id2int(args->hdr_out, BCF_DT_ID, str.s);
             if ( !bcf_hdr_idinfo_exists(args->hdr_out, BCF_HL_INFO, hdr_id) )
             {
                 bcf_hrec_t *hrec = bcf_hdr_get_hrec(acols.header, BCF_HL_INFO, "ID", str.s, NULL);
@@ -83,9 +83,9 @@ void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_
                 assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
             }
 
-            acols->ncols++;
-            acols->cols = (struct annot_col*) realloc(acols->cols, sizeof(struct annot_col)*acols->ncols);
-            struct annot_col *col = &acols->cols[acols->ncols-1];
+            *ncols++;
+            cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(*ncols));
+            struct annot_col *col = &cols[*ncols-1];
             col->icol = i;
             col->replace = replace;
             col->hdr_key = strdup(str.s);
@@ -104,6 +104,7 @@ void init_columns(struct annot_cols_pack *acols, char *rules, bcf_hdr_t *header_
     }
     free(str.s);
     free(tmp.s);
+    return cols;
 }
 
 

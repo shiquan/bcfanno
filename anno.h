@@ -120,7 +120,7 @@ struct annot_cols_pack
 {
     annot_col_t *cols;
     int ncols;
-    int type;
+    int type; // ?
     char *columns;
 };
 
@@ -166,52 +166,7 @@ struct region {
     uint32_t stop;
 };
 
-#define clear_all(x) (x ＝ 0)
-#define clear_flag(x, n) (x &= ~(n))
-
-#define REFGENE_PRASE_BIN    1
-#define REFGENE_PRASE_NAME1  2
-#define REFGENE_PRASE_REG    4
-#define REFGENE_PRASE_STRAND 8
-#define REFGENE_PRASE_EXONS  (1<<4 | 8)
-#define REFGENE_PRASE_ALL (REFGENE_PRASE_BIN | REFGENE_PRASE_NAME1 | REFGENE_PRASE_REG| REFGENE_PRASE_EXONS)
-
-struct refgene_entry {
-    char *buffers;
-    int n_buffer;
-    int m_buffer;
-    int prase_flag;
-    
-    int bin; // see USCS bin scheme for details, be used to check regions
-    
-    const char *name1; // rna name usually
-    const char *name2; // gene name
-
-    int rid; // chromosome id, should be one of contigs in the VCF header, -1
-    
-    int strand; // strand_plus, strand_minus, strand_unknown
-    uint32_t exon_begin; // exon region begin from xxx
-    uint32_t exon_end; // exon end to xxx, remember exon contains cds and utr
-    uint32_t cds_start; // cds region start position, 5'UTR is exon_begin to cds_start-1.
-    uint32_t cds_stop; // 3'UTR is cds_end+1 to exon_end in plus strand
-    int total_exons; // exon number
-    struct region *exons;
-    struct region *cds;
-};
-
-struct anno_hgvs_option {
-    struct refgene_file refgene;
-    struct refrna_file refrna;
-    struct annot_col *cols;
-    int ncols;    
-};
-
-extern void extract_refgene(struct refgene_entry *entry, int type);
-extern int local_setter_hgvs_func(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-
-extern void init_columns(anno_cols_t *cols, char *string, bcf_hdr_t *header);
-
+extern void init_columns(anno_col_t *cols, char *string, bcf_hdr_t *header);
 
 struct sql_connect
 {
@@ -251,6 +206,7 @@ struct anno_handler
     bcf_hdr_t *hdr, *hdr_out;
     htsFile *out_fn;
     int output_type, n_threads;
+    struct anno_hgvs_option *hgvs_opts;
     bcf_srs_t *files;
     struct annot_cols_pack *cols;
     struct sql_connect *connects;
