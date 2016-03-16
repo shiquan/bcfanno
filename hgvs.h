@@ -79,11 +79,13 @@ struct refgene_entry {
     struct region *cds;
 };
 
+#define NAME_HASH_TRANS 0
+#define NAME_HASH_GENES 1
+
 struct anno_hgvs_option {
     struct refgene_file refgene;
     struct refrna_file refrna;
-    void *name_hash1; // transcript hash
-    void *name_hash2; // gene hash
+    void *hash[2];
     struct annot_col *cols;
     int ncols;
     struct refgene_entry *buffers;
@@ -93,7 +95,7 @@ struct anno_hgvs_option {
 /* retrieve data from local tabix indexed refgene database, see manual for more details
    about databases */
 extern void extract_refgene(struct refgene_entry *entry, int type);
-extern int local_setter_hgvs_func(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
+extern int local_setter_hgvs_gene(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 
 extern void refgene_fill_buffers_from_local(struct anno_hgvs_option *hgvs_opts, int prase_flag);
