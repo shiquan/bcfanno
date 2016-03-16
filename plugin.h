@@ -49,8 +49,9 @@ typedef annot_line annot_line_t;
  *   void destroy(void)
  *      - called after all lines have been processed to clean up 
  */
-
+// add tag information line to the out header structure
 typedef int (*dl_init_func)(int, char**, bcf_hdr_t *, bcf_hdr_t *); 
+
 typedef char * (*dl_about_func)(void);
 typedef int (*dl_test_func)(void);
 typedef annot_line_t * (*dl_process_func)(annot_line_t *anno);

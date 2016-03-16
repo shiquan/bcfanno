@@ -17,8 +17,10 @@
 #include <htslib/tbx.h>
 #include <htslib/faidx.h>
 #include "plugin.h"
+#include "config.h"
 
 #define ANNOTCOLS_PACK_INIT { NULL, 0, 0, NULL }
+#define KSTRING_INIT { 0, 0, 0 }
 
 /* annot line also defined in plugin.h for compile dynamic library */
 #ifndef ANNOT_LINE_FLAG
@@ -36,22 +38,19 @@ typedef annot_line annot_line_t;
 
 #endif
 
-
 /* memory handle macros */
-
 #define LINE_CACHE 1024
-
 #define check_double_free(p) do						\
     {                                                                   \
         void **_pp = (void**)&(p);                                      \
-        if (_pp==NULL || *_pp == NULL) { \
+        if (_pp==NULL || *_pp == NULL) {				\
 	    fprintf(stderr,"[error] double free %s, %d", __FUNCTION__, __LINE__); \
 	    exit(EXIT_FAILURE);						\
 	}								\
     } while(0)
 
-#define ignore_free(p) do \
-    {\
+#define ignore_free(p) do						\
+    {									\
 	void **_pp = (void**)&(p);					\
 	if (*_pp!=NULL && _pp != NULL) {				\
 	    free(*_pp);							\
@@ -59,9 +58,9 @@ typedef annot_line annot_line_t;
 	}								\
     } while(0)
 
-#define safe_free(p) do \
-    {\
-	void **_pp = (void**)&(p);	 \
+#define safe_free(p) do				\
+    {						\
+	void **_pp = (void**)&(p);					\
         if (_pp==NULL || *_pp == NULL) {				\
 	    fprintf(stderr,"[error] double free %s, %d", __FUNCTION__, __LINE__); \
 	    exit(EXIT_FAILURE);						\
@@ -70,13 +69,13 @@ typedef annot_line annot_line_t;
         *_pp = NULL;                                                    \
     } while(0)
 
-#define check_mem(p) do \
-    {\
-	void **_pp = (void**)&p; \
-	if (_pp == NULL || *_pp == NULL) {\
+#define check_mem(p) do				\
+    {						\
+	void **_pp = (void**)&p;		\
+	if (_pp == NULL || *_pp == NULL) {				\
 	    fprintf(stderr, "[memory out] func: %s, line: %d\n", __FUNCTION__, __LINE__);\
 	    exit(EXIT_FAILURE);						\
-	}\
+	}								\
     }while(0)
 
 typedef void (* rel_func)(void*);
@@ -120,7 +119,7 @@ struct annot_cols_pack
 {
     annot_col_t *cols;
     int ncols;
-    int type; // ?
+    enum anno_type type; 
     char *columns;
 };
 
@@ -199,6 +198,13 @@ struct sql_connect
 /*     int nreaders; */
 /* }; */
 /* anno_handler is adapt form args_t struct in vcfannotation.c */
+struct filter_pack
+{
+    filter_t *filter;
+    char * string;
+    anno_col_t *cols;
+    int ncols;
+};
 struct anno_handler
 {
     int vcf_anno_count;
@@ -212,10 +218,8 @@ struct anno_handler
     struct sql_connect *connects;
 
     /* filter tag, usually in FORMAT field */
-    filter_t *filter;
-    char *filter_str;
-    int filter_logic;
-
+    struct filter_pack *filter;
+    
     vcmp_t *vcmp;  // for matching annotation and VCF lines by allele
     //annot_line_t *alines; // buffered annotation lines
     //int nalines, malines;

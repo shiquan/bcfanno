@@ -9,7 +9,7 @@
 
 #define ANNOCONFIG_INIT { NULL, NULL, NULL, 0, 0, NULL }
 
-enum api_type { api_is_vcf, api_is_sql, api_is_unknown };
+enum anno_type { anno_is_vcf, anno_is_sql, anno_is_unknown };
 
 //enum api_error_num { api_is_unreach, api_fail_open, api_fail_index };
 
