@@ -44,7 +44,9 @@ void init_data(const char *json, const char *fname)
 void init_buffers(int start, int end_pos)
 {
 }
-
+void check_environ_paras()
+{
+}
 #define VARSTAT(x) do \
     {				\
 	sites_stat.all_sites++; \
