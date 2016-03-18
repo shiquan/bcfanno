@@ -601,7 +601,49 @@ int vcf_setter_info_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *c
     bcf_update_info_float(hand->hdr_out,line,col->hdr_key,hand->tmpf,ntmpf);
     return 0;
 }
-int copy_string_field(char *src, int isrc, int src_len, kstring_t *dst, int idst); // see vcfmerge.c
+
+int copy_string_field(char *src, int isrc, int src_len, kstring_t *dst, int idst)
+{
+    int ith_src = 0, start_src = 0;    // i-th field in src string
+    while ( ith_src<isrc && start_src<src_len )
+    {
+        if ( src[start_src]==',' ) { ith_src++; }
+        start_src++;
+    }
+    if ( ith_src!=isrc ) return -1; // requested field not found
+    int end_src = start_src;
+    while ( end_src<src_len && src[end_src] && src[end_src]!=',' ) end_src++;
+
+    int nsrc_cpy = end_src - start_src;
+    if ( nsrc_cpy==1 && src[start_src]=='.' ) return 0;   // don't write missing values, dst is already initialized
+
+    int ith_dst = 0, start_dst = 0;
+    while ( ith_dst<idst && start_dst<dst->l )
+    {
+        if ( dst->s[start_dst]==',' ) { ith_dst++; }
+        start_dst++;
+    }
+    if ( ith_dst!=idst ) return -2;
+    int end_dst = start_dst;
+    while ( end_dst<dst->l && dst->s[end_dst]!=',' ) end_dst++;
+
+    if ( end_dst - start_dst>1 || dst->s[start_dst]!='.' ) return 0;   // do not overwrite non-empty values
+
+    // Now start_dst and end_dst are indexes to the destination memory area
+    // which needs to be replaced with nsrc_cpy
+    // source bytes, end_dst points just after.
+    int ndst_shift = nsrc_cpy - (end_dst - start_dst);
+    int ndst_move  = dst->l - end_dst + 1;  // how many bytes must be moved (including \0)
+    if ( ndst_shift )
+    {
+        ks_resize(dst, dst->l + ndst_shift + 1);    // plus \0
+        memmove(dst->s+end_dst+ndst_shift, dst->s+end_dst, ndst_move);
+    }
+    memcpy(dst->s+start_dst, src+start_src, nsrc_cpy);
+    dst->l += ndst_shift;
+    return 0;
+}
+
 int setter_ARinfo_string(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, int nals, char **als)
 {
     int nsrc = 1, lsrc = 0;
