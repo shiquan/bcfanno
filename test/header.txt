@@ -1,0 +1,1 @@
+##INFO=<ID=RS,Number=A,Type=String,Description="snp id">
