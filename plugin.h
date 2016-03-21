@@ -49,7 +49,11 @@ typedef annot_line annot_line_t;
  *   void destroy(void)
  *      - called after all lines have been processed to clean up 
  */
-// add tag information line to the out header structure
+
+/* Add tag information line to the out header structure
+ *   An const array contained header information should be created in the dynamic library before init.
+ *   Program will go crash if header INFO is inconsistency with info structure.
+ */ 
 typedef int (*dl_init_func)(int, char**, bcf_hdr_t *, bcf_hdr_t *); 
 
 typedef char * (*dl_about_func)(void);
