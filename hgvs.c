@@ -1,8 +1,18 @@
 #include "hgvs.h"
 #include <htslib/faidx.h>
 
-struct refgene * retrieve_refgene_from_local(const char *fname, int retrieve_rule)
+/*
+  input: 
+    start: begin position
+    end:  end position
+    
+  return
+    *buffers: the refgene entries buffer
+    *nbuffers: the entry number
+ */
+struct refgene_entry * retrieve_refgene_from_local(const char *fname, int retrieve_rule, int start, int end, int *nbuffer)
 {
+
 }
 
 void release_refgene_list(struct refgene *root)
