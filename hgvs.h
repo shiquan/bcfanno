@@ -7,6 +7,12 @@
 #include "anno.h"
 #include <htslib/khash.h>
 
+/* split site definition , this definition can be changed by splitsite:(2,2,2,2) in the configure file */ 
+#define SPLITSITE_5_UTR_LEFT  3
+#define SPLITSITE_5_UTR_RIGHT 8
+#define SPLITSITE_3_UTR_LEFT  12
+#define SPLITSITE_3_UTR_RIGHT 2
+
 enum variant_type {
     is_ref,
     is_del,
