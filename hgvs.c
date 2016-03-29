@@ -1,6 +1,11 @@
 #include "hgvs.h"
 #include <htslib/faidx.h>
 
+struct refgene_entry *refgene_entry_praser (struct refgene_entry *entry, char *string, int rule)
+{
+    
+}
+
 /*
   input: 
     start: begin position
