@@ -100,6 +100,8 @@ struct anno_hgvs_option {
 
 /* retrieve data from local tabix indexed refgene database, see manual for more details
    about databases */
+extern struct refgene_entry * retrieve_refgene_from_local(const char *fname, int rule, int tid, int start, int end, int *nbuffer);
+
 extern void extract_refgene(struct refgene_entry *entry, int type);
 extern int local_setter_hgvs_gene(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
