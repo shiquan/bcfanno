@@ -1,9 +1,17 @@
 #include "hgvs.h"
 #include <htslib/faidx.h>
 
-struct refgene_entry *refgene_entry_praser (struct refgene_entry *entry, char *string, int rule)
+void extract_refgene(struct refgene_entry *entry, int type)
 {
     
+}
+
+struct refgene_entry *refgene_entry_praser (struct refgene_entry *entry, char *string, int rule)
+{
+    assert(entry->buffer == NULL);
+    entry->buffer = string;
+    extract_refgene(entry, rule);
+    return entry;
 }
 
 /*
