@@ -1,5 +1,6 @@
 #include "hgvs.h"
 #include <htslib/faidx.h>
+#include <htslib/tbx.h>
 
 void extract_refgene(struct refgene_entry *entry, int type)
 {
