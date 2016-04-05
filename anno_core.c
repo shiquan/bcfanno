@@ -1,6 +1,7 @@
 #include "anno.h"
 #include "plugin.h"
 
+/* stat variants positions */
 struct {
     uint64_t all_sites;
     uint64_t refs;

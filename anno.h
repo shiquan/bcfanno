@@ -269,6 +269,7 @@ extern int vcf_setter_format_int(struct anno_handler *hand, bcf1_t *line, annot_
 extern int vcf_setter_format_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 extern int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 
+/**/
 extern void handler_release(void *hand);
 extern void rebuild_anno_lines(struct anno_handler *hand);
 
