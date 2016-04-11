@@ -91,17 +91,25 @@ struct refgene_mempools {
     int lastend;
 };
 
+struct hgvs1 {
+	enum variant_type type;
+	char *name;
+	char *alt1;
+	int cds_pos;	
+	int offset;
+	int exon_id;
+	int cds_id;
+};
+
 struct hgvs {
     int tid;
     int start;
     int end;
+    int lref, lalt;
     char *ref;
     char *alt;
-    char *alt1;
-    int cds_pos;
-    int offset;
-    int exon_id;
-    int cds_id;
+    int ltrans;
+    struct hgvs1 *trans;
 };
 
 #endif
