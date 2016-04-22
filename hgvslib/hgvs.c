@@ -21,3 +21,7 @@ struct hgvs *pos_anno_hgvs(bcf1_t *line)
     
 }
 
+void fill_pool (int tid, int start, int end)
+{
+    
+}
