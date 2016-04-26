@@ -92,13 +92,13 @@ struct refgene_mempools {
 };
 
 struct hgvs1 {
-	enum variant_type type;
-	char *name;
-	char *alt1;
-	int cds_pos;	
-	int offset;
-	int exon_id;
-	int cds_id;
+    enum variant_type type;
+    char *name;
+    char *alt1;
+    int cds_pos;	
+    int offset;
+    int exon_id;
+    int cds_id;
 };
 
 struct hgvs {
