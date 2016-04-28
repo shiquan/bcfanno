@@ -9,6 +9,9 @@
 #ifndef HGVS_HEADER
 #define HGVS_HEADER
 
+#define UTR3_REG  10
+#define UTR5_REG  10
+
 /* refgene format praser */
 #define REFGENE_PRASE_BIN    1
 #define REFGENE_PRASE_NAME1  2
@@ -26,19 +29,31 @@ enum strand {
 enum cdsStat {
     CDSSTAT_NONE,
     CDSSTAT_UNKN,
-    CDSSTAT_INCOMPL,
+    CDSSTAT_INCMPL,
     CDSSTAT_CMPL
 };
 
 enum sequenceType {
-    TYPE_UNKN, TYPE_CODING, TYPE_NONCODING,
-    TYPE_GENOMIC, TYPE_MITOCHONDRIAL, TYPE_RNA,
-    TYPE_PROTEIN
+    TYPE_UNKN,
+    TYPE_CODING,
+    TYPE_NONCODING,
+    TYPE_GENOMIC,
+    TYPE_MITOCHONDRIAL,
+    TYPE_RNA,
+    TYPE_PROTEIN,
 };
 
 enum variant_type {
-    VARTYPE_REF, VARTYPE_SUBSITITUTION, VARTYPE_CONVERSION, VARTYPE_DELETION, VARTYPE_INDEL, VARTYPE_INSERTION,
-    VARTYPE_INVERSION, VARTYPE_DUPLICATION, VARTYPE_TRANSLOCATION, VARTYPE_TRANSPOSITION,
+    VARTYPE_REF,
+    VARTYPE_SUBSITITUTION,
+    VARTYPE_CONVERSION,
+    VARTYPE_DELETION,
+    VARTYPE_INDEL,
+    VARTYPE_INSERTION,
+    VARTYPE_INVERSION,
+    VARTYPE_DUPLICATION,
+    VARTYPE_TRANSLOCATION,
+    VARTYPE_TRANSPOSITION,
     VARTYPE_UNKN,
 };
 
@@ -62,9 +77,9 @@ enum variant_type {
  */
 
 struct refgene_entry {
-    int extract_flag; // bitwise flag of refgene prase
+    int flag; // bitwise flag of refgene prase
     int bin;
-    char *name;
+    char *name1;
     int tid; //    char *chr;
     enum strand strand; // GENOME_STRAND
     int txStart;
@@ -79,14 +94,20 @@ struct refgene_entry {
     enum cdsStat cdsStartStat;
     enum cdsStat cdsEndStat;
     int *exonFrames;
+    int nfields;
+    int *splits;
+    kstring_t buffer;
 };
 
 struct refgene_mempools {
+    htsFile *fp;
+    const char *fn;
+    tbx_t *idx;
+    int tid;
     int n, m;
-    struct refgene_entry *entrys;
+    struct refgene_entry *entries;
     int begin;
     int end;
-    int tid;
     int lastbegin;
     int lastend;
 };
@@ -111,5 +132,8 @@ struct hgvs {
     int ltrans;
     struct hgvs1 *trans;
 };
+
+extern void fill_mempool(int tid, int start, int end, int flag);
+extern void release_refgene_mempool();
 
 #endif
