@@ -14,7 +14,7 @@
 
 /* refgene format praser */
 #define REFGENE_PRASE_BIN    1
-#define REFGENE_PRASE_NAME1  2
+#define REFGENE_PRASE_NAME1  (1<<1)
 #define REFGENE_PRASE_REG    (1<<2)
 #define REFGENE_PRASE_EXONS  (1<<3 | 1<<2)
 #define REFGENE_PRASE_NAME2  (1<<4 | 1<<1)
@@ -77,6 +77,7 @@ enum variant_type {
  */
 
 struct refgene_entry {
+    int empty;
     int flag; // bitwise flag of refgene prase
     int bin;
     char *name1;
@@ -99,19 +100,6 @@ struct refgene_entry {
     kstring_t buffer;
 };
 
-struct refgene_mempools {
-    htsFile *fp;
-    const char *fn;
-    tbx_t *idx;
-    int tid;
-    int n, m;
-    struct refgene_entry *entries;
-    int begin;
-    int end;
-    int lastbegin;
-    int lastend;
-};
-
 struct hgvs1 {
     enum variant_type type;
     char *name;
@@ -122,7 +110,7 @@ struct hgvs1 {
     int cds_id;
 };
 
-struct hgvs {
+struct hgvs_record {
     int tid;
     int start;
     int end;
