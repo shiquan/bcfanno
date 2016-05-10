@@ -201,7 +201,7 @@ struct sql_connect
 struct filter_pack
 {
     filter_t *filter;
-    char * string;
+    char *string;
     anno_col_t *cols;
     int ncols;
 };
