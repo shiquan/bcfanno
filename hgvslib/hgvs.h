@@ -33,7 +33,7 @@ enum cdsStat {
     CDSSTAT_CMPL
 };
 
-enum sequenceType {
+enum seqType {
     TYPE_UNKN,
     TYPE_CODING,
     TYPE_NONCODING,
@@ -43,7 +43,32 @@ enum sequenceType {
     TYPE_PROTEIN,
 };
 
-enum variant_type {
+enum funcType {
+    FUNC_UNKNOWN,
+    FUNC_INTERGENIC, // intergenic region 
+    FUNC_REGULATORY, // regulator, enhancer, sliencer
+    FUNC_UPSTREAM, // promoter
+    FUNC_5UTR,
+    FUNC_NR,
+    FUNC_CDS,
+    FUNC_MISSENSE,
+    FUNC_NONSENSE,
+    FUNC_SPLITSITE,
+    FUNC_SPLITSITE3,
+    FUNC_SPLITSITE5,
+    FUNC_INTRON,
+    FUNC_SPAN,
+    FUNC_INITLOSS,
+    FUNC_NONCHANGE,
+    FUNC_STOPRETAIN,
+    FUNC_STOP,
+    FUNC_STOPLOSS,
+    FUNC_STOPGAIN,
+    FUNC_3UTR,
+    FUNC_DOWNSTREAM,
+};
+
+enum varType {
     VARTYPE_REF,
     VARTYPE_SUBSITITUTION,
     VARTYPE_CONVERSION,
@@ -55,6 +80,11 @@ enum variant_type {
     VARTYPE_TRANSLOCATION,
     VARTYPE_TRANSPOSITION,
     VARTYPE_UNKN,
+};
+
+enum fsType {
+    IS_FRAMESHIFT,
+    NOT_FRAMESHIFT,
 };
 
 /* UCSC refgene format :
@@ -100,24 +130,32 @@ struct refgene_entry {
     kstring_t buffer;
 };
 
+struct varCompact {
+    enum varType var;
+    enum fsType fs;
+};
+    
+struct hgvs_ale {
+    enum varCompact type;
+    char *cols;
+    int fs; // -1 for non-fs
+};
+
 struct hgvs1 {
-    enum variant_type type;
-    char *name;
-    char *alt1;
-    int cds_pos;	
-    int offset;
-    int exon_id;
-    int cds_id;
+    int empty; // skip if empty == 1
+    char *trans;
+    enum seqType type;
+    enum funcType func;
+    int n_allele;
+    struct hgvs_ale *als;
+    int cpos;	
+    int offset; // 0 for cds region
+    int exId;
+    int cdsId;
 };
 
 struct hgvs_record {
-    int tid;
-    int start;
-    int end;
-    int lref, lalt;
-    char *ref;
-    char *alt;
-    int ltrans;
+    int ntrans, mtrans;
     struct hgvs1 *trans;
 };
 

@@ -408,7 +408,6 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 	    int j;
 	    int pos = 0;
 	    int offset = 0; 
-	    int cc = -1; // cds count, for noncoding RNA cc == -1
 	    // check if var in utr
 	    if (line->pos <= entr->txStart+UTR3_REG) {
 		// promoter or split site region	
@@ -447,8 +446,59 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 				else htr->func = FUNC_INTRON;
 			    }
 			}
+		    } // exon loop
+		    htr->exId = j;
+		    htr->cdsId = -1;
+		    if (j == entr->exonCount && line->pos > entr->exonEnds[j-1]) {
+			offset = line->pos - entr->exonEnds[j-1];
+			htr->func = FUNC_DOWNSTREAM;
 		    }
+			
 		} else {
+		    htr->type = TYPE_CODING;
+		    int cc = 0;
+		    int n=0;
+		    /* if (line->pos < entr->cdsStart) { */
+		    /* 	htr->func = FUNC_UPSTREAM; */
+		    /* 	if (line->pos >= entr->txStart) { */
+		    /* 	    htr->func = FUNC_5UTR; */
+		    /* 	    for (j=0; j<entr->exonCount; ++j) */
+		    /* 		if (line->pos */
+		    /* 	} */
+		    /* 	if (line->pos >= entr->cdsStart - UTR5_REG) { */
+		    /* 	    htr->func = FUNC_SPLITSITE5; */
+		    /* 	} */
+		    /* 	pos = 0; */
+		    /* 	offset = line->pos - entr->cdsStart; */
+		    /* 	htr->cdsId = 0; // cdsId == 0 stand for UTR5 or Intergenic */
+		    /* }  */
+
+		    /*
+		           *         *    *       *           *
+		                       =======  ============
+		      -----------   ----------  ------------
+		     */
+		    for (j=0; j<entr->exonCount; ++j) {
+			if (line->pos >= entr->exonStarts[j] && line->pos <= entr->exonEnds[j]) {
+			    htr->exId = j;
+			    
+			    
+			    
+			}
+			if (entr->exonEnds[j] > entr->cdsStart) {
+			    // cds region come here
+			    cc++;
+			    if (entr->exonStarts[j] <= entr->cdsStart) {
+				pos += exonEnds[j] - entr->cdsStart + 1;
+			    } else {
+				pos += exonEnds[j] - entr->exonStarts[j] + 1;
+			    }
+			    
+			} else {
+			    continue;
+			}
+		    }
+		    
 		}
 	    }
 	    // function predition
