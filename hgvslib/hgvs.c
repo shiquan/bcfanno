@@ -388,19 +388,77 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
     for (i=0; i<pool.n; ++i) {
 	if (pool.entries[i].empty == 1)
 	    continue;
-	int start = pool.entries[i].txStart;
-	int stop = pool.entries[i].txEnd;
+	struct refgene_entry *entr = &pool.entries[i];
+	int start = entr->txStart;
+	int stop = entr->txEnd;
 	if (line->pos >= start && line->pos <= stop) {
 	    if (rec->ntrans == rec->mtrans) {
 		rec->mtrans = rec->mtrans == 0 ? 2 : rec->mtrans + 2;
 		rec->trans = (struct hgvs1*)realloc(rec->trans, rec->mtrans*sizeof(struct hgvs1));
 	    }
-	    struct hgvs1 * entr = rec->trans[rec->ntrans++];
-	    entr->empty = 1;
-	    entr->n_allele = line->n_allele;
+	    struct hgvs1 * htr = rec->trans[rec->ntrans++];
+	    htr->empty = 1;
+	    htrr->n_allele = line->n_allele;
 	    // trans convertor name come here
-	    entr->als = (struct hgvs_ale*)malloc(entr->n_allele*sizeof(struct hgvs_ale));
+	    // check coding or noncoding transcript
+	    assert(htr->name1);
+	    if (entr->name1[1] == 'M') htr->type = TYPE_CODING;
+	    else htr->type = TYPE_NONCODING;
+	    // calculate position
+	    int j;
+	    int pos = 0;
+	    int offset = 0; 
+	    int cc = -1; // cds count, for noncoding RNA cc == -1
+	    // check if var in utr
+	    if (line->pos <= entr->txStart+UTR3_REG) {
+		// promoter or split site region	
+	    } else if (line->pos >= entr->txEnd - UTR5_REG) {
+		// downstream or split site region
+	    } else {
+/* 
+   UTR_REG5    .  UTR_REG3   CODING     UTR_REG5.UTR_REG3
+   ============ATG=================================
+*/
+		
+		// tx region
+		if (entr->type != TYPE_CODING) {
+		    // just count tx position
+		    htr->type = TYPE_NONCODING;
+		    for (j=0; j<entr->exonCount; ++j) {
+			if (line->pos > entr->exonEnds[j]) {
+			    pos += entr->exonEnds[j] - entr->exonStarts[j] + 1;
+			} else {
+			    if (pos > entr->exonStarts[j]) {
+				int l = line->pos - entr->exonStarts[j] + 1;
+				pos += l;
+				if (l <= UTR3_REG) {
+				    htr->func = FUNC_SPLITSITE5; 
+				} else {
+				    htr->func = FUNC_UNKNOWN;
+				}
+			    } else if (pos == entr->exonStarts[j]) {
+				pos +=1;
+				htr->func = FUNC_SPLITSITE;
+			    } else {
+				//pos < entr->exonStarts[j]
+				// TODO: check downstream or upstream in a intron
+				offset = line->pos - entr->exonStarts[j];
+				if (j==0) htr->func = FUNC_UPSTREAM;
+				else htr->func = FUNC_INTRON;
+			    }
+			}
+		    }
+		} else {
+		}
+	    }
+	    // function predition
 	    
+	    // generate name for each allele
+	    entr->als = (struct hgvs_ale*)malloc(entr->n_allele*sizeof(struct hgvs_ale));
+
+	    for (j=1; j< entr->n_allele; ++j) {
+		
+	    }
 	    
 	    
 	}
