@@ -12,6 +12,8 @@
 // keep gene list and transcript list into two hash structures 
 KHASH_MAP_INIT_STR(list, char*)
 
+
+// files open and keep in mempool
 struct refgene_mempools {
     htsFile *fp;
     const char *fn;
@@ -380,17 +382,23 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
     rec->ntrans = rec->mtrans = 0;
     
     int x = bcf_get_variant_type(line);
+
+    // skip ref record in the first place, it is rudentency, remove this part later
     if (x == VCF_REF|| line->n_allele < 2) {
 	free(rec);
 	return NULL;
     }
-    
+
+    // loop the mempool
     for (i=0; i<pool.n; ++i) {
+
 	if (pool.entries[i].empty == 1)
 	    continue;
+
 	struct refgene_entry *entr = &pool.entries[i];
 	int start = entr->txStart;
 	int stop = entr->txEnd;
+
 	if (line->pos >= start && line->pos <= stop) {
 	    if (rec->ntrans == rec->mtrans) {
 		rec->mtrans = rec->mtrans == 0 ? 2 : rec->mtrans + 2;
@@ -406,29 +414,28 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 	    else htr->type = TYPE_NONCODING;
 	    // calculate position
 	    int j;
-	    int pos = 0;
-	    int offset = 0; 
-	    // check if var in utr
-	    if (line->pos <= entr->txStart+UTR3_REG) {
-		// promoter or split site region	
-	    } else if (line->pos >= entr->txEnd - UTR5_REG) {
-		// downstream or split site region
-	    } else {
+	    int loc = 0; // locations in exon or cds
+	    int off = 0;  // offset in noncoding region
+
 /* 
    UTR_REG5    .  UTR_REG3   CODING     UTR_REG5.UTR_REG3
    ============ATG=================================
 */
 		
-		// tx region
-		if (entr->type != TYPE_CODING) {
-		    // just count tx position
-		    htr->type = TYPE_NONCODING;
-		    for (j=0; j<entr->exonCount; ++j) {
-			if (line->pos > entr->exonEnds[j]) {
-			    pos += entr->exonEnds[j] - entr->exonStarts[j] + 1;
-			} else {
-			    if (pos > entr->exonStarts[j]) {
-				int l = line->pos - entr->exonStarts[j] + 1;
+	    // tx region
+	    int pos = line->pos; // variant position
+
+	    if (pos < )
+	    if (entr->type != TYPE_CODING) {
+		// just count tx position
+		htr->type = TYPE_NONCODING;
+		if ()
+		for (j=0; j<entr->exonCount; ++j) {
+		    if (line->pos > entr->exonEnds[j]) {
+			pos += entr->exonEnds[j] - entr->exonStarts[j] + 1;
+		    } else {
+			if (pos > entr->exonStarts[j]) {
+			    int l = line->pos - entr->exonStarts[j] + 1;
 				pos += l;
 				if (l <= UTR3_REG) {
 				    htr->func = FUNC_SPLITSITE5; 
@@ -474,10 +481,17 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 		    /* }  */
 
 		    /*
-		           *         *    *       *           *
-		                       =======  ============
-		      -----------   ----------  ------------
+		        *       *         *    *       *           *
+		                            =======  ============
+		           -----------   ----------  ------------
 		     */
+
+
+		    if (line->pos < entr->txStart) {
+			if (line->pos >= entr->txStart + UTR5_REG) {
+			    htr->func = FUNC_SPLITSITE5;
+			    htr
+		    }
 		    for (j=0; j<entr->exonCount; ++j) {
 			if (line->pos >= entr->exonStarts[j] && line->pos <= entr->exonEnds[j]) {
 			    htr->exId = j;
