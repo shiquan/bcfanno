@@ -9,8 +9,13 @@
 #ifndef HGVS_HEADER
 #define HGVS_HEADER
 
-#define UTR3_REG  10
-#define UTR5_REG  10
+/*splicing consensus regions*/
+
+#define SPLIT5_UPSTREAM   3
+#define SPLIT5_DOWNSTREAM 8
+#define SPLIT3_UPSTREAM   12
+#define SPLIT3_DOWNSTREAM 2
+#define SPLITSITE_RANG 3
 
 /* refgene format praser */
 #define REFGENE_PRASE_BIN    1

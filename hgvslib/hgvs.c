@@ -9,7 +9,7 @@
 #include <htslib/kstring.h>
 #include "hgvs.h"
 
-// keep gene list and transcript list into two hash structures 
+// keep gene list and transcript list into two hash structures
 KHASH_MAP_INIT_STR(list, char*)
 
 
@@ -347,7 +347,7 @@ void fill_mempool(const bcf_hdr_t *h, int tid, int start, int end, int flag)
     update_mempool(h);
 
     if (pool.tid != -1 && pool.end != -1 &&
-	tid == pool.tid && start <= pool.end+UTR3_REG) {
+	tid == pool.tid && start <= pool.end+SPLITSITE_RANG) {
 	return;
     } else {
 	empty_mempool();
@@ -371,7 +371,7 @@ void fill_mempool(const bcf_hdr_t *h, int tid, int start, int end, int flag)
 
 struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 {
-    int i,n=0;
+    int n=0;
     int end = cal_end(line);
     int flag = REFGENE_PRASE_REG | REFGENE_PRASE_NAME1 | REFGENE_PRASE_NAME2;
     fill_mempool(h, line->rid, line->pos, end, flag);
@@ -406,7 +406,7 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 	    }
 	    struct hgvs1 * htr = rec->trans[rec->ntrans++];
 	    htr->empty = 1;
-	    htrr->n_allele = line->n_allele;
+	    htr->n_allele = line->n_allele;
 	    // trans convertor name come here
 	    // check coding or noncoding transcript
 	    assert(htr->name1);
@@ -424,97 +424,125 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 		
 	    // tx region
 	    int pos = line->pos; // variant position
-
-	    if (pos < )
 	    if (entr->type != TYPE_CODING) {
 		// just count tx position
 		htr->type = TYPE_NONCODING;
-		if ()
-		for (j=0; j<entr->exonCount; ++j) {
-		    if (line->pos > entr->exonEnds[j]) {
-			pos += entr->exonEnds[j] - entr->exonStarts[j] + 1;
+		int i;
+		int length = 0;
+		int offset = 0;
+		int last_end = 0;
+		for (i=0; i< entr->exonCount; ++i) {
+		    if (pos > entr->exonEnds[i]) {
+			length += entr->exonEnds[i] - entr->exonStarts[i] + 1;
+			last_end = htr->exonEnds[i];
+		    }
+		    if (pos >= entr->exonStarts[i]) {
+			length += pos - entr->exonStarts + 1;
+			htr->cpos = length;
+			htr->offset = 0;
+			htr->exId = i;
+			htr->func =
+			    pos - entr->exonStarts[i] < SPLITSITE_RANG || // 5' downstream splicing region
+			    entr->exonEnds[i] - pos > SPLITSITE_RANG ? // 3' upstream splicing region
+			    FUNC_SPLITSITE : FUNC_NR;			
+			break;
 		    } else {
-			if (pos > entr->exonStarts[j]) {
-			    int l = line->pos - entr->exonStarts[j] + 1;
-				pos += l;
-				if (l <= UTR3_REG) {
-				    htr->func = FUNC_SPLITSITE5; 
-				} else {
-				    htr->func = FUNC_UNKNOWN;
-				}
-			    } else if (pos == entr->exonStarts[j]) {
-				pos +=1;
-				htr->func = FUNC_SPLITSITE;
-			    } else {
-				//pos < entr->exonStarts[j]
-				// TODO: check downstream or upstream in a intron
-				offset = line->pos - entr->exonStarts[j];
-				if (j==0) htr->func = FUNC_UPSTREAM;
-				else htr->func = FUNC_INTRON;
-			    }
-			}
-		    } // exon loop
-		    htr->exId = j;
-		    htr->cdsId = -1;
-		    if (j == entr->exonCount && line->pos > entr->exonEnds[j-1]) {
-			offset = line->pos - entr->exonEnds[j-1];
-			htr->func = FUNC_DOWNSTREAM;
-		    }
-			
-		} else {
-		    htr->type = TYPE_CODING;
-		    int cc = 0;
-		    int n=0;
-		    /* if (line->pos < entr->cdsStart) { */
-		    /* 	htr->func = FUNC_UPSTREAM; */
-		    /* 	if (line->pos >= entr->txStart) { */
-		    /* 	    htr->func = FUNC_5UTR; */
-		    /* 	    for (j=0; j<entr->exonCount; ++j) */
-		    /* 		if (line->pos */
-		    /* 	} */
-		    /* 	if (line->pos >= entr->cdsStart - UTR5_REG) { */
-		    /* 	    htr->func = FUNC_SPLITSITE5; */
-		    /* 	} */
-		    /* 	pos = 0; */
-		    /* 	offset = line->pos - entr->cdsStart; */
-		    /* 	htr->cdsId = 0; // cdsId == 0 stand for UTR5 or Intergenic */
-		    /* }  */
-
-		    /*
-		        *       *         *    *       *           *
-		                            =======  ============
-		           -----------   ----------  ------------
-		     */
-
-
-		    if (line->pos < entr->txStart) {
-			if (line->pos >= entr->txStart + UTR5_REG) {
-			    htr->func = FUNC_SPLITSITE5;
-			    htr
-		    }
-		    for (j=0; j<entr->exonCount; ++j) {
-			if (line->pos >= entr->exonStarts[j] && line->pos <= entr->exonEnds[j]) {
-			    htr->exId = j;
-			    
-			    
-			    
-			}
-			if (entr->exonEnds[j] > entr->cdsStart) {
-			    // cds region come here
-			    cc++;
-			    if (entr->exonStarts[j] <= entr->cdsStart) {
-				pos += exonEnds[j] - entr->cdsStart + 1;
-			    } else {
-				pos += exonEnds[j] - entr->exonStarts[j] + 1;
-			    }
-			    
+			assert(last_end > 0);
+			assert(pos > last_end);
+			if (pos - last_end < (entr->exonStarts[i] -last_end)/2 ) {
+			    offset = pos -last_end;
+			    htr->exId = i-1;
+			    htr->func = pos - last_end < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_INTRON;
 			} else {
-			    continue;
+			    offset = pos - entr->exonStarts[i];
+			    htr->exId = i;
+			    htr->func = entr->exonStarts[i] - pos < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_INTRON;
+			}
+			htr->cpos = length;
+		    }
+		}
+	    } else {
+		// coding transcript
+		htr->type = TYPE_CODING;
+
+		int i;
+		int length = 0;
+		int offset = 0;
+		int last_end = 0;
+		int cds = 0;
+		for (i=0; i<entr->exonCount; ++i) {
+
+		    /*     exon                pos         exon
+		          ==================   0          ==========
+
+		     */
+		    if (pos > entr->exonEnds[i]) {
+			if (entr->cdsStart <= entr->exonEnds[i]) {
+			    cds++;
+			    length +=
+				entr->cdsStart > entr->exonStarts[i] ?
+				entr->exonEnds[i] - entr->cdsStart + 1 :
+				entr->exonEnds[i] - entr->exonStarts[i] + 1;
+			}
+			last_end = entr->exonEnds[i];
+		    } else {
+			/*  exon
+			  0 ======= 1 ========
+			 */
+			if (pos < entr->exonStarts[i]) {
+			    /*
+			      exon              exon
+			      ============    0 ==========
+			     */
+			    if (entr->cdsStart > entr->exonStarts[i]) {
+				/*
+				  exon
+				  =============  
+				        cds
+					-------
+				 */
+				if (pos - last_end > entr->exonStarts[i] - pos) {
+				    if (entr->exonStarts[i] -pos < SPLITSITE_RANG)
+					htr->func = FUNC_SPLITSITE;
+				    else
+					htr->func = FUNC_INTRON;
+				    cds++;
+				    htr->exId = i;				
+				    htr->cdsId = cds;
+				    offset = pos - entr->exonStarts[i];
+				} else {
+				    if (pos -last_end < SPLITSITE_RANG)
+					htr->func = FUNC_SPLITSITE;
+				    else
+					htr->func = FUNC_INTRON;
+				    htr->exId = i -1;
+				    htr->cdsId = cds;
+				    offset  = pos - last_end;
+				}
+			    }
+			    break;
+			} else {
+			    /*
+			      exon            exon
+			      =====0======    =====1====
+			              cds     cds
+				      ---     ----------
+			     */
+			    if (pos < htr->cdsStart) {
+				htr->exId = i;
+				offset = pos - htr->cdsStart;
+				htr->func = FUNC_5UTR;
+				break;
+			    }
+			    if (htr->cdsStart < exonEnds[i]) {
+				
+			    }
 			}
 		    }
-		    
 		}
 	    }
+		
+
 	    // function predition
 	    
 	    // generate name for each allele
@@ -529,7 +557,7 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
     }
 
 
-    
+    return rec;    
 }
 
 #ifdef HGVS_MAIN
