@@ -189,10 +189,27 @@ void refgene_entry_prase1(const bcf_hdr_t *h, struct refgene_entry *entry, int f
 	char *ss = entry->buffer.s + entry->splits[9];
 	char *se = entry->buffer.s + entry->splits[10];
 	char *sa = entry->buffer.s + entry->splits[15];
+
+	char *ss1, *se1, *sa1;	
 	for (i=0; i<entry->exonCount; ++i) {
-	    entry->exonStarts[i] = atoi(strchr(ss, ','));
-	    entry->exonEnds[i] = atoi(strchr(se,','));
-	    entry->exonFrames[i] = atoi(strchr(sa, ','));
+
+	    ss1 = ss;
+	    while (*ss1 != ',') ss1++;
+	    ss1[0] = '\0';
+	    entry->exonStarts[i] = atoi(ss);
+	    ss = ss1+1;
+
+	    se1 = se;	    
+	    while (*se1 != ',') se1++;
+	    se1[0] = '\0';
+	    entry->exonEnds[i] = atoi(se);
+	    se = se1+1;
+
+	    sa1 = sa;
+	    while (*sa1 != ',') sa1++;
+	    sa1[0] = '\0';
+	    entry->exonFrames[i] = atoi(sa);
+	    sa = sa1+1;
 	}
 	entry->flag |= REFGENE_PRASE_EXONS;
     }
@@ -369,7 +386,7 @@ struct hgvs_record *hgvs_generate(bcf_hdr_t *h, bcf1_t *line)
     }
     int n=0;
     int end = cal_end(line);
-    int flag = REFGENE_PRASE_REG | REFGENE_PRASE_NAME1 | REFGENE_PRASE_NAME2;
+    int flag = REFGENE_PRASE_REG | REFGENE_PRASE_NAME1 | REFGENE_PRASE_NAME2 | REFGENE_PRASE_EXONS;
     
     filter_mempool(h); // filter records if set transcript or gene list
     fill_mempool(h, line->rid, line->pos, end, flag);
@@ -477,67 +494,64 @@ struct hgvs_record *hgvs_generate(bcf_hdr_t *h, bcf1_t *line)
 			length += entr->cdsStart > entr->exonStarts[i] ? entr->exonEnds[i] - entr->cdsStart + 1 : entr->exonEnds[i] - entr->exonStarts[i] + 1;
 		    }
 		    last_end = entr->exonEnds[i];
+		    continue;
 		} // end pos > exonend
-		else {
-		    // pos <= entr->exonEnds[i]
-		    /*  exon
-			0 ======= 1 ========
-		    */
+		// pos <= entr->exonEnds[i]
+		/*  exon
+		    0 ======= 1 ========
+		*/
 		    
-		    if (pos < entr->exonStarts[i]) { /* intron region */
-			/*
-			  exon              exon
-			  ============    0 ==========
-			*/
-			if (pos - last_end > entr->exonStarts[i] - pos) {
-			    if (entr->exonStarts[i] -pos < SPLITSITE_RANG)
-				func = FUNC_SPLITSITE;
-			    else
-				func = FUNC_INTRON;
-			    if (pos > entr->cdsStart) {
-				cdsId++;
-				offset = pos - entr->exonStarts[i];
-			    } else {
-				offset =  pos - entr->cdsStart;
-			    }
-			    exId = i;				
-			} // next to this exon
-			else { // next to last exon
-			    if (pos -last_end < SPLITSITE_RANG)
-				func = FUNC_SPLITSITE;
-			    else
-				func = FUNC_INTRON;
-
-			    exId = i -1;
-			    offset  = pos > entr->cdsStart ? pos - last_end : pos - entr->cdsStart;
-			}
-			
-		    } /* exon region */
-		    else {
-			// pos >= entr->exonStarts[i]
-			/*
-			  exon            exon
-			  =====0======    =====1====
-			           cds     cds
-				   ---    ----------
-			*/
-			if (pos < entr->cdsStart) {
-			    exId = i;
-			    offset = pos - entr->cdsStart;
-			    func = FUNC_5UTR;
-			} else {
+		if (pos < entr->exonStarts[i]) { /* intron region */
+		    /*
+		      exon              exon
+		      ============    0 ==========
+		    */
+		    if (pos - last_end > entr->exonStarts[i] - pos) {
+			if (entr->exonStarts[i] -pos < SPLITSITE_RANG)
+			    func = FUNC_SPLITSITE;
+			else
+			    func = FUNC_INTRON;
+			if (pos > entr->cdsStart) {
 			    cdsId++;
-			    exId = i;
-			    offset = 0;
-			    length += entr->cdsStart > entr->exonStarts[i] ? pos - entr->cdsStart +1 : pos - entr->exonStarts[i] +1;
-				
-			    func = entr->exonEnds[i] - pos < SPLITSITE_RANG || pos - entr->exonStarts[i] < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_CDS;			    
+			    offset = pos - entr->exonStarts[i];
+			} else {
+			    offset =  pos - entr->cdsStart;
 			}
+			exId = i;				
+		    } // next to this exon
+		    else { // next to last exon
+			if (pos -last_end < SPLITSITE_RANG)
+			    func = FUNC_SPLITSITE;
+			else
+			    func = FUNC_INTRON;
+			
+			exId = i -1;
+			offset  = pos > entr->cdsStart ? pos - last_end : pos - entr->cdsStart;
 		    }
-		    break;
-		} // end if  entr->exonStarts[i] <= pos <= entr->exonEnds[i]
-
-	    } // end loop
+			
+		} /* exon region */
+		else {
+		    // pos >= entr->exonStarts[i]
+		    /*
+		      exon            exon
+		      =====0======    =====1====
+		               cds     cds
+			       ---    ----------
+		    */
+		    if (pos < entr->cdsStart) {
+			exId = i;
+			offset = pos - entr->cdsStart;
+			func = FUNC_5UTR;
+		    } else {
+			cdsId++;
+			exId = i;
+			offset = 0;
+			length += entr->cdsStart > entr->exonStarts[i] ? pos - entr->cdsStart +1 : pos - entr->exonStarts[i] +1;
+			func = entr->exonEnds[i]-pos < SPLITSITE_RANG || pos - entr->exonStarts[i] < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_CDS;
+		    }
+		}
+		break;
+	    } // end for
 	    htr->cpos = length;
 	    htr->offset = offset;
 	    htr->cdsId = cdsId;		
@@ -618,7 +632,7 @@ int main(int argc, char **argv)
     }
     pool.fn = argv[1];
 
-    int flag = REFGENE_PRASE_REG | REFGENE_PRASE_NAME1 | REFGENE_PRASE_NAME2;
+    int flag = REFGENE_PRASE_REG | REFGENE_PRASE_NAME1 | REFGENE_PRASE_NAME2 |REFGENE_PRASE_EXONS;
 
     while (bcf_sr_next_line(file)) {
 	bcf1_t *line = file->readers[0].buffer[0];
