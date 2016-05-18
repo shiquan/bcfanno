@@ -17,9 +17,9 @@ KHASH_MAP_INIT_STR(list, char*)
 struct refgene_mempools {
     htsFile *fp;
     const char *fn;
-    const tbx_t *idx;
+    tbx_t *idx;
     const char *fa; // transcript fasta file
-    const faidx_t *fai;
+    faidx_t *fai;
     /* todo: badaln */
     int tid;
     int n, m;
@@ -59,7 +59,7 @@ int generate_gene_hash(char *fn)
     pool.ghash = kh_init(list);
     int ignore, k;
     for (i=0; i<n; ++i) {
-	k = kh_put(list, ghash, names[i], &ignore);
+	k = kh_put(list, pool.ghash, names[i], &ignore);
     }
     return n;
 }
@@ -72,20 +72,9 @@ int generate_trans_hash(char *fn)
     pool.thash = kh_init(list);
     int ignore, k;
     for (i=0; i<n; ++i) {
-	k = kh_put(list, thash, names[i], &ignore);
+	k = kh_put(list, pool.thash, names[i], &ignore);
     }
     return n;
-}
-
-int generate_gene_hash(char *fn)
-{
-    int i, n=0;
-    char **names = hts_readlist(fn, 1, &n);
-    pool.ghash = kh_init(list);
-    int ignore, k;
-    for (i=0; i<n; ++i) {
-	k = kh_put(list, ghash, names[i], &ignore);
-    }
 }
 
 void destroy_mempool()
@@ -175,9 +164,7 @@ void refgene_entry_prase1(const bcf_hdr_t *h, struct refgene_entry *entry, int f
     
     if (flag & REFGENE_PRASE_NAME1) {
 	assert(entry->name1 == NULL);
-	//entry->name1 = strdup(entry->buffer.s + entry->splits[1]);
 	entry->name1 = entry->buffer.s + entry->splits[1];
-//	fprintf(stderr, "name1: %s\n", entry->name1);
 	entry->flag |= REFGENE_PRASE_NAME1;
     }
     
@@ -190,8 +177,7 @@ void refgene_entry_prase1(const bcf_hdr_t *h, struct refgene_entry *entry, int f
 	entry->txEnd = atoi(entry->buffer.s + entry->splits[5]);
 	entry->cdsStart = atoi(entry->buffer.s + entry->splits[6]);
 	entry->cdsEnd = atoi(entry->buffer.s + entry->splits[7]);
-	entry->flag |= REFGENE_PRASE_REG;
-//	fprintf(stderr, "txstart: %d\ttxend: %d\tcdstart: %d\tcdsend: %d\n", entry->txStart, entry->txEnd, entry->cdsStart, entry->cdsEnd);
+	entry->flag |= REFGENE_PRASE_REG;       
     }
     
     if (flag & REFGENE_PRASE_EXONS) {
@@ -212,10 +198,8 @@ void refgene_entry_prase1(const bcf_hdr_t *h, struct refgene_entry *entry, int f
     }
     
     if (flag & REFGENE_PRASE_NAME2) {
-	//entry->name2 = strdup(entry->buffer.s + entry->splits[12]);
 	entry->name2 = entry->buffer.s + entry->splits[12];
 	entry->flag |= REFGENE_PRASE_NAME2;
-//	fprintf(stderr, "name2: %s\n", entry->name2);
     }
     
     if (flag & REFGENE_PRASE_SUFFIX) {
@@ -329,7 +313,7 @@ void filter_mempool(const bcf_hdr_t *h)
     }
 }
 
-void fill_mempool(const bcf_hdr_t *h, int tid, int start, int end, int flag)
+void fill_mempool(bcf_hdr_t *h, int tid, int start, int end, int flag)
 {
     if (tid == -1) return;
     assert (pool.fn != NULL);
@@ -368,196 +352,201 @@ void fill_mempool(const bcf_hdr_t *h, int tid, int start, int end, int flag)
     update_mempool(h);
 }
 
-
-struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
+void destroy_hgvs_record(struct hgvs_record *rec)
 {
+    if (rec == NULL) return;
+    int i;
+    for (i=0; i<rec->ntrans; ++i) {
+	free(rec->trans[i].trans);
+    }
+    free(rec);
+}
+struct hgvs_record *hgvs_generate(bcf_hdr_t *h, bcf1_t *line)
+{
+    // skip ref record in the first place, it is rudentency, remove this part later
+    if (line->n_allele < 2 &&  bcf_get_variant_type(line,1) == VCF_REF) {
+	return NULL;
+    }
     int n=0;
     int end = cal_end(line);
     int flag = REFGENE_PRASE_REG | REFGENE_PRASE_NAME1 | REFGENE_PRASE_NAME2;
-    fill_mempool(h, line->rid, line->pos, end, flag);
+    
     filter_mempool(h); // filter records if set transcript or gene list
-
+    fill_mempool(h, line->rid, line->pos, end, flag);
+    
     struct hgvs_record *rec;
     rec = (struct hgvs_record *)calloc(1, sizeof(struct hgvs_record));
     rec->ntrans = rec->mtrans = 0;
     
-    int x = bcf_get_variant_type(line);
+    int ip;
+    for (ip=0; ip<pool.n; ++ip) {	/* loop the mempool */
 
-    // skip ref record in the first place, it is rudentency, remove this part later
-    if (x == VCF_REF|| line->n_allele < 2) {
-	free(rec);
-	return NULL;
-    }
-
-    // loop the mempool
-    for (i=0; i<pool.n; ++i) {
-
-	if (pool.entries[i].empty == 1)
+	if (pool.entries[ip].empty == 1)
 	    continue;
-
-	struct refgene_entry *entr = &pool.entries[i];
+	
+	struct refgene_entry *entr = &pool.entries[ip];
 	int start = entr->txStart;
 	int stop = entr->txEnd;
 
-	if (line->pos >= start && line->pos <= stop) {
-	    if (rec->ntrans == rec->mtrans) {
-		rec->mtrans = rec->mtrans == 0 ? 2 : rec->mtrans + 2;
-		rec->trans = (struct hgvs1*)realloc(rec->trans, rec->mtrans*sizeof(struct hgvs1));
-	    }
-	    struct hgvs1 * htr = rec->trans[rec->ntrans++];
-	    htr->empty = 1;
-	    htr->n_allele = line->n_allele;
-	    // trans convertor name come here
-	    // check coding or noncoding transcript
-	    assert(htr->name1);
-	    if (entr->name1[1] == 'M') htr->type = TYPE_CODING;
-	    else htr->type = TYPE_NONCODING;
-	    // calculate position
-	    int j;
-	    int loc = 0; // locations in exon or cds
-	    int off = 0;  // offset in noncoding region
+	// check if pos local in this transcript
+	if (line->pos < start || line->pos > stop)
+	    continue; 
 
-/* 
-   UTR_REG5    .  UTR_REG3   CODING     UTR_REG5.UTR_REG3
-   ============ATG=================================
-*/
+	if (rec->ntrans == rec->mtrans) {
+	    rec->mtrans = rec->mtrans == 0 ? 2 : rec->mtrans + 2;
+	    rec->trans = (struct hgvs1*)realloc(rec->trans, rec->mtrans*sizeof(struct hgvs1));
+	}
+	struct hgvs1 * htr = &rec->trans[rec->ntrans++];
+
+	//htr->n_allele = line->n_allele;
+	// trans convertor name come here
+	// check coding or noncoding transcript
+	
+	htr->trans = strdup(entr->name1);
+	if (entr->name1[1] == 'M')
+	    htr->type = TYPE_CODING;	    
+	else
+	    htr->type = TYPE_NONCODING;
+
+	htr->empty = 0;
+
+	// calculate position
+	    	    
+	/* 
+	   UTR_REG5    .  UTR_REG3   CODING     UTR_REG5.UTR_REG3
+	   ============ATG=================================
+	*/
 		
-	    // tx region
-	    int pos = line->pos; // variant position
-	    if (entr->type != TYPE_CODING) {
-		// just count tx position
-		htr->type = TYPE_NONCODING;
-		int i;
-		int length = 0;
-		int offset = 0;
-		int last_end = 0;
-		for (i=0; i< entr->exonCount; ++i) {
-		    if (pos > entr->exonEnds[i]) {
-			length += entr->exonEnds[i] - entr->exonStarts[i] + 1;
-			last_end = htr->exonEnds[i];
-		    }
+	// tx region
+	int pos = line->pos; // variant position
+
+	int i;
+	int length = 0;
+	int offset = 0;
+	int last_end = 0;
+	int exId = 0;
+	int cdsId = 0;
+	enum funcType func = FUNC_UNKNOWN;
+
+	if (htr->type == TYPE_NONCODING) {
+
+	    for (i=0; i< entr->exonCount; ++i) {
+		if (pos > entr->exonEnds[i]) {
+		    length += entr->exonEnds[i] - entr->exonStarts[i] + 1;
+		    last_end = entr->exonEnds[i];			
+		} else {
 		    if (pos >= entr->exonStarts[i]) {
-			length += pos - entr->exonStarts + 1;
-			htr->cpos = length;
-			htr->offset = 0;
-			htr->exId = i;
-			htr->func =
-			    pos - entr->exonStarts[i] < SPLITSITE_RANG || // 5' downstream splicing region
-			    entr->exonEnds[i] - pos > SPLITSITE_RANG ? // 3' upstream splicing region
-			    FUNC_SPLITSITE : FUNC_NR;			
+			length += pos - entr->exonStarts[i] + 1;		       
+			exId = i;
+			func = pos - entr->exonStarts[i] < SPLITSITE_RANG || entr->exonEnds[i] - pos > SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_NR;
 			break;
 		    } else {
 			assert(last_end > 0);
 			assert(pos > last_end);
-			if (pos - last_end < (entr->exonStarts[i] -last_end)/2 ) {
+			if (pos - last_end < entr->exonStarts[i] - pos ) {
 			    offset = pos -last_end;
-			    htr->exId = i-1;
-			    htr->func = pos - last_end < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_INTRON;
+			    exId = i-1;
+			    func = pos - last_end < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_INTRON;
 			} else {
 			    offset = pos - entr->exonStarts[i];
-			    htr->exId = i;
-			    htr->func = entr->exonStarts[i] - pos < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_INTRON;
+			    exId = i;
+			    func = entr->exonStarts[i] - pos < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_INTRON;
 			}
-			htr->cpos = length;
 		    }
+		    break;
 		}
-	    } else {
-		// coding transcript
-		htr->type = TYPE_CODING;
-
-		int i;
-		int length = 0;
-		int offset = 0;
-		int last_end = 0;
-		int cds = 0;
-		for (i=0; i<entr->exonCount; ++i) {
-
-		    /*     exon                pos         exon
-		          ==================   0          ==========
-
-		     */
-		    if (pos > entr->exonEnds[i]) {
-			if (entr->cdsStart <= entr->exonEnds[i]) {
-			    cds++;
-			    length +=
-				entr->cdsStart > entr->exonStarts[i] ?
-				entr->exonEnds[i] - entr->cdsStart + 1 :
-				entr->exonEnds[i] - entr->exonStarts[i] + 1;
-			}
-			last_end = entr->exonEnds[i];
-		    } else {
-			/*  exon
-			  0 ======= 1 ========
-			 */
-			if (pos < entr->exonStarts[i]) {
-			    /*
-			      exon              exon
-			      ============    0 ==========
-			     */
-			    if (entr->cdsStart > entr->exonStarts[i]) {
-				/*
-				  exon
-				  =============  
-				        cds
-					-------
-				 */
-				if (pos - last_end > entr->exonStarts[i] - pos) {
-				    if (entr->exonStarts[i] -pos < SPLITSITE_RANG)
-					htr->func = FUNC_SPLITSITE;
-				    else
-					htr->func = FUNC_INTRON;
-				    cds++;
-				    htr->exId = i;				
-				    htr->cdsId = cds;
-				    offset = pos - entr->exonStarts[i];
-				} else {
-				    if (pos -last_end < SPLITSITE_RANG)
-					htr->func = FUNC_SPLITSITE;
-				    else
-					htr->func = FUNC_INTRON;
-				    htr->exId = i -1;
-				    htr->cdsId = cds;
-				    offset  = pos - last_end;
-				}
+	    }
+	    
+	    htr->func = func;
+	    htr->exId = exId;
+	    htr->cpos = length;
+	    htr->offset = offset;
+	    
+	} // end noncoding transcript
+	else {
+	    // coding transcript
+	    for (i=0; i<entr->exonCount; ++i) {
+		
+		/*     exon                pos         exon
+		       ==================   0          ==========
+		       
+		*/
+		if (pos > entr->exonEnds[i]) {
+		    if (entr->cdsStart < entr->exonEnds[i]) {
+			cdsId++;
+			length += entr->cdsStart > entr->exonStarts[i] ? entr->exonEnds[i] - entr->cdsStart + 1 : entr->exonEnds[i] - entr->exonStarts[i] + 1;
+		    }
+		    last_end = entr->exonEnds[i];
+		} // end pos > exonend
+		else {
+		    // pos <= entr->exonEnds[i]
+		    /*  exon
+			0 ======= 1 ========
+		    */
+		    
+		    if (pos < entr->exonStarts[i]) { /* intron region */
+			/*
+			  exon              exon
+			  ============    0 ==========
+			*/
+			if (pos - last_end > entr->exonStarts[i] - pos) {
+			    if (entr->exonStarts[i] -pos < SPLITSITE_RANG)
+				func = FUNC_SPLITSITE;
+			    else
+				func = FUNC_INTRON;
+			    if (pos > entr->cdsStart) {
+				cdsId++;
+				offset = pos - entr->exonStarts[i];
+			    } else {
+				offset =  pos - entr->cdsStart;
 			    }
-			    break;
+			    exId = i;				
+			} // next to this exon
+			else { // next to last exon
+			    if (pos -last_end < SPLITSITE_RANG)
+				func = FUNC_SPLITSITE;
+			    else
+				func = FUNC_INTRON;
+
+			    exId = i -1;
+			    offset  = pos > entr->cdsStart ? pos - last_end : pos - entr->cdsStart;
+			}
+			
+		    } /* exon region */
+		    else {
+			// pos >= entr->exonStarts[i]
+			/*
+			  exon            exon
+			  =====0======    =====1====
+			           cds     cds
+				   ---    ----------
+			*/
+			if (pos < entr->cdsStart) {
+			    exId = i;
+			    offset = pos - entr->cdsStart;
+			    func = FUNC_5UTR;
 			} else {
-			    /*
-			      exon            exon
-			      =====0======    =====1====
-			              cds     cds
-				      ---     ----------
-			     */
-			    if (pos < htr->cdsStart) {
-				htr->exId = i;
-				offset = pos - htr->cdsStart;
-				htr->func = FUNC_5UTR;
-				break;
-			    }
-			    if (htr->cdsStart < exonEnds[i]) {
+			    cdsId++;
+			    exId = i;
+			    offset = 0;
+			    length += entr->cdsStart > entr->exonStarts[i] ? pos - entr->cdsStart +1 : pos - entr->exonStarts[i] +1;
 				
-			    }
+			    func = entr->exonEnds[i] - pos < SPLITSITE_RANG || pos - entr->exonStarts[i] < SPLITSITE_RANG ? FUNC_SPLITSITE : FUNC_CDS;			    
 			}
 		    }
-		}
-	    }
-		
+		    break;
+		} // end if  entr->exonStarts[i] <= pos <= entr->exonEnds[i]
 
-	    // function predition
-	    
-	    // generate name for each allele
-	    entr->als = (struct hgvs_ale*)malloc(entr->n_allele*sizeof(struct hgvs_ale));
-
-	    for (j=1; j< entr->n_allele; ++j) {
-		
-	    }
-	    
-	    
-	}
-    }
-
-
-    return rec;    
+	    } // end loop
+	    htr->cpos = length;
+	    htr->offset = offset;
+	    htr->cdsId = cdsId;		
+	    htr->exId = exId;
+	    htr->func = func;		
+	    // function predition or NOT?	
+	} // end if type == CODING TRANSCRIPT	   	    
+    } // end mem pool loop
+    return rec; 
 }
 
 #ifdef HGVS_MAIN
@@ -566,6 +555,56 @@ struct hgvs_record *(bcf_hdr_t *h, bcf1_t *line)
 int usage() {
     fprintf(stderr, "hgvs refgene.txt.gz in.vcf\n");
     return 1;
+}
+void show_hgvs_records(struct hgvs_record *rec)
+{
+    if (rec == NULL) return;
+    int i;
+    kstring_t str = {0,0,0};
+    for (i=0; i<rec->ntrans; ++i) {
+	str.l = 0;
+	struct hgvs1 *h = &rec->trans[i];
+	kputs(h->trans, &str);
+	kputc(':', &str);
+	switch(h->type) {
+	    case TYPE_CODING:
+		kputs("c.", &str);
+		break;
+	    case TYPE_NONCODING:
+		kputs("n.", &str);
+		break;
+	    case TYPE_RNA:
+		kputs("r.", &str);
+		break;
+	    case TYPE_GENOMIC:
+		kputs("g.", &str);
+		break;
+	    case TYPE_MITOCHONDRIAL:
+		kputs("m.", &str);
+		break;
+	    case TYPE_PROTEIN:
+		kputs("p.", &str);
+		break;
+	    case TYPE_UNKN:
+	    default:
+		fprintf(stderr, "Unknow type: %d", h->type);
+		exit(1);
+	}
+	if (h->cpos != 0) {
+	    kputw(h->cpos, &str);
+	}
+	if (h->offset !=0) {
+	    if (h->offset>0) {
+		kputc('+', &str);		
+	    }
+	    kputw(h->offset, &str);		
+	}
+	if (str.l > 0) {
+	    fputs(str.s, stdout);
+	    putc('\n', stdout);
+	}
+    }
+    if (str.l) free(str.s);
 }
 int main(int argc, char **argv)
 {
@@ -584,9 +623,14 @@ int main(int argc, char **argv)
     while (bcf_sr_next_line(file)) {
 	bcf1_t *line = file->readers[0].buffer[0];
 	int end = cal_end(line);
+	const char *name = bcf_hdr_id2name(file->readers[0].header, line->rid);
+	fprintf(stdout,"%s\t%d\t%d\n",name, line->pos, end);
 	fill_mempool(file->readers[0].header, line->rid, line->pos, end, flag);
+	struct hgvs_record *rec = hgvs_generate(file->readers[0].header, line);
+	show_hgvs_records(rec);
+	destroy_hgvs_record(rec);
     }
-
+    
     bcf_sr_destroy(file);
     destroy_mempool();
     return 0;
