@@ -149,6 +149,8 @@ struct hgvs_ale {
 struct hgvs1 {
     int empty; // skip if empty == 1
     char *trans;
+    char *gene;
+    enum strand strand;
     enum seqType type;
     enum funcType func;
     //int n_allele;
