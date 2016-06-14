@@ -5,7 +5,7 @@
 #include <stdlib.h>
 //#include "anno_setter.h"
 
-#define DEFAULT_INTRON_EDGE 30
+//#define DEFAULT_INTRON_EDGE 30
 
 #define ANNOCONFIG_INIT { NULL, NULL, NULL, 0, 0, NULL }
 

@@ -56,8 +56,6 @@ enum funcType {
     FUNC_5UTR,
     FUNC_NR,
     FUNC_CDS,
-    FUNC_MISSENSE,
-    FUNC_NONSENSE,
     FUNC_SPLITSITE,
     FUNC_SPLITSITE3,
     FUNC_SPLITSITE5,
@@ -76,6 +74,8 @@ enum funcType {
 enum varType {
     VARTYPE_REF,
     VARTYPE_SUBSITITUTION,
+    VARTYPE_MISSENSE,
+    VARTYPE_NONSENSE,
     VARTYPE_CONVERSION,
     VARTYPE_DELETION,
     VARTYPE_INDEL,
@@ -141,7 +141,7 @@ struct varCompact {
 };
     
 struct hgvs_ale {
-    enum varCompact type;
+    struct varCompact type;
     char *cols;
     int fs; // -1 for non-fs
 };
@@ -149,10 +149,12 @@ struct hgvs_ale {
 struct hgvs1 {
     int empty; // skip if empty == 1
     char *trans;
+    char *gene;
+    enum strand strand;
     enum seqType type;
     enum funcType func;
-    int n_allele;
-    struct hgvs_ale *als;
+    //int n_allele;
+    //struct hgvs_ale *als;
     int cpos;	
     int offset; // 0 for cds region
     int exId;
@@ -164,7 +166,8 @@ struct hgvs_record {
     struct hgvs1 *trans;
 };
 
-extern void fill_mempool(int tid, int start, int end, int flag);
+extern void fill_mempool(bcf_hdr_t *h, int tid, int start, int end, int flag);
 extern void release_refgene_mempool();
+extern struct hgvs_record *hgvs_generate(bcf_hdr_t *h, bcf1_t *line);
 
 #endif
