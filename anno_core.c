@@ -72,7 +72,7 @@ bcf1_t * anno_core(bcf1_t *line)
 {
     int i, j;
     int x = bcf_get_variant_types(line); // get the variant type
-    VARSTAT(x);
+    //VARSTAT(x);
     // get the start position of variant
     int len = 0;
     for (i=1; i<line->n_allele; i++) {
@@ -82,10 +82,10 @@ bcf1_t * anno_core(bcf1_t *line)
     }
     
     int end_pos = len<0 ? line->pos - len: line->pos;
-    init_buffers(line->pos, end_pos);
-    for (i=0; i<hand->sql_anno_count; ++i) {
-	anno_sql_line(hand->connects[i], line);
-    }
+    /* init_buffers(line->pos, end_pos); */
+    /* for (i=0; i<hand->sql_anno_count; ++i) { */
+    /* 	anno_sql_line(hand->connects[i], line); */
+    /* } */
     for (i=0; i<hand->vcf_anno_count; ++i) {
 	anno_vcf_line(i, line);
     }

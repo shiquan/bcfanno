@@ -3,7 +3,7 @@
 #include "plugin.h"
 
 // only if annotation database is VCF/BCF file, header_in has values or else header_in == NULL
-anno_col_t * init_columns(char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
+annot_col_t * init_columns(char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
 {
     assert(rules != NULL);
     if (type == anno_file_is_vcf && header_in == NULL) {
@@ -11,7 +11,7 @@ anno_col_t * init_columns(char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_o
     }
     char *ss = rules, *se = ss;
     *ncols = 0;
-    anno_col_t *cols = NULL;
+    annot_col_t *cols = NULL;
     kstring_t tmp = KSTRING_INIT;
     kstring_t str = KSTRING_INIT; 
     int i = -1;
@@ -232,7 +232,7 @@ anno_col_t * init_columns(char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_o
 
 /* int anno_setter_id(anno_setters_t *handler, bcf1_t *line, struct annot_col *col, void *data) */
 /* { */
-/*     anno_line_t *tab = (anno_line_t*)data; */
+/*     annot_line_t *tab = (annot_line_t*)data; */
 /*     if ( tab->cols[col->icol] && tab->cols[col->icol][0]=='.' && !tab->cols[col->icol][1]) */
 /* 	return 0; // donot replace with '.' */
 /*     if ( col->replace != REPLACE_MISSING) */

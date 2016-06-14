@@ -18,6 +18,7 @@
 #include <htslib/faidx.h>
 #include "plugin.h"
 #include "config.h"
+#include "vcmp.h"
 
 #define ANNOTCOLS_PACK_INIT { NULL, 0, 0, NULL }
 #define KSTRING_INIT { 0, 0, 0 }
@@ -80,7 +81,7 @@ typedef annot_line annot_line_t;
 
 typedef void (* rel_func)(void*);
 
-extern void safe_release(void const * p, rel_func func);
+extern void safe_release(void * p, rel_func func);
 
 /* ref: http://c.learncodethehardway.org/book/ex20.html */
 #define str_errno() (errno == 0 ? "None" : strerror(errno))
@@ -160,12 +161,7 @@ struct refrna_file_option {
 
 enum strand { strand_plus, strand_minus, strand_unknonw, };
 
-struct region {
-    uint32_t start;
-    uint32_t stop;
-};
-
-extern void init_columns(anno_col_t *cols, char *string, bcf_hdr_t *header);
+extern void init_columns(annot_col_t *cols, char *string, bcf_hdr_t *header);
 
 struct sql_connect
 {
@@ -198,13 +194,13 @@ struct sql_connect
 /*     int nreaders; */
 /* }; */
 /* anno_handler is adapt form args_t struct in vcfannotation.c */
-struct filter_pack
-{
-    filter_t *filter;
-    char *string;
-    anno_col_t *cols;
-    int ncols;
-};
+/* struct filter_pack */
+/* { */
+/*     filter_t *filter; */
+/*     char *string; */
+/*     annot_col_t *cols; */
+/*     int ncols; */
+/* }; */
 struct anno_handler
 {
     int vcf_anno_count;
@@ -218,7 +214,7 @@ struct anno_handler
     struct sql_connect *connects;
 
     /* filter tag, usually in FORMAT field */
-    struct filter_pack *filter;
+    //struct filter_pack *filter;
     
     vcmp_t *vcmp;  // for matching annotation and VCF lines by allele
     //annot_line_t *alines; // buffered annotation lines
@@ -271,7 +267,7 @@ extern int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_
 
 /**/
 extern void handler_release(void *hand);
-extern void rebuild_anno_lines(struct anno_handler *hand);
+extern void rebuild_annot_lines(struct anno_handler *hand);
 
 
 #endif

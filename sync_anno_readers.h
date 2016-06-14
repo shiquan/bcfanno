@@ -25,13 +25,13 @@ typedef struct
     kstring_t line;
     int rid, start, end;
 }
-anno_line_t;
+annot_line_t;
 
 typedef struct
 {
     anno_hdr_t *header;
     const char *fname;
-    anno_line_t **buffer;
+    annot_line_t **buffer;
     int nbuffer, mbuffer;
 }
 anno_sr_t;
@@ -66,7 +66,7 @@ typedef struct _anno_api
     int isrc;
     char *file;
     char *dynlib_path;
-    anno_col_t *cols;
+    annot_col_t *cols;
     int ncols;
 
 }

@@ -20,7 +20,7 @@ int has_hgvs = 0;
 /* 	x = NULL;				\ */
 /*     } while(0) */
 
-void safe_release(void const *p, rel_func func)
+void safe_release(void *p, rel_func func)
 {
     check_double_free(p);
     func(p);
@@ -35,7 +35,7 @@ static void config_hgvs_release()
     ignore_free( anno_config_file.anno->columns);
     ignore_free( anno_config_file.anno);
 }
-static void config_summary_release(void const *_summary)
+static void config_summary_release(void *_summary)
 {
     struct summary * summary = (struct summary*)( _summary);
     ignore_free(summary->name);
@@ -44,7 +44,7 @@ static void config_summary_release(void const *_summary)
     ignore_free(summary->ref_version);
     ignore_free(summary->path);
 }
-static void config_api_release(void const *_api)
+static void config_api_release(void *_api)
 {
     struct vcf_sql_api *api = (struct vcf_sql_api *)_api;
     if ( api != NULL ) {
@@ -121,14 +121,14 @@ static char *skip_comments(const char *json_file)
     return json;
 }
 
-static enum api_type check_api_type (char const *str)
+static enum anno_type check_anno_type (char const *str)
 {
     if (!strcmp(str, "vcf")) {
-        return api_is_vcf;
+        return anno_is_vcf;
     } else if (!strcmp(str, "sql")) {
-        return api_is_sql;
+        return anno_is_sql;
     } else {
-        return api_is_unknown;
+        return anno_is_unknown;
     }
 }
 
@@ -185,7 +185,7 @@ static int load_readers(const kson_t *s)
             anno->refgene_file_path = NULL;
             anno->transcripts_list = NULL;
             anno->genes_list = NULL;
-            anno->intron_edge = DEFAULT_INTRON_EDGE;
+            //anno->intron_edge = DEFAULT_INTRON_EDGE;
             anno->columns = NULL;
 
             int i;
@@ -197,7 +197,7 @@ static int load_readers(const kson_t *s)
                 BRANCH(node1, "refgene", anno->refgene_file_path, strdup);
                 BRANCH(node1, "trans_list", anno->transcripts_list, strdup);
                 BRANCH(node1, "genes_list", anno->genes_list, strdup);
-                BRANCH(node1, "intron_edge", anno->intron_edge, atoi);
+                //BRANCH(node1, "intron_edge", anno->intron_edge, atoi);
                 BRANCH(node1, "columns", anno->columns, strdup);
                 warnings("%s is not a pre-defined element. skip it ..", node1->key);
             }
@@ -232,7 +232,7 @@ static int load_readers(const kson_t *s)
 		for (j = 0; j < (long)node1->n; ++j) {
 		    debug_print("n: %llu\ti:%ld\n", node1->n, j);
 		    const kson_node_t *node2 = kson_by_index(node1, j);
-		    BRANCH(node2, "type", api->type, check_api_type);
+		    BRANCH(node2, "type", api->type, check_anno_type);
 		    BRANCH(node2, "file", api->vfile, strdup);
 		    BRANCH(node2, "dynlib", api->dynlib, strdup);
 		    BRANCH(node2, "columns", api->columns, strdup);
@@ -271,7 +271,7 @@ void debug_configure_file()
 	debug_configure_summary(anno_config_file.summary);
     if ( anno_config_file.anno ) {
 	struct anno_data_file *anno = anno_config_file.anno;
-	printf("[hgvs] intron edge: %u\n", anno->intron_edge);
+	//printf("[hgvs] intron edge: %u\n", anno->intron_edge);
 	if ( anno->refgene_file_path )
 	    printf("[hgvs] file path: %s\n", anno->refgene_file_path);
 	if ( anno->transcripts_list )
@@ -283,11 +283,11 @@ void debug_configure_file()
     }
     for (i=0; i<anno_config_file.n_apis; i++) {
 	struct vcf_sql_api *api = &anno_config_file.apis[i];
-	if (api->type == api_is_vcf && api->vfile) {
+	if (api->type == anno_is_vcf && api->vfile) {
 	    printf( "[api] api is VCF\n");
 	    printf( "[api] %s\n", api->vfile);
 	    printf( "[api] columns: %s\n", api->columns);
-	} else if ( api->type == api_is_sql && api->dynlib) {
+	} else if ( api->type == anno_is_sql && api->dynlib) {
 	    printf( "[api] api is dynlib\n");
 	    printf( "[api] %s\n", api->dynlib);
 	    printf( "[api] columns: %s\n", api->columns);

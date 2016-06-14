@@ -22,7 +22,7 @@ struct summary {
 };
 
 struct vcf_sql_api {
-    enum api_type type;
+    enum anno_type type;
     const char *vfile;
     const char *dynlib;
     const char *columns;
@@ -36,7 +36,7 @@ struct anno_data_file {
     char *transcripts_list;
     char *genes_list;
     char *columns;
-    int intron_edge;
+    //int intron_edge;
 };
 
 struct configs {
