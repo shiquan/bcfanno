@@ -204,14 +204,15 @@ struct sql_connect
 struct anno_handler
 {
     int vcf_anno_count;
-    int sql_anno_count;
+    //int sql_anno_count;
     bcf_hdr_t *hdr, *hdr_out;
     htsFile *out_fn;
+    char *out;
     int output_type, n_threads;
-    struct anno_hgvs_option *hgvs_opts;
+    //struct anno_hgvs_option *hgvs_opts;
     bcf_srs_t *files;
     struct annot_cols_pack *cols;
-    struct sql_connect *connects;
+    //struct sql_connect *connects;
 
     /* filter tag, usually in FORMAT field */
     //struct filter_pack *filter;
