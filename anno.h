@@ -161,7 +161,7 @@ struct refrna_file_option {
 
 enum strand { strand_plus, strand_minus, strand_unknonw, };
 
-extern void init_columns(annot_col_t *cols, char *string, bcf_hdr_t *header);
+extern annot_col_t *init_columns(char *rules, bcf_hdr_t *in, bcf_hdr_t *out, int *n, enum anno_type type);
 
 struct sql_connect
 {
@@ -201,9 +201,21 @@ struct sql_connect
 /*     annot_col_t *cols; */
 /*     int ncols; */
 /* }; */
+
+struct annot_cols {
+    int ncols;
+    annot_col_t *cols;
+    //char *columns;
+};
+
+struct annot_cols_vector {
+    int n, m;
+    struct annot_cols *vcols;
+};
+
 struct anno_handler
 {
-    int vcf_anno_count;
+    //int vcf_anno_count;
     //int sql_anno_count;
     bcf_hdr_t *hdr, *hdr_out;
     htsFile *out_fn;
@@ -211,7 +223,9 @@ struct anno_handler
     int output_type, n_threads;
     //struct anno_hgvs_option *hgvs_opts;
     bcf_srs_t *files;
-    struct annot_cols_pack *cols;
+    struct annot_cols_vector *vcf_cols;
+    struct annot_cols_vector *sql_cols;
+    //struct annot_cols_pack *cols;
     //struct sql_connect *connects;
 
     /* filter tag, usually in FORMAT field */
@@ -223,6 +237,9 @@ struct anno_handler
     //int ref_idx, alt_idx, from_idx, to_idx; // -1 for not present
     //struct annot_col *cols;
     //int ncols;
+
+    int *sample_map, nsample_map, sample_is_file;
+    
     int mtmpi, mtmpf, mtmps;
     int mtmpi2, mtmpf2, mtmps2;
     int mtmpi3, mtmpf3, mtmps3;
@@ -231,6 +248,11 @@ struct anno_handler
     char *tmps, *tmps2, **tmpp, **tmpp2;
     kstring_t tmpks;
 };
+
+#define REPLACE_MISSING  0 // replace only missing values
+#define REPLACE_ALL      1 // replace both missing and existing values
+#define REPLACE_EXISTING 2 // replace only if tgt is not missing
+#define SET_OR_APPEND    3 // set new value if missing or non-existent, append otherwise
 
 struct annot_col
 {

@@ -317,6 +317,7 @@ int load_config(const char *json_file)
     return 0;
 }
 
+#ifdef _MAIN_CONFIG
 int main(int argc, char **argv)
 {
     if (argc == 1) {
@@ -326,3 +327,4 @@ int main(int argc, char **argv)
     load_config(argv[1]);
     return 0;
 }
+#endif

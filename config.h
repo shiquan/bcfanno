@@ -45,7 +45,7 @@ struct configs {
     struct anno_data_file *anno;
     int n_theads;
     int n_apis;
-    struct vcf_sql_api * apis;
+    struct vcf_sql_api *apis;
 };
 
 extern struct configs anno_config_file;

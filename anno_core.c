@@ -16,24 +16,64 @@ struct {
 //extern struct configs anno_config_file;
 
 struct anno_handler hand = {
-    .files=NULL,
-    .hdr=NULL,
-    .hdr_out=NULL,
+    .files = NULL,
+    .hdr = NULL,
+    .hdr_out = NULL,
     //.sql_anno_count=0,
-    .vcf_anno_count=0,
+    .vcf_cols = NULL,
+    .sql_cols = NULL,
     //.connects=NULL
 };
 
-void init_data(const char *json, const char *fname)
+struct annot_cols_vector * acols_vector_init()
+{
+    struct annot_cols_vector *v = (struct annot_cols_vector*)malloc(sizeof(struct annot_cols_vector));
+    v->m = v->n = 0;
+    v->vcols = 0;
+    return v;
+}
+int parse_columns(struct vcf_sql_api *api)
+{
+    if (api == NULL) 
+	error("empty api");
+    assert(api->column);
+    assert(hand.header_in);
+    assert(hand.header_out);
+    if (api.type == api_is_vcf) {
+	int ncols = 0;
+	struct annot_cols_vector *v = hand.vcf_cols;
+	if (v->m == v->n) {
+	    v->m = v->n == 0 ? 2: v->n << 1;
+	    v->cols = (struct annot_cols*)realloc(v->m, sizeof(struct annot_cols));
+	}
+	struct annot_cols *ac = &v->vcols[v->n++];
+	ac->cols = init_columns(api->column, hand.header_in, hand.header_out, &ncols, api_is_vcf);
+	if (ac->cols == NULL || cols == 0) {
+	    warnings("failed to prase %s",api_column);
+	    ac->cols == NULL;
+	    ac->ncols = 0;
+	}
+    } else {
+	/* TODO: api.type == api_is_sql */
+	assert(1);
+    }
+}
+int init_data(const char *json, const char *fname)
 {
     if ( load_config(json) ) {
 	error("Load JSON file failed");
     }
     // assume input is VCF/BCF file
+    hand->files = bcf_sr_init();
+    hand->vcf_cols = acols_vector_init();
+    hand->sql_cols = acols_vector_init();
+    
     if ( !bcf_sr_add_reader(hand->files, fname) ) {
 	error("Failed to open %s: %s\n", fname, bcf_sr_strerror(hand->files->errnum));
     }
+
     int i;
+
     for (i=0; i<anno_config_file.n_apis; ++i) {
 	/* only accept vcf/bcf for now*/
 	if (anno_config_file.apis[i].type == api_is_vcf) {
@@ -50,6 +90,7 @@ void init_data(const char *json, const char *fname)
 	    parse_columns(anno_config_file.apis[i]);
 	}
     }
+    return 0;
 }
 
 /* void init_buffers(int start, int end_pos) */
@@ -80,7 +121,7 @@ void init_data(const char *json, const char *fname)
 	    
 bcf1_t * anno_core(bcf1_t *line)
 {
-    int i;
+    int i, j;
     //int x = bcf_get_variant_types(line); // get the variant type
     //VARSTAT(x);
     // get the start position of variant
@@ -96,8 +137,12 @@ bcf1_t * anno_core(bcf1_t *line)
     /* for (i=0; i<hand->sql_anno_count; ++i) { */
     /* 	anno_sql_line(hand->connects[i], line); */
     /* } */
-    for (i=0; i<hand->vcf_anno_count; ++i) {
-	anno_vcf_line(i, line);
+    for (i=0; i<hand.vcf_anno_count; ++i) {
+	bcf1_t *aline = bcf_sr_get_line(hand.files, i+1);
+	struct annot_col_t *cols = hand.cols[i].cols;
+	for (j=0; j<cols->ncols; ++j) {
+	    cols->setter(&hand, line, cols, aline);
+	}
     }
     return line;
 }
@@ -114,6 +159,19 @@ static struct options opts = {
     {NULL, 0, NULL, 0},    
 };
 
+int usage()
+{
+    fprintf(stderr, "\n");
+    fprintf(stderr, "About : Annotate VCF/BCF file.\n");    
+    fprintf(stderr, "Usage: vcfanno -c config.json in.vcf.gz\n");
+    fprintf(stderr, "   -c, --config <file>            configure file, include annotations and tags, see man page for details\n");
+    fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
+    fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
+    fprintf(stderr, "\n");
+    return 1;
+}
 int paras_praser(int argc, char **argv)
 {
     int c;
@@ -141,7 +199,7 @@ int paras_praser(int argc, char **argv)
 		return usage();
 		
 	    default:
-		error("unknown argument : %s", optarg);
+		error("Unknown argument : %s", optarg);
 	}
     }
 
@@ -157,7 +215,7 @@ int paras_praser(int argc, char **argv)
     htsFile *fp = hts_open(input_fname, "r");
 
     if (fp == NULL)
-	error("failed to open : %s", input_fname);
+	error("Failed to open : %s", input_fname);
     
     htsFormat type = *hts_get_format(fp);
 
@@ -166,9 +224,7 @@ int paras_praser(int argc, char **argv)
     }
     hts_close(fp);
     
-    init_data(config_file, input_fname);
-    
-    return 0;
+    return init_data(config_file, input_fname);
 }
 
 #ifdef _ANNO_CORE_MAIN
@@ -177,8 +233,8 @@ int main(int argc, char **argv)
     if ( para_praser(argc, argv) ) {
 	return EXIT_FAILURE;
     }
-     check_environ_paras();
-    init_data(config_fname, input_fname);
+    //check_environ_paras();
+
     while( bcf_sr_next_line(hand->files))
     {
 	if ( !bcf_sr_has_line(hand->files, 0) ) continue;

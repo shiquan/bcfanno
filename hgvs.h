@@ -105,6 +105,9 @@ extern struct refgene_entry * retrieve_refgene_from_local(const char *fname, int
 extern void extract_refgene(struct refgene_entry *entry, int type);
 extern int local_setter_hgvs_gene(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
+extern int local_setter_refgene_funcreg(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
+extern int local_setter_refgene_function(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
+extern int local_setter_refgene_exin(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 
 extern void refgene_fill_buffers_from_local(struct anno_hgvs_option *hgvs_opts, int prase_flag);
 
