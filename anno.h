@@ -30,9 +30,10 @@
 struct annot_line {
     char **cols;
     int ncols, mcols;
+    int nals, mals;
     char **als;
     kstring_t line;
-    //int rid, start, end;
+    int rid, start, end;
 };
 
 typedef annot_line annot_line_t;
@@ -225,6 +226,8 @@ struct anno_handler
     bcf_srs_t *files;
     struct annot_cols_vector *vcf_cols;
     struct annot_cols_vector *sql_cols;
+
+    int ti; 
     //struct annot_cols_pack *cols;
     //struct sql_connect *connects;
 

@@ -25,10 +25,7 @@
 /* } */
 /* annot_line_t; */
 
-#define REPLACE_MISSING  0  // replace only missing values
-#define REPLACE_ALL      1  // replace both missing and existing values
-#define REPLACE_EXISTING 2  // replace only if tgt is not missing
-#define SET_OR_APPEND    3  // set new value if missing or non-existent, append otherwise
+
 
 // Logic of the filters: include or exclude sites which match the filters?
 #define FLT_INCLUDE 1
@@ -342,6 +339,7 @@ int setter_filter(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, voi
         bcf_update_filter(hand->hdr_out,line,hand->tmpi,1);
     return 0;
 }
+
 int vcf_setter_filter(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     int i;
@@ -412,7 +410,7 @@ int setter_qual(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void 
 
     line->qual = strtod(str, &str);
     if ( str == tab->cols[col->icol] )
-        error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
+        error("Could not parse %s at %s:%d [%s]\n", col->hdr_key, bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
     return 0;
 }
 int vcf_setter_qual(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
@@ -431,7 +429,7 @@ int setter_info_flag(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, 
 
     if ( str[0]=='1' && str[1]==0 ) return bcf_update_info_flag(hand->hdr_out,line,col->hdr_key,NULL,1);
     if ( str[0]=='0' && str[1]==0 ) return bcf_update_info_flag(hand->hdr_out,line,col->hdr_key,NULL,0);
-    error("Could not parse %s at %s:%d .. [%s]\n", bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
+    error("Could not parse %s at %s:%d .. [%s]",col->hdr_key, bcf_seqname(hand->hdr,line), line->pos+1, tab->cols[col->icol]);
     return -1;
 }
 int vcf_setter_info_flag(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
@@ -444,13 +442,13 @@ int vcf_setter_info_flag(struct anno_handler *hand, bcf1_t *line, annot_col_t *c
 int setter_ARinfo_int32(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, int nals, char **als, int ntmpi)
 {
     if ( col->number==BCF_VL_A && ntmpi!=nals-1 && (ntmpi!=1 || hand->tmpi[0]!=bcf_int32_missing || hand->tmpi[1]!=bcf_int32_vector_end) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi,col->hdr_key,bcf_seqname(hand->hdr,line),line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(hand->hdr,line), line->pos+1);
     else if ( col->number==BCF_VL_R && ntmpi!=nals && (ntmpi!=1 || hand->tmpi[0]!=bcf_int32_missing || hand->tmpi[1]!=bcf_int32_vector_end) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi,col->hdr_key,bcf_seqname(hand->hdr,line),line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(hand->hdr,line), line->pos+1);
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(hand->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map ) error("REF alleles not compatible at %s:%d\n");
+    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(hand->hdr, line), line->pos +1);
 
     // fill in any missing values in the target VCF (or all, if not present)
     int ntmpi2 = bcf_get_info_float(hand->hdr, line, col->hdr_key, &hand->tmpi2, &hand->mtmpi2);
@@ -484,7 +482,7 @@ int setter_info_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, v
     {
         int val = strtol(str, &end, 10); 
         if ( end==str )
-            error("Could not parse %s at %s:%d .. [%s]\n", bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
+            error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key, bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
         ntmpi++;
         hts_expand(int32_t,ntmpi,hand->mtmpi,hand->tmpi);
         hand->tmpi[ntmpi-1] = val;
@@ -530,7 +528,7 @@ int setter_ARinfo_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(hand->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map ) error("REF alleles not compatible at %s:%d\n");
+    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(hand->hdr, line), line->pos +1);
 
     // fill in any missing values in the target VCF (or all, if not present)
     int ntmpf2 = bcf_get_info_float(hand->hdr, line, col->hdr_key, &hand->tmpf2, &hand->mtmpf2);
@@ -564,7 +562,7 @@ int setter_info_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, 
     {
         double val = strtod(str, &end);
         if ( end==str )
-            error("Could not parse %s at %s:%d .. [%s]\n", bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
+            error("Could not parse %s at %s:%d .. [%s]\n",col->hdr_key, bcf_seqname(hand->hdr,line),line->pos+1,tab->cols[col->icol]);
         ntmpf++;
         hts_expand(float,ntmpf,hand->mtmpf,hand->tmpf);
         hand->tmpf[ntmpf-1] = val;
@@ -659,7 +657,7 @@ int setter_ARinfo_string(struct anno_handler *hand, bcf1_t *line, annot_col_t *c
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(hand->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map ) error("REF alleles not compatible at %s:%d\n");
+    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(hand->hdr, line), line->pos+1);
 
     // fill in any missing values in the target VCF (or all, if not present)
     int i, empty = 0, nstr, mstr = hand->tmpks.m;
@@ -741,7 +739,9 @@ int vcf_setter_info_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *co
 int vcf_setter_format_gt(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int nsrc = bcf_get_genotypes(hand->files->readers[1].header,rec,&hand->tmpi,&hand->mtmpi);
+    assert(hand->ti > 0);
+    bcf_hdr_t *header = hand->files->readers[hand->ti].header;
+    int nsrc = bcf_get_genotypes(header, rec, &hand->tmpi, &hand->mtmpi);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
 
@@ -750,7 +750,7 @@ int vcf_setter_format_gt(struct anno_handler *hand, bcf1_t *line, annot_col_t *c
 
     int i, j, ndst = bcf_get_genotypes(hand->hdr,line,&hand->tmpi2,&hand->mtmpi2);
     if ( ndst > 0 ) ndst /= bcf_hdr_nsamples(hand->hdr_out);
-    nsrc /= bcf_hdr_nsamples(hand->files->readers[1].header);
+    nsrc /= bcf_hdr_nsamples(header);
     if ( ndst<=0 )  // field not present in dst file
     {
         if ( col->replace==REPLACE_EXISTING ) return 0;
@@ -870,6 +870,7 @@ int setter_format_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *col,
     }
     return bcf_update_format_int32(hand->hdr_out,line,col->hdr_key,hand->tmpi,nsmpl*nvals);
 }
+
 int setter_format_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     annot_line_t *tab = (annot_line_t*) data;
@@ -939,10 +940,13 @@ int setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *col,
     }
     return bcf_update_format_char(hand->hdr_out,line,col->hdr_key,hand->tmps,nsmpl*max_len);
 }
+
 int vcf_setter_format_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int nsrc = bcf_get_format_int32(hand->files->readers[1].header,rec,col->hdr_key,&hand->tmpi,&hand->mtmpi);
+    assert(hand->ti > 0);
+    bcf_hdr_t *header = hand->files->readers[hand->ti].header;
+    int nsrc = bcf_get_format_int32(header, rec, col->hdr_key, &hand->tmpi, &hand->mtmpi);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
 
@@ -951,31 +955,23 @@ int vcf_setter_format_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *
 
     int i, j, ndst = bcf_get_format_int32(hand->hdr,line,col->hdr_key,&hand->tmpi2,&hand->mtmpi2);
     if ( ndst > 0 ) ndst /= bcf_hdr_nsamples(hand->hdr_out);
-    nsrc /= bcf_hdr_nsamples(hand->files->readers[1].header);
-    if ( ndst<=0 )
-    {
+    nsrc /= bcf_hdr_nsamples(header);
+    if ( ndst<=0 ) {
         if ( col->replace==REPLACE_EXISTING ) return 0;    // overwrite only if present
         hts_expand(int32_t, nsrc*bcf_hdr_nsamples(hand->hdr_out), hand->mtmpi2, hand->tmpi2);
-        for (i=0; i<bcf_hdr_nsamples(hand->hdr_out); i++)
-        {
+        for (i=0; i<bcf_hdr_nsamples(hand->hdr_out); i++) {
             int32_t *dst = hand->tmpi2 + nsrc*i;
-            if ( hand->sample_map[i]==-1 )
-            {
+            if ( hand->sample_map[i]==-1 ) {
                 dst[0] = bcf_int32_missing;
                 for (j=1; j<nsrc; j++) dst[j] = bcf_int32_vector_end;
-            }
-            else
-            {
+            } else {
                 int32_t *src = hand->tmpi + nsrc*hand->sample_map[i];
                 for (j=0; j<nsrc; j++) dst[j] = src[j];
             }
         }
         return bcf_update_format_int32(hand->hdr_out,line,col->hdr_key,hand->tmpi2,nsrc*bcf_hdr_nsamples(hand->hdr_out));
-    }
-    else if ( ndst >= nsrc )     
-    {
-        for (i=0; i<bcf_hdr_nsamples(hand->hdr_out); i++)
-        {
+    } else if ( ndst >= nsrc ) {
+        for (i=0; i<bcf_hdr_nsamples(hand->hdr_out); i++) {
             if ( hand->sample_map[i]==-1 ) continue;
             int32_t *src = hand->tmpi  + nsrc*hand->sample_map[i];
             int32_t *dst = hand->tmpi2 + ndst*i;
@@ -1014,7 +1010,8 @@ int vcf_setter_format_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *
 int vcf_setter_format_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int nsrc = bcf_get_format_float(hand->files->readers[1].header,rec,col->hdr_key,&hand->tmpf,&hand->mtmpf);
+    bcf_hdr_t *header = hand->files->readers[hand->ti].header;
+    int nsrc = bcf_get_format_float(header, rec, col->hdr_key, &hand->tmpf, &hand->mtmpf);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
 
@@ -1023,7 +1020,7 @@ int vcf_setter_format_real(struct anno_handler *hand, bcf1_t *line, annot_col_t 
 
     int i, j, ndst = bcf_get_format_float(hand->hdr,line,col->hdr_key,&hand->tmpf2,&hand->mtmpf2);
     if ( ndst > 0 ) ndst /= bcf_hdr_nsamples(hand->hdr_out);
-    nsrc /= bcf_hdr_nsamples(hand->files->readers[1].header);
+    nsrc /= bcf_hdr_nsamples(header);
     if ( ndst<=0 )
     {
         if ( col->replace==REPLACE_EXISTING ) return 0;    // overwrite only if present
@@ -1087,7 +1084,8 @@ int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *
 {
     bcf1_t *rec = (bcf1_t*) data;
     hand->tmpp[0] = hand->tmps;
-    int ret = bcf_get_format_string(hand->files->readers[1].header,rec,col->hdr_key,&hand->tmpp,&hand->mtmps);
+    bcf_hdr_t *header = hand->files->readers[hand->ti].header;
+    int ret = bcf_get_format_string(header,rec,col->hdr_key,&hand->tmpp,&hand->mtmps);
     hand->tmps = hand->tmpp[0]; // tmps might be realloced
     if ( ret==-3 ) return 0;    // the tag is not present
     if ( ret<=0 ) return 1;     // error

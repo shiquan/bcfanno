@@ -19,6 +19,7 @@ struct anno_handler hand = {
     .files = NULL,
     .hdr = NULL,
     .hdr_out = NULL,
+    .ti = 0,
     //.sql_anno_count=0,
     .vcf_cols = NULL,
     .sql_cols = NULL,

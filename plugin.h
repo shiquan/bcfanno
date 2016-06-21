@@ -17,14 +17,15 @@
 /*
  * try to convert any data from SQL into annot_line struct and annotated by core_annotate()
  */
-typedef struct annot_line {
+struct annot_line {
     char **cols;
     int ncols, mcols;
+    int nals, mals;
     char **als;
     kstring_t line;
-    //int rid, start, end;
-} annot_line_t;
-
+    int rid, start, end;
+};
+typedef struct annot_line annot_line_t;
 #endif
 
 /** 
