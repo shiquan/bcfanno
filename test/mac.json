@@ -10,6 +10,10 @@
 	"columns":"",
     },
     "api": [
-	{},
+	{
+	    "type":"vcf",
+	    "columns":"INFO/RS,INFO/CLNHGVS",
+	    "file":"/Users/shiquan/Documents/02.codes/vcfanno/test/clinvar_20151201_CRCH37p13.vcf.gz",
+	},
     ],
 }

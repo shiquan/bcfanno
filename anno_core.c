@@ -24,6 +24,28 @@ struct anno_handler hand = {
     .vcf_cols = NULL,
     .sql_cols = NULL,
     //.connects=NULL
+    /* .sample_map = NULL, */
+    /* .nsample_map = 0, */
+    /* .sample_is_file = 0, */
+    /* .mtmpi = 0, */
+    /* .mtmpi2 = 0, */
+    /* .mtmpi3 = 0, */
+    /* .mtmps = 0, */
+    /* .mtmps2 = 0, */
+    /* .mtmps3 = 0, */
+    /* .mtmpf = 0, */
+    /* .mtmpf2 = 0, */
+    /* .mtmpf3 = 0, */
+    /* .tmpi = NULL, */
+    /* .tmpi2 = NULL, */
+    /* .tmpi3 = NULL, */
+    /* .tmpf = NULL, */
+    /* .tmpf2 = NULL, */
+    /* .tmpf3 = NULL, */
+    /* .tmps = NULL, */
+    /* .tmps2 = NULL, */
+    /* .tmpp = NULL, */
+    /* .tmpp2 = NULL, */
 };
 
 int destroy_cols_vector(struct annot_cols_vector *v)
@@ -49,18 +71,18 @@ int release_handler()
     bcf_hdr_destroy(hand.hdr_out);
     destroy_cols_vector(hand.vcf_cols);
     destroy_cols_vector(hand.sql_cols);
-    if (hand.sample_map) free(hand.sample_map);
-    if (hand.tmpi) free(hand.tmpi);
-    if (hand.tmpi2) free(hand.tmpi2);
-    if (hand.tmpi3) free(hand.tmpi3);
-    if (hand.tmpf) free(hand.tmpf);
-    if (hand.tmpf2) free(hand.tmpf2);
-    if (hand.tmpf3) free(hand.tmpf3);
-    if (hand.tmps) free(hand.tmps);
-    if (hand.tmps2) free(hand.tmps2);
-    if (hand.tmpp) free(hand.tmpp);
-    if (hand.tmpp2) free(hand.tmpp2);
-    if (hand.tmpks.m) free(hand.tmpks.s);
+    ignore_free(hand.sample_map);
+    ignore_free(hand.tmpi);
+    ignore_free(hand.tmpi2);
+    ignore_free(hand.tmpi3);
+    ignore_free(hand.tmpf);
+    ignore_free(hand.tmpf2);
+    ignore_free(hand.tmpf3);
+    ignore_free(hand.tmps);
+    ignore_free(hand.tmps2);
+    ignore_free(hand.tmpp);
+    ignore_free(hand.tmpp2);
+    ignore_free(hand.tmpks.s);
     return 0;    
 }
 struct annot_cols_vector * acols_vector_init()
@@ -74,18 +96,27 @@ int parse_columns(struct vcf_sql_api *api)
 {
     if (api == NULL) 
 	error("empty api");
+
     assert(api->columns);
-    assert(hand.hdr);
+    assert(hand.files->readers[hand.ti].header);
     assert(hand.hdr_out);
+
     if (api->type == anno_is_vcf) {
+
 	int ncols = 0;
 	struct annot_cols_vector *v = hand.vcf_cols;
+
 	if (v->m == v->n) {
 	    v->m = v->n == 0 ? 2: v->n << 1;
 	    v->vcols = (struct annot_cols*)realloc(v->vcols, v->m *sizeof(struct annot_cols));
 	}
 	struct annot_cols *ac = &v->vcols[v->n++];
-	ac->cols = init_columns((const char*)api->columns, hand.hdr, hand.hdr_out, &ncols, anno_is_vcf);
+	int length = 0;
+
+	//debug_print("%s", bcf_hdr_fmt_text(hand.files->readers[hand.ti].header, 1, &length));
+	
+	ac->cols = init_columns((const char*)api->columns, hand.files->readers[hand.ti].header, hand.hdr_out, &ncols, anno_is_vcf);
+	
 	if (ac->cols == NULL || ncols == 0) {
 	    warnings("failed to prase %s",api->columns);
 	    ac->cols = NULL;
@@ -105,6 +136,7 @@ int init_data(const char *json, const char *fname)
     }
     // assume input is VCF/BCF file
     hand.files = bcf_sr_init();
+    hand.files->require_index = 1;
     hand.vcf_cols = acols_vector_init();
     hand.sql_cols = acols_vector_init();
     
@@ -112,14 +144,20 @@ int init_data(const char *json, const char *fname)
 	error("Failed to open %s: %s\n", fname, bcf_sr_strerror(hand.files->errnum));
     }
 
-    int i;
+    hand.hdr =  hand.files->readers[0].header;
+    hand.hdr_out = bcf_hdr_dup(hand.hdr);
+    hand.vcmp = vcmp_init();
+    hand.tmpks.l = hand.tmpks.m = 0;
 
+    int i;
     for (i=0; i<anno_config_file.n_apis; ++i) {
 	/* only accept vcf/bcf for now*/
 	if (anno_config_file.apis[i].type == anno_is_vcf) {
-
-	    if (!bcf_sr_add_reader(hand.files, anno_config_file.apis[i].vfile)) 
+	    
+	    if ( !bcf_sr_add_reader(hand.files, anno_config_file.apis[i].vfile) ) 
 		error("Failed to open %s: %s\n", fname, bcf_sr_strerror(hand.files->errnum));
+	    
+	    hand.ti = i+1;
 	    parse_columns(&anno_config_file.apis[i]);
 	    
 	}
@@ -160,9 +198,10 @@ int init_data(const char *json, const char *fname)
 	}\
     } while(0)
 	    
-bcf1_t * anno_core(bcf1_t *line)
+bcf1_t *anno_core(bcf1_t *line)
 {
     int i, j;
+
     //int x = bcf_get_variant_types(line); // get the variant type
     //VARSTAT(x);
     // get the start position of variant
@@ -180,13 +219,15 @@ bcf1_t * anno_core(bcf1_t *line)
     /* } */
 
     for (i=0; i < hand.vcf_cols->n; ++i) {
-	bcf1_t *aline = bcf_sr_get_line(hand.files, i+1);
-	struct annot_cols *cols = &hand.vcf_cols->vcols[i];
+	hand.ti = i+1;
+	if ( bcf_sr_has_line(hand.files, hand.ti) ) {
+	    bcf1_t *aline = bcf_sr_get_line(hand.files, hand.ti);
+	    struct annot_cols *cols = &hand.vcf_cols->vcols[i];
 
-	for (j=0; j<cols->ncols; ++j) {
-	    annot_col_t *col = &cols->cols[j];
-	    if ( col->setter(&hand, line, col, aline) ) {
-		warnings("failed to annotate %s at %s:%d",col->hdr_key, bcf_seqname(hand.hdr, line), line->pos+1);
+	    for (j=0; j<cols->ncols; ++j) {
+		annot_col_t *col = &cols->cols[j];
+		if ( col->setter(&hand, line, col, aline) ) 
+		    warnings("failed to annotate %s at %s:%d",col->hdr_key, bcf_seqname(hand.hdr, line), line->pos+1);
 	    }
 	}
     }
@@ -261,7 +302,6 @@ int paras_praser(int argc, char **argv)
     if (argc - optind > 1)
 	error("Only accept one VCF/BCF file. Please use `bcftools merge` to merge all the VCF/BCF files first.");
 
-    
     htsFile *fp = hts_open(input_fname, "r");
 
     if (fp == NULL)
@@ -270,8 +310,9 @@ int paras_praser(int argc, char **argv)
     htsFormat type = *hts_get_format(fp);
 
     if (type.format != vcf && type.format != bcf) {
-	error("Unsupport input format! %s", input_fname);
+	error("Unsupported input format! %s", input_fname);
     }
+
     hts_close(fp);
     
     return init_data(config_file, input_fname);
@@ -285,16 +326,19 @@ int main(int argc, char **argv)
     }
     //check_environ_paras();
 
-    while( bcf_sr_next_line(hand.files))
-    {
+    while ( bcf_sr_next_line(hand.files)) {
+	
 	if ( !bcf_sr_has_line(hand.files, 0) ) continue;
 	bcf1_t *line = bcf_sr_get_line(hand.files, 0);
+
 	if ( line->errcode ) {
 	    error("Encountered error, cannot proceed. Please check the error output above.\n");
 	}
+
 	anno_core(line);
 	bcf_write1(hand.out_fn, hand.hdr_out, line);
     }
+    
     release_handler();
     return EXIT_SUCCESS;
 }

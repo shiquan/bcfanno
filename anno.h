@@ -95,7 +95,7 @@ extern void safe_release(void * p, rel_func func);
 
 #define error(line, ...) do						\
     {									\
-	fprintf(stderr, "[error] func:%s, line:%d, errno:%s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
+	fprintf(stderr, "[error] func : %s, line : %d, errno : %s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
 	errno = 0;							\
 	exit(EXIT_FAILURE);						\
     }while(0)
@@ -111,7 +111,7 @@ extern void safe_release(void * p, rel_func func);
 
 #define debug_print(line, ...) do						\
     {									\
-	fprintf(stderr, "[debug] func:%s, line:%d, errno:%s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
+	fprintf(stderr, "[debug] func : %s, line : %d, errno : %s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
     } while(0)
 
 

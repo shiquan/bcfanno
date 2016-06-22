@@ -17,8 +17,7 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
     kstring_t str = KSTRING_INIT;
     int i = -1;
 
-    while (*ss)
-    {
+    while (*ss) {
 	if ( *se && *se!=',' ) {
 	    se++;
 	    continue;
@@ -54,7 +53,9 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 		error("It is not allowed to change GT tag.");
 
 	    int hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
+	    
 	    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_FMT, hdr_id) ) {
+		
 		if ( type == anno_is_vcf ) {
 		    bcf_hrec_t *hrec = bcf_hdr_get_hrec(header_in, BCF_HL_FMT, "ID", str.s, NULL);
 		    if ( !hrec )
@@ -77,19 +78,25 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
             col->icol = -1;
             col->replace = replace;
             col->hdr_key = strdup(key);
+
             switch ( bcf_hdr_id2type(header_out, BCF_HL_FMT, hdr_id) ) {
+
 		case BCF_HT_INT:
 		    col->setter = type == anno_is_vcf ? vcf_setter_format_int : setter_format_int;
 		    break;
-                case BCF_HT_REAL:
+
+		case BCF_HT_REAL:
 		    col->setter = type == anno_is_vcf ? vcf_setter_format_real : setter_format_real;
 		    break;
-                case BCF_HT_STR:
+
+		case BCF_HT_STR:
 		    col->setter = type == anno_is_vcf ? vcf_setter_format_str : setter_format_str;
 		    break;
-                default :
+
+		default :
 		    error("The type of %s not recognised (%d)\n", str.s, bcf_hdr_id2type(header_out, BCF_HL_FMT, hdr_id));
             }
+
 	} else if ( !strncasecmp("INFO/", str.s, 5) ) {
 	    memmove(str.s, str.s+5, str.l-4);
 	    str.l -= 4;
@@ -181,12 +188,15 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 		    error("The tag %s not support yet (send an email to the mail list for function request please.)", str.s);
 		}		
 		} else { */
+
 	    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
 		if ( type == anno_is_vcf ) {
 		    bcf_hrec_t *hrec = bcf_hdr_get_hrec(header_in, BCF_HL_INFO, "ID", str.s, NULL);
+
 		    if ( !hrec )
 			error("The tag \"%s\" is not defined in header: %s\n", str.s, rules);
 		    tmp.l = 0;
+
 		    bcf_hrec_format(hrec, &tmp);
 		    bcf_hdr_append(header_out, tmp.s);
 		    bcf_hdr_sync(header_out);
@@ -202,23 +212,31 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 	    col->icol = i;
 	    col->replace = replace;
 	    col->hdr_key = strdup(str.s);
+
 	    col->number = bcf_hdr_id2length(header_out, BCF_HL_INFO, hdr_id);
+
 	    switch ( bcf_hdr_id2type(header_out, BCF_HL_INFO, hdr_id) ) {
+
 		case BCF_HT_FLAG:
 		    col->setter = type == anno_is_vcf ? vcf_setter_info_flag : setter_info_flag;
 		    break;
+
 		case BCF_HT_INT:
 		    col->setter = type == anno_is_vcf ? vcf_setter_info_int : setter_info_int;
 		    break;
+
 		case BCF_HT_REAL:
 		    col->setter = type == anno_is_vcf ? vcf_setter_info_real : setter_info_real;
 		    break;
+
 		case BCF_HT_STR:
 		    col->setter = type == anno_is_vcf ? vcf_setter_info_str : setter_info_str;
 		    break;
+
 		default:
 		    error("The type of %s not recognised (%d)\n", str.s, bcf_hdr_id2type(header_out, BCF_HL_INFO, hdr_id));
 	    }
+
 	    /* } */
 	}
 	if ( !*se ) break;

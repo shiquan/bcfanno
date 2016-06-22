@@ -344,6 +344,7 @@ int vcf_setter_filter(struct anno_handler *hand, bcf1_t *line, annot_col_t *col,
 {
     int i;
     bcf1_t *rec = (bcf1_t*) data;
+    bcf_hdr_t *hdr = hand->files->readers[hand->ti].header;
     if ( !(rec->unpacked & BCF_UN_FLT) ) bcf_unpack(rec, BCF_UN_FLT);
     if ( !(line->unpacked & BCF_UN_FLT) ) bcf_unpack(line, BCF_UN_FLT);
     if ( !rec->d.n_flt ) return 0;  // don't overwrite with a missing value
@@ -352,7 +353,7 @@ int vcf_setter_filter(struct anno_handler *hand, bcf1_t *line, annot_col_t *col,
         if ( col->replace==REPLACE_MISSING && line->d.n_flt ) return 0; // only update missing FILTER
         for (i=0; i<rec->d.n_flt; i++)
         {
-            const char *flt = bcf_hdr_int2id(hand->files->readers[1].header, BCF_DT_ID, rec->d.flt[i]);
+            const char *flt = bcf_hdr_int2id(hdr, BCF_DT_ID, rec->d.flt[i]);
             bcf_add_filter(hand->hdr_out,line,bcf_hdr_id2int(hand->hdr_out, BCF_DT_ID, flt));
         }
         return 0;
@@ -360,7 +361,7 @@ int vcf_setter_filter(struct anno_handler *hand, bcf1_t *line, annot_col_t *col,
     hts_expand(int,rec->d.n_flt,hand->mtmpi,hand->tmpi);
     for (i=0; i<rec->d.n_flt; i++)
     {
-        const char *flt = bcf_hdr_int2id(hand->files->readers[1].header, BCF_DT_ID, rec->d.flt[i]);
+        const char *flt = bcf_hdr_int2id(hdr, BCF_DT_ID, rec->d.flt[i]);
         hand->tmpi[i] = bcf_hdr_id2int(hand->hdr_out, BCF_DT_ID, flt);
     }
     bcf_update_filter(hand->hdr_out,line,NULL,0);
@@ -435,7 +436,8 @@ int setter_info_flag(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, 
 int vcf_setter_info_flag(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int flag = bcf_get_info_flag(hand->files->readers[1].header,rec,col->hdr_key,NULL,NULL);
+    bcf_hdr_t *hdr = hand->files->readers[hand->ti].header;
+    int flag = bcf_get_info_flag(hdr,rec,col->hdr_key,NULL,NULL);
     bcf_update_info_flag(hand->hdr_out,line,col->hdr_key,NULL,flag);
     return 0;
 }
@@ -504,7 +506,8 @@ int setter_info_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, v
 int vcf_setter_info_int(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int ntmpi = bcf_get_info_int32(hand->files->readers[1].header,rec,col->hdr_key,&hand->tmpi,&hand->mtmpi);
+    bcf_hdr_t *hdr = hand->files->readers[hand->ti].header;
+    int ntmpi = bcf_get_info_int32(hdr, rec, col->hdr_key, &hand->tmpi, &hand->mtmpi);
     if ( ntmpi < 0 ) return 0;    // nothing to add
 
     if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
@@ -584,7 +587,8 @@ int setter_info_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, 
 int vcf_setter_info_real(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int ntmpf = bcf_get_info_float(hand->files->readers[1].header,rec,col->hdr_key,&hand->tmpf,&hand->mtmpf);
+    bcf_hdr_t *hdr = hand->files->readers[hand->ti].header;
+    int ntmpf = bcf_get_info_float(hdr,rec,col->hdr_key,&hand->tmpf,&hand->mtmpf);
     if ( ntmpf < 0 ) return 0;    // nothing to add
 
     if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
@@ -721,7 +725,8 @@ int setter_info_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, v
 int vcf_setter_info_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    int ntmps = bcf_get_info_string(hand->files->readers[1].header,rec,col->hdr_key,&hand->tmps,&hand->mtmps);
+    bcf_hdr_t *hdr = hand->files->readers[hand->ti].header;
+    int ntmps = bcf_get_info_string(hdr,rec,col->hdr_key,&hand->tmps,&hand->mtmps);
     if ( ntmps < 0 ) return 0;    // nothing to add
 
     if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 

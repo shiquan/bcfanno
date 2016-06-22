@@ -79,14 +79,14 @@ static char *skip_comments(const char *json_file)
 	clear_errno();
         return NULL;
     }
-    char *json;
+    char *json = NULL;
     int temp, len=0, max=0;
     int i, j;
     char buf[LINE_CACHE];
     while ((temp=fread(buf, 1, LINE_CACHE, fp)) != 0 )
     {
-        if ( len+temp+1>max ) {
-            max=len+temp+1;
+        if ( len + temp + 1 > max ) {
+            max = len + temp + 1;
             kroundup32(max);
             json = (char*)realloc(json, max);
         }
@@ -210,9 +210,7 @@ static int load_readers(const kson_t *s)
                 config_hgvs_release();
             }
             //continue; // only accept one node
-        }
-
-        if (!strcmp(node->key, "api")) {
+        } else if (!strcmp(node->key, "api")) {
 	    if (node->type != KSON_TYPE_BRACKET) {
 		error("Wrong format! api configure should looks like this: api:[{},{}]");
 	    }
@@ -230,7 +228,7 @@ static int load_readers(const kson_t *s)
                 if ( node1==NULL) continue;
 		struct vcf_sql_api * const api = &anno_config_file.apis[anno_config_file.n_apis++];
 		for (j = 0; j < (long)node1->n; ++j) {
-		    debug_print("n: %llu\ti:%ld\n", node1->n, j);
+		    //debug_print("n: %llu\ti:%ld\n", node1->n, j);
 		    const kson_node_t *node2 = kson_by_index(node1, j);
 		    BRANCH(node2, "type", api->type, check_anno_type);
 		    BRANCH(node2, "file", api->vfile, strdup);
@@ -301,7 +299,6 @@ int load_config(const char *json_file)
     const char *json = skip_comments(json_file);
     if (json==NULL) return 1;
     anno_config_file.path_string = strdup(json_file);
-    fprintf(stderr, "configure file:\n%s\n", json);
     kson = kson_parse(json);
     safe_free(json);
     if ( !kson )
@@ -311,7 +308,7 @@ int load_config(const char *json_file)
     if (n < 0) {
 	debug_print("Failed to load file from %s\n", json_file);
     }
-    debug_configure_file();
+    //debug_configure_file();
     //config_release();
     kson_destroy(kson);
     return 0;
