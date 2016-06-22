@@ -162,7 +162,7 @@ struct refrna_file_option {
 
 enum strand { strand_plus, strand_minus, strand_unknonw, };
 
-extern annot_col_t *init_columns(char *rules, bcf_hdr_t *in, bcf_hdr_t *out, int *n, enum anno_type type);
+extern annot_col_t *init_columns(const char *rules, bcf_hdr_t *in, bcf_hdr_t *out, int *n, enum anno_type type);
 
 struct sql_connect
 {
@@ -292,7 +292,6 @@ extern int vcf_setter_format_real(struct anno_handler *hand, bcf1_t *line, annot
 extern int vcf_setter_format_str(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
 
 /**/
-extern void handler_release(void *hand);
 extern void rebuild_annot_lines(struct anno_handler *hand);
 
 

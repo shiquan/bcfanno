@@ -4,13 +4,13 @@
 //#include "hgvs.h"
 
 // only if annotation database is VCF/BCF file, header_in has values or else header_in == NULL
-annot_col_t *init_columns(char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
+annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
 {
     assert(rules != NULL);
     if (type == anno_is_vcf && header_in == NULL) {
 	error("Inconsistent file type!");
     }
-    char *ss = rules, *se = ss;
+    char *ss = (char*)rules, *se = ss;
     int nc = 0;
     annot_col_t *cols = NULL;
     kstring_t tmp = KSTRING_INIT;
@@ -235,21 +235,10 @@ void print_annot_cols(annot_col_t *cols, int n)
     int i;
     for (i=0; i<n; ++i) {
 	annot_col_t *col = &cols[i];
-	fprintf(stderr, "[%s] %d : %s\n",__func__, col->icol, col->hdr_key);
+	fprintf(stderr, "[%s] %d : %s, %p\n",__func__, col->icol, col->hdr_key, col->setter);
     }
     return;
 }
-/* int setter_id(setters_t *handler, bcf1_t *line, struct annot_col *col, void *data) */
-/* { */
-/*     annot_line_t *tab = (annot_line_t*)data; */
-/*     if ( tab->cols[col->icol] && tab->cols[col->icol][0]=='.' && !tab->cols[col->icol][1]) */
-/* 	return 0; // donot replace with '.' */
-/*     if ( col->replace != REPLACE_MISSING) */
-/* 	return bcf_update_id(handler->hdr_out, line, tab->cols[col->icol]); */
-
-/*     if ( !line->d.id || (line->d.id[0]=='.' && !line->d.id[1]) ) */
-/* 	return bcf_update_id() */
-/* } */
 
 #ifdef _SETTER_MAIN
 
@@ -258,8 +247,10 @@ void print_annot_cols(annot_col_t *cols, int n)
 
 int main(int argc, char **argv)
 {
-    if (argc != 3)
-	error("anno_setter <in.vcf.gz> <columns_string>");
+    if (argc != 3) {
+	fprintf(stderr,"anno_setter <in.vcf.gz> <columns_string>\n");
+	return 1;
+    }
     bcf_hdr_t *h = NULL; //bcf_hdr_init();
     htsFile *fp = hts_open(argv[1], "r");
     if (fp == NULL)
