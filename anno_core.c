@@ -1,5 +1,6 @@
 #include "anno.h"
 #include "plugin.h"
+#include "version.h"
 
 /* stat variants positions */
 struct {
@@ -24,28 +25,6 @@ struct anno_handler hand = {
     .vcf_cols = NULL,
     .sql_cols = NULL,
     //.connects=NULL
-    /* .sample_map = NULL, */
-    /* .nsample_map = 0, */
-    /* .sample_is_file = 0, */
-    /* .mtmpi = 0, */
-    /* .mtmpi2 = 0, */
-    /* .mtmpi3 = 0, */
-    /* .mtmps = 0, */
-    /* .mtmps2 = 0, */
-    /* .mtmps3 = 0, */
-    /* .mtmpf = 0, */
-    /* .mtmpf2 = 0, */
-    /* .mtmpf3 = 0, */
-    /* .tmpi = NULL, */
-    /* .tmpi2 = NULL, */
-    /* .tmpi3 = NULL, */
-    /* .tmpf = NULL, */
-    /* .tmpf2 = NULL, */
-    /* .tmpf3 = NULL, */
-    /* .tmps = NULL, */
-    /* .tmps2 = NULL, */
-    /* .tmpp = NULL, */
-    /* .tmpp2 = NULL, */
 };
 
 int destroy_cols_vector(struct annot_cols_vector *v)
@@ -58,19 +37,27 @@ int destroy_cols_vector(struct annot_cols_vector *v)
 	for (j=0; j<cols->ncols; ++j) {
 	    free(cols->cols[j].hdr_key);
 	}
-	free(v->vcols);
+	free(cols->cols);
     }
+    free(v->vcols);
     free(v);
     return 0;    
 }
 
+const char *hts_bcf_wmode(int file_type)
+{
+    if ( file_type == FT_BCF ) return "wbu";    // uncompressed BCF
+    if ( file_type & FT_BCF ) return "wb";      // compressed BCF
+    if ( file_type & FT_GZ ) return "wz";       // compressed VCF
+    return "w";                                 // uncompressed VCF
+}
 int release_handler()
 {
     bcf_sr_destroy(hand.files);
-    bcf_hdr_destroy(hand.hdr);
     bcf_hdr_destroy(hand.hdr_out);
     destroy_cols_vector(hand.vcf_cols);
     destroy_cols_vector(hand.sql_cols);
+    hts_close(hand.out_fh);
     ignore_free(hand.sample_map);
     ignore_free(hand.tmpi);
     ignore_free(hand.tmpi2);
@@ -111,10 +98,7 @@ int parse_columns(struct vcf_sql_api *api)
 	    v->vcols = (struct annot_cols*)realloc(v->vcols, v->m *sizeof(struct annot_cols));
 	}
 	struct annot_cols *ac = &v->vcols[v->n++];
-	int length = 0;
 
-	//debug_print("%s", bcf_hdr_fmt_text(hand.files->readers[hand.ti].header, 1, &length));
-	
 	ac->cols = init_columns((const char*)api->columns, hand.files->readers[hand.ti].header, hand.hdr_out, &ncols, anno_is_vcf);
 	
 	if (ac->cols == NULL || ncols == 0) {
@@ -235,9 +219,6 @@ bcf1_t *anno_core(bcf1_t *line)
 }
 #undef VARSTAT
 
-static char *input_fname = NULL;
-static char *config_fname = NULL;
-
 #include <getopt.h>
 
 static struct option opts[] = {
@@ -251,8 +232,9 @@ static struct option opts[] = {
 int usage()
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "About : Annotate VCF/BCF file.\n");    
-    fprintf(stderr, "Usage: vcfanno -c config.json in.vcf.gz\n");
+    fprintf(stderr, "About : Annotate VCF/BCF file.\n");
+    fprintf(stderr, "Version : %s\n", VCFANNO_VERSION);
+    fprintf(stderr, "Usage : vcfanno -c config.json in.vcf.gz\n");
     fprintf(stderr, "   -c, --config <file>            configure file, include annotations and tags, see man page for details\n");
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
@@ -266,6 +248,7 @@ int paras_praser(int argc, char **argv)
     int c;
     char *config_file = NULL;
     char *input_fname = NULL;
+    hand.out = "-";
     if (argc == 1)
 	return usage();
     while ( (c=getopt_long(argc, argv, "O:o:c:h", opts, NULL))>=0 ) {
@@ -314,8 +297,13 @@ int paras_praser(int argc, char **argv)
     }
 
     hts_close(fp);
+    hand.out_fh = hts_open(hand.out, hts_bcf_wmode(hand.output_type));
+    if (hand.out_fh == NULL)
+	error("cannot write to %s", hand.out);
     
-    return init_data(config_file, input_fname);
+    int ret = init_data(config_file, input_fname);
+    free(config_file);
+    return ret;
 }
 
 
@@ -336,7 +324,9 @@ int main(int argc, char **argv)
 	}
 
 	anno_core(line);
-	bcf_write1(hand.out_fn, hand.hdr_out, line);
+	int length = 0;
+	
+	bcf_write1(hand.out_fh, hand.hdr_out, line);
     }
     
     release_handler();

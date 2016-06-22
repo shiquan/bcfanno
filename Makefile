@@ -4,7 +4,7 @@ PROG=       vcfanno
 all: $(PROG) $(TEST_PROG)
 
 # Adjust $(HTSDIR) to point to your top-level htslib directory
-HTSDIR = htslib-1.2.1
+HTSDIR = htslib-1.3
 include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
 #BGZIP  = $(HTSDIR)/bgzip
@@ -47,12 +47,6 @@ force:
 .c.o:
 	$(CC) -c $(CFLAGS) $(DFLAGS) $(INCLUDES) $< -o $@
 
-test: $(PROG) plugins test/test-rbuf $(BGZIP) $(TABIX)
-	./test/test.pl --exec bgzip=$(BGZIP) --exec tabix=$(TABIX)
-
-test-plugins: $(PROG) plugins test/test-rbuf $(BGZIP) $(TABIX)
-	./test/test.pl --plugins --exec bgzip=$(BGZIP) --exec tabix=$(TABIX)
-
 
 # Plugin rules
 #PLUGINC = $(foreach dir, plugins, $(wildcard $(dir)/*.c))
@@ -66,8 +60,8 @@ test-plugins: $(PROG) plugins test/test-rbuf $(BGZIP) $(TABIX)
 
 #plugins: $(PLUGINS)
 
-vcfanno: $(HTSLIB) 
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ vcfanno.c vcmp.c $(HTSLIB) -lz
+vcfanno: $(HTSLIB) version.h
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ anno_core.c vcmp.c config.c anno_setter.c kson.c vcfannotate.c $(HTSLIB) -lz
 
 
 #docs: doc/bcftools.1 doc/bcftools.html
@@ -77,12 +71,10 @@ vcfanno: $(HTSLIB)
 #	$(INSTALL_PROGRAM) $(PROG) plot-vcfstats vcfutils.pl $(DESTDIR)$(bindir)
 #	$(INSTALL_DATA) doc/bcftools.1 $(DESTDIR)$(man1dir)
 
-clean: testclean clean-plugins
-	-rm -f gmon.out *.o *~ $(PROG) version.h plugins/*.so plugins/*.P
+clean: testclean
+	-rm -f gmon.out *.o *~ $(PROG) version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
 
-clean-plugins:
-	-rm -f plugins/*.so plugins/*.P plugins/*.dSYM
 
 testclean:
 	-rm -f test/*.o test/*~ $(TEST_PROG)

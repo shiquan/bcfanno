@@ -219,7 +219,7 @@ struct anno_handler
     //int vcf_anno_count;
     //int sql_anno_count;
     bcf_hdr_t *hdr, *hdr_out;
-    htsFile *out_fn;
+    htsFile *out_fh;
     char *out;
     int output_type, n_threads;
     //struct anno_hgvs_option *hgvs_opts;
