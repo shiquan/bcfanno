@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <math.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <htslib/vcf.h>
 #include <htslib/kstring.h>
 #include <htslib/khash.h>
