@@ -75,7 +75,14 @@
 #define MEMPOOL     2621440
 
 #define NONFLAG  -2
-static void error(const char *format, ...);
+#define str_errno() (errno == 0 ? "None" : strerror(errno))
+
+#define error(line, ...) do						\
+    {									\
+	fprintf(stderr, "[error] func : %s, line : %d, errno : %s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
+	errno = 0;							\
+	exit(EXIT_FAILURE);						\
+    }while(0)
 
 /* split flag */
 static int split_flag = SPLIT_DEFAULT;
@@ -174,7 +181,8 @@ int tags2str(tags_t * const t, kstring_t *s)
 
 		if ((f->type & IS_TRANS) && f->m > 1)
 		{
-		    if (d != 1 && d != f->m) error("ERROR: TRANS tags have different transcripts!\n");
+		    if (d != 1 && d != f->m)
+			error("TRANS tags have different transcripts!\n");
 		    d=f->m;
 		}
 		if (f->type & IS_TRANS)
@@ -221,7 +229,8 @@ int convert_header(kstring_t *str)
 	    continue;
 	}
 	if ( convert->fmt[i].type & IS_SAM ) {
-	    if ( !(split_flag & SPLIT_SAMPLE) ) error("split tag has inconsistent format\n");
+	    if ( !(split_flag & SPLIT_SAMPLE) )
+		error("split tag has inconsistent format\n");
 	    kputs("SAMPLE", str);
 	    continue;
 	}
@@ -502,7 +511,8 @@ static void process_filter(bcf1_t *line, fmt_t *fmt, int iala, int isample, tags
 }
 static void process_tgt(bcf1_t *line, fmt_t *fmt, int iala, int isample, tags_t *tag)
 {
-    if (iala != NONFLAG ) error("%TGT only used with SPLIT_GT \n");
+    if (iala != NONFLAG )
+	error("%%TGT only used with SPLIT_GT \n");
     mval_t *pv= &tag->trans[tag->m][tag->n];
     if ( fmt->fmt==NULL ) kputc('.', &pv->a[pv->m]);
     else
@@ -674,7 +684,8 @@ static void process_sample(bcf1_t *line, fmt_t *fmt, int iala, int isample, tags
 }
 static void process_sep(bcf1_t *line, fmt_t *fmt, int iala, int isample, tags_t *tag)
 {
-    if (!fmt->key) error("FIXME: This is an empty fmt\n");
+    if (!fmt->key)
+	error("FIXME: This is an empty fmt\n");
     mval_t *pv= &tag->trans[tag->m][tag->n];
     pv->type = fmt->type;
     kputs(fmt->key,&pv->a[pv->m++]);
@@ -759,35 +770,85 @@ fmt_t *register_tag(int type, char *key, int is_gtf)
     /* 	/\*     } *\/ */
     /* 	/\*}*\/ */
     /* } */
-    switch ( fmt->type )
-    {
-    case S_FIRST_ALT: fmt->handler = &process_first_alt; break;
-    case S_CHROM: fmt->handler = &process_chrom; break;
-    case S_POS: fmt->handler = &process_pos; break;
-    case S_BED: fmt->handler = &process_bed; break;
-    case S_ID: fmt->handler = &process_id; break;
-    case S_REF: fmt->handler = &process_ref; break;
-    case S_ALT: fmt->handler = &process_alt; break;
-    case S_QUAL: fmt->handler = &process_qual; break;
-    case S_FILTER: fmt->handler = &process_filter; convert->max_unpack |= BCF_UN_FLT; break;
-    case S_INFO: fmt->handler = &process_info; convert->max_unpack |= BCF_UN_INFO; break;	
-    case S_TRANS: fmt->handler = &process_trans; convert->max_unpack |= BCF_UN_INFO; break;
-    case S_FORMAT: fmt->handler = &process_format; convert->max_unpack |= BCF_UN_FMT; break;
-    case S_SAMPLE: fmt->handler = &process_sample; break;
-    case S_SEP: fmt->handler = &process_sep; break;
-    case S_TGT: fmt->handler = &process_tgt; convert->max_unpack |= BCF_UN_FMT; break;
-    default: error("TODO: handler for type %d\n", fmt->type);
+    switch ( fmt->type ) {
+    
+	case S_FIRST_ALT:
+	    fmt->handler = &process_first_alt;
+	    break;
+	    
+	case S_CHROM:
+	    fmt->handler = &process_chrom;
+	    break;
+	    
+	case S_POS:
+	    fmt->handler = &process_pos;
+	    break;
+	    
+	case S_BED:
+	    fmt->handler = &process_bed;
+	    break;
+
+	case S_ID:
+	    fmt->handler = &process_id;
+	    break;
+
+	case S_REF:
+	    fmt->handler = &process_ref;
+	    break;
+
+	case S_ALT:
+	    fmt->handler = &process_alt;
+	    break;
+
+	case S_QUAL:
+	    fmt->handler = &process_qual;
+	    break;
+	    
+	case S_FILTER:
+	    fmt->handler = &process_filter;
+	    convert->max_unpack |= BCF_UN_FLT;
+	    break;
+	    
+	case S_INFO:
+	    fmt->handler = &process_info;
+	    convert->max_unpack |= BCF_UN_INFO;
+	    break;
+	    
+	case S_TRANS:
+	    fmt->handler = &process_trans;
+	    convert->max_unpack |= BCF_UN_INFO;
+	    break;
+	    
+	case S_FORMAT:
+	    fmt->handler = &process_format;
+	    convert->max_unpack |= BCF_UN_FMT;
+	    break;
+	    
+	case S_SAMPLE:
+	    fmt->handler = &process_sample;
+	    break;
+	    
+	case S_SEP:
+	    fmt->handler = &process_sep;
+	    break;
+	    
+	case S_TGT:
+	    fmt->handler = &process_tgt;
+	    convert->max_unpack |= BCF_UN_FMT;
+	    break;
+	    
+	default:
+	    error("TODO: handler for type %d\n", fmt->type);
     }
-    if ( key )
-    {
-	if ( fmt->type==S_INFO )
-	{
+    if ( key ) {
+	if ( fmt->type==S_INFO ) {
 	    fmt->id = bcf_hdr_id2int(header, BCF_DT_ID, key);
 	    if ( fmt->id==-1 ) error("Error: no such tag defined in the VCF header: INFO/%s\n", key);
 	}
     }
     return fmt;
 }
+
 static char *parse_tag(char *p, int is_gtf)
 {
     char *q = ++p;
@@ -795,18 +856,14 @@ static char *parse_tag(char *p, int is_gtf)
     kstring_t str = {0,0,0};
     if ( q-p==0 ) error("Could not parse format string: %s\n", convert->format_str);
     kputsn(p, q-p, &str);
-    if ( is_gtf )
-    {
+    if ( is_gtf ) {
 	if ( !strcmp(str.s, "SAMPLE") ) register_tag(S_SAMPLE, "SAMPLE", is_gtf);
 	else if ( !strcmp(str.s, "GT") || !strcmp(str.s, "TGT")) register_tag(S_TGT, "GT", is_gtf);
 	else if ( !strcmp(str.s, "IUPACGT") ) register_tag(S_IUPAC_GT, "GT", is_gtf);
-	else
-	{
+	else {
 	    register_tag(S_FORMAT, str.s, is_gtf);
 	}
-    }
-    else
-    {
+    } else {
 	if ( !strcmp(str.s, "CHROM") ) register_tag(S_CHROM, "CHROM", is_gtf);
 	else if ( !strcmp(str.s, "POS") ) register_tag(S_POS, "POS", is_gtf);
 	else if ( !strcmp(str.s, "BED") ) register_tag(S_BED, "BED", is_gtf);
@@ -820,8 +877,7 @@ static char *parse_tag(char *p, int is_gtf)
 	else if ( !strcmp(str.s, "SAMPLE") ) { split_flag |= SPLIT_SAMPLE; register_tag(S_SAMPLE, "SAMPLE", is_gtf); }
 	else if ( !strcmp(str.s, "FIRST_ALT") ) register_tag(S_FIRST_ALT, "FIRST_ALT", is_gtf);
 	else if ( !strcmp(str.s, "QUAL") ) register_tag(S_QUAL, "QUAL", is_gtf);
-	else if ( !strcmp(str.s, "INFO") )
-	{
+	else if ( !strcmp(str.s, "INFO") ) {
 	    if ( *q=='/' ) error("Could not parse format string: %s\n", convert->format_str);
 	    p = ++q;
 	    str.l = 0;
@@ -829,9 +885,7 @@ static char *parse_tag(char *p, int is_gtf)
 	    if ( q-p==0 ) error("Could not parse format string: %s\n", convert->format_str);
 	    kputsn(p, q-p, &str);
 	    register_tag(S_INFO, str.s, is_gtf);
-	}
-	else
-	{
+	} else {
 	    register_tag(S_INFO, str.s, is_gtf);
 	}
     }
@@ -842,10 +896,8 @@ static char *parse_sep(char *p, int is_gtf)
 {
     char *q = p;
     kstring_t str = { 0, 0, 0};
-    while ( *q && *q!='[' && *q!=']' && *q!='%' )
-    {
-	if ( *q=='\\' )
-	{
+    while ( *q && *q!='[' && *q!=']' && *q!='%' ) {
+	if ( *q=='\\' ) {
 	    q++;
 	    if ( *q=='n' ) kputc('\n', &str);
 	    else if ( *q == 't') kputc('\t', &str);
@@ -885,29 +937,22 @@ const char *about(void)
     return "Select tags in pre-defined format.\n";
 }
 
-const char *usage(void)
+int usage(void)
 {
-    return
-	"\n"
-	"About : Select tags from VCF/BCF file.\n"
-	"Usage:\n"
-	"Standalone mode:\n"
-	"\tbcfselect [Options] in.vcf.gz\n"
-	"Options:\n"
-	"\t-f, --format   see man page for deatils.\n"
-	"\t-s, --split    split by [ALT,SAMPLE,TRANS].\n"
-	"\t-p, --print-header  print the header comment.\n"
-	"BCFtools plugin mode:\n"
-	"\tbcftools +select [General Options] -- [Plugin Options]\n"
-	"General Options:\n"
-	"\trun \"bcftools plugin\" for a list of common options.\n"
-	"Plugin Options: same with standalone mode.\n"
-	"\n"
-	"Website:\n";
+    fprintf(stderr,"About : Select tags from VCF/BCF file.\n");
+    fprintf(stderr,"Usage:\n");
+    fprintf(stderr,"Standalone mode:\n");
+    fprintf(stderr,"\tbcfselect [Options] in.vcf.gz\n");
+    fprintf(stderr,"Options:\n");
+    fprintf(stderr,"\t-f, --format   see man page for deatils.\n");
+    fprintf(stderr,"\t-s, --split    split by [ALT,SAMPLE,TRANS].\n");
+    fprintf(stderr,"\t-p, --print-header  print the header comment.\n");
+    fprintf(stderr,"Website :\n");
+    fprintf(stderr,"https://github.com/shiquan/vcfanno\n");
+    return 1;
 }
 
 kstring_t *mempool = NULL;
-
 
 int run(int argc, char**argv)
 {
@@ -921,17 +966,29 @@ int run(int argc, char**argv)
 	};
     char c;
     char *format = NULL, *flag = NULL;
-    while ((c = getopt_long(argc, argv, "f:s:rph?", long_opts, NULL)) >= 0)
-    {
-	switch (c)
-	{
-	case 'f': format = strdup(optarg); break;
-	case 'r': skip_ref = 1; break;
-	case 's': flag = strdup(optarg); break;
-	case 'p': print_header = 1; break;
-	case 'h':
-	case '?':
-	default: error("%s", usage()); break;
+    while ((c = getopt_long(argc, argv, "f:s:rph?", long_opts, NULL)) >= 0) {
+	switch (c) {
+	    case 'f':
+		format = strdup(optarg);
+		break;
+		
+	    case 'r':
+		skip_ref = 1;
+		break;
+		
+	    case 's':
+		flag = strdup(optarg);
+		break;
+		
+	    case 'p':
+		print_header = 1;
+		break;
+		
+	    case 'h':
+	    case '?':
+	    default:
+		return usage();
+
 	}
     }
     bcf_srs_t *sr = bcf_sr_init();
@@ -946,8 +1003,21 @@ int run(int argc, char**argv)
     /* 	fname = argv[optind]; */
     /* } */
     /* if ( !bcf_sr_add_reader(sr, fname) ) error("Failed to open %s : %s\n", fname, bcf_sr_strerror(sr->errnum)); */
-    if (!argv[0]) error("%s", usage());
-    if (!bcf_sr_add_reader(sr, argv[0])) error("Failed to open %s : %s\n", argv[optind], bcf_sr_strerror(sr->errnum));
+    char *input = NULL;
+    if (argc == optind) {
+	if ( !isatty(fileno((FILE*)stdin))) input = "-";
+	else
+	    return usage();
+    } else {
+	input = argv[optind];
+    }
+	
+    if (!argv[optind])
+	return usage();
+
+    if (!bcf_sr_add_reader(sr, input))
+	error("Failed to open %s : %s\n", argv[optind], bcf_sr_strerror(sr->errnum));
+
     header = sr->readers[0].header;
 
     if (flag)
@@ -974,8 +1044,8 @@ int run(int argc, char**argv)
 
     if (print_header) convert_header(mempool);
 
-    while (bcf_sr_next_line(sr))
-    {
+    while (bcf_sr_next_line(sr)) {
+
 	bcf1_t *line = bcf_sr_get_line(sr, 0);
 	convert_line(line, mempool);
 	if (mempool->l > MEMPOOL)
@@ -993,29 +1063,9 @@ int run(int argc, char**argv)
 }
 
 
-#ifdef _SELECT_MAIN
+
 int main(int argc, char **argv)
 {
-    return run(argc-1, argv+1);
-}
-#endif
-
-#ifndef BCFTOOLS_VERSION
-#define BCFTOOLS_VERSION "1.2"
-
-static void version(const char **bcftools_version, const char **htslib_version)
-{
-    *bcftools_version = BCFTOOLS_VERSION;
-    *htslib_version = hts_version();
+    return run(argc, argv);
 }
 
-static void error(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    vfprintf(stderr, format, ap);
-    va_end(ap);
-    exit(-1);
-}
-
-#endif
