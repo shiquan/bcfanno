@@ -233,7 +233,7 @@ int usage()
 {
     fprintf(stderr, "\n");
     fprintf(stderr, "About : Annotate VCF/BCF file.\n");
-    fprintf(stderr, "Version : %s\n", VCFANNO_VERSION);
+    fprintf(stderr, "Version : %s, build with htslib version : %s\n", VCFANNO_VERSION, hts_version());
     fprintf(stderr, "Usage : vcfanno -c config.json in.vcf.gz\n");
     fprintf(stderr, "   -c, --config <file>            configure file, include annotations and tags, see man page for details\n");
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
@@ -324,8 +324,7 @@ int main(int argc, char **argv)
 	}
 
 	anno_core(line);
-	int length = 0;
-	
+		
 	bcf_write1(hand.out_fh, hand.hdr_out, line);
     }
     
