@@ -61,7 +61,7 @@ force:
 #plugins: $(PLUGINS)
 
 vcfanno: $(HTSLIB) version.h
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ anno_core.c vcmp.c config.c anno_setter.c kson.c vcf_annos.c $(HTSLIB) -lz
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ anno_core.c vcmp.c config.c anno_setter.c kson.c vcf_annos.c $(HTSLIB) -pthread -lz
 
 
 #docs: doc/bcftools.1 doc/bcftools.html
