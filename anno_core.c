@@ -313,7 +313,9 @@ int main(int argc, char **argv)
 	return EXIT_FAILURE;
     }
     //check_environ_paras();
-
+    if ( bcf_hdr_write(hand.out_fh, hand.hdr_out) )
+	error("failed to write header.");
+	    
     while ( bcf_sr_next_line(hand.files)) {
 	
 	if ( !bcf_sr_has_line(hand.files, 0) ) continue;
