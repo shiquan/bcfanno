@@ -1,25 +1,12 @@
-/*   select.c  --
- *   This is a plugin of bcftools for selecting fields in defined format from VCF/BCF file
+/*   vcf2tsv.c  --
+ *   the program select fields in defined format from VCF/BCF file and convert into tsv file
  *
- *   The extracting rules are most similar with `bcftools-query -f`, but still
- *   there are two different rules in this plugin. 
- *   1) each sample can be exported per line by specify %SAMPLE in the INFO region
- *   2) split entry by specified tag  '--split NONE,ALT,GT,SAMPLE,HGVS,ALL'
- *
- *   Copyright (C) 2015 BGI Research
- *
- *   Author : SHI Quan (shiquan@genomics.cn)
- *
- *   License : MIT
- *
- *   This program is inspired by pd3's vcfquery.c .
- *
- * 
+ *   Copyright 2015, 2016   shiquan@genomics.cn
  * Demo:
  *
- * bcfselect -f '%CHROM\t%POS\t%REF[\t%TGT\t%DP]' demo.vcf.gz
+ * vcf2tsv -f '%CHROM\t%POS\t%REF[\t%TGT\t%DP]' demo.vcf.gz
  *
- * bcfselect -f '%BED\t%SAMPLE\t%REF\t%ALT\t[%DP]' demo.vcf.gz
+ * vcf2tsv -f '%BED\t%SAMPLE\t%REF\t%ALT\t[%DP]' -
  *
  */
 
@@ -39,44 +26,15 @@
 
 // split mode
 #define SPLIT_NONE     1          //  bcftools query mode, one bcf1_t per line
-//#define SPLIT_TAG      0
 #define SPLIT_SAMPLE   2          //  flag for spliting by sample
 #define SPLIT_ALT      4          //  flag for split by allele, each alt per line
-//#define SPLIT_GT       2          //  flag for split by genotype (0/0, 0/1, 1/1), it's same with split by samples ^ SPLIT_ALT
-//#define SPLIT_TRANS    (1<<4)     //  flag for split by TRANS name, if use this flag any tags related with transcripts should be split 
 #define SPLIT_DEFAULT  0
-//#define SPLIT_ALL      (SPLIT_SAMPLE | SPLIT_ALT | SPLIT_TRANS)
 
-#define TAG_UNKNOWN   0
-#define TAG_CHROM     1
-#define TAG_POS       2
-#define TAG_ID        4
-#define TAG_REF       8
-#define TAG_ALT       16
-#define TAG_BED       32
-#define TAG_QUAL      64
-#define TAG_FILTER    128
-#define TAG_INFO      256
-#define TAG_FORMAT    513
-#define TAG_SAMPLE    1024
-#define TAG_SEP       2048
-#define TAG_TYPE      4096
-#define TAG_GT        8192
-#define TAG_TGT       8192
-//#define TAG_IUPAC_GT  16384
-//#define TAG_FIRST_ALT 32768
-//#define TAG_TRANS     65536
+/*
+  BED,REF,ALT,GT,SAMPLE,...
+ */
 
-#define IS_SEP    (TAG_SEP)
-#define IS_SAM    (TAG_SAMPLE)
-//#define IS_ALT    (TAG_BED | TAG_ALT | TAG_INFO | TAG_FORMAT | TAG_TRANS)
-#define IS_ALT    (TAG_BED | TAG_ALT | TAG_INFO | TAG_FORMAT)
-#define IS_GT     (TAG_GT | TAG_TGT)
-//#define IS_TRANS  (TAG_TRANS)
-
-#define MEMPOOL     2621440
-
-#define NONFLAG  -2
+#define KSTRING_INIT { 0, 0, 0}
 
 #define str_errno() (errno == 0 ? "None" : strerror(errno))
 
@@ -86,26 +44,6 @@
 	errno = 0;							\
 	exit(EXIT_FAILURE);						\
     } while(0)
-
-/* split flag */
-static int split_flag = SPLIT_DEFAULT;
-
-/* bcf_hdr_t * header; */
-
-/* the fmt_t and convert_t are adapted from pd3's convert.c 
- * if we want export the sample info and allele info per line
- * we must rewrite the process_* functions in convert.c
- */
-/* typedef struct _convert convert_t; */
-/* typedef struct _tags     tags_t; */
-
-/* struct _fmt { */
-/*     int id, type, is_format; */
-/*     char *key; */
-/*     bcf_fmt_t *fmt; */
-/*     void (*handler)(bcf1_t *, struct _fmt *, int l, int isample, tags_t *); */
-/*     // int l, allele */
-/* }; */
 
 enum col_type {
     is_unknown,
@@ -142,33 +80,16 @@ struct _convert_cols {
     int m, n;
     col_t *cols;
     int max_unpack;
-    char *format_string;
 };
 
+/* value for each node in print cached matrix */
 struct matrix_value {
     enum col_type type;
     int m, n; // m: max memory cache
     kstring_t *a; 
 };
 
-/* typedef struct _fmt fmt_t; */
-
-/* struct _convert { */
-/*     int mfmt, nfmt; // mfmt: max memory cache, nfmt: used memory cache */
-/*     int max_unpack; // unpack flag */
-/*     fmt_t *fmt; */
-/*     char *format_str; */
-/* }; */
-
-
-/* struct _mval_t { */
-/*     int type; // tag types */
-/*     int m, n;    // m: max memory cache, n: used */
-/*     kstring_t *a;  */
-/* }; */
-
-/* typedef struct _mval_t mval_t; */
-
+// matrix cache
 struct _matrix_cache {
     int allele_count;
     int sample_count;
@@ -176,6 +97,7 @@ struct _matrix_cache {
     struct matrix_value **matrix;
 };
 
+// options and handlers
 struct args {
     int skip_reference;
     int print_header;
@@ -186,6 +108,7 @@ struct args {
     bcf_header_t *hdr;
 };
 
+// init args
 struct args args = {
     .skip_reference = 0,
     .print_header = 1,
@@ -196,37 +119,42 @@ struct args args = {
     .hdr = NULL,
 };
 
-/* struct _tags { */
-/*     int n, m; // n : fields , m : genotypesn*samples */
-    
-/*     int allele_count; */
-/*     int k, l; // the sizes of matrix */
-/*     mval_t **trans; */
-/* }; */
+ccols_t * ccols_init()
+{
+    ccols_t *ccols = (ccols_t *)calloc(sizeof(ccols_t));
+    ccols->m = ccols->n = 0;
+    ccols->cols = 0;
+    ccols->max_unpack = 0;
+    return ccols;
+}
 
-/* // tags format */
-/* static tags_t *tag = NULL; */
-
-/* static int skip_ref = 0; */
-/* static int print_header = 0; */
 void format_string_init(char *s)
 {
     if (s== NULL)
 	error("Empty format string!");
     
-    args.convert = (ccols_t *)calloc(sizeof(ccols_t));
-    ccols_t *convert = args.convert;
-    convert->format_string = strdup(s);
-    convert->
+    ccols_t *convert = args.convert = ccols_init();
+
+    char *p = s;
+
+    for (;*p; ++p) {
+	char *q = p;	
+	while (*q && *q != ',') q++;
+	if (q-p != 0) {
+	    kstring tmp = KSTRING_INIT;
+	    kputsn(p, q-p, &tmp);
+	    
+	}
+    }
 }
-enum col_type parse_key (char *p, enum field_type type)
+
+col_t *register_key (char *p)
 {
     if (p == NULL) return is_unknown;
     char *q = p;
-
-    if (*q == '%') p++;
-    else return is_sep;
-
+    if (!strncmp(q, "FMT/", 4) || !strncmp(q, "FORMAT/", 7)) {
+    } else if (
+	
     if (*p
 #define same_string(a, b) (!strcmp(a, b))
     
