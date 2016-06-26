@@ -56,7 +56,6 @@ enum col_type {
     is_format,
     is_sample,
     is_bed,
-    is_sep, 
 };
 
 enum field_type {
@@ -72,20 +71,21 @@ typedef struct _convert_cols ccols_t;
 
 struct _col {
     enum col_type type;
+    int unpack;
     char *key;
     void (*setter)(bcf1_t *, col_t *, int ale,  mcache_t*);
 };
 
 struct _convert_cols {
-    int m, n;
+    int m, l;
     col_t *cols;
     int max_unpack;
 };
 
 /* value for each node in print cached matrix */
-struct matrix_value {
+struct mval {
     enum col_type type;
-    int m, n; // m: max memory cache
+    int m, l; // m : max memory cache
     kstring_t *a; 
 };
 
@@ -94,7 +94,7 @@ struct _matrix_cache {
     int allele_count;
     int sample_count;
     int mmtx, nmtx;
-    struct matrix_value **matrix;
+    struct mval **matrix;
 };
 
 // options and handlers
@@ -121,53 +121,108 @@ struct args args = {
 
 ccols_t * ccols_init()
 {
-    ccols_t *ccols = (ccols_t *)calloc(sizeof(ccols_t));
-    ccols->m = ccols->n = 0;
-    ccols->cols = 0;
-    ccols->max_unpack = 0;
-    return ccols;
+    ccols_t *c = (ccols_t *)calloc(sizeof(ccols_t));
+    c->m = c->l = 0;
+    c->cols = 0;
+    c->max_unpack = 0;
+    return c;
 }
 
-void format_string_init(char *s)
+ccols_t *format_string_init(char *s)
 {
     if (s== NULL)
 	error("Empty format string!");
     
-    ccols_t *convert = args.convert = ccols_init();
+    ccols_t *c = ccols_init();
 
-    char *p = s;
-
-    for (;*p; ++p) {
+    kstring tmp = KSTRING_INIT;
+    char *p = s;    
+    for (; *p; ++p) {
 	char *q = p;	
 	while (*q && *q != ',') q++;
-	if (q-p != 0) {
-	    kstring tmp = KSTRING_INIT;
+	if (q-p != 0) {	    
 	    kputsn(p, q-p, &tmp);
-	    
+	    if (c->l == c->m) {
+		c->m = c->l == 0 ? 2 : c->m << 1;
+		c->cols = (col_t *)realloc(c->cols, sizeof(col_t)*c->l);
+	    }
+	    col_t *t = register_key(tmp.s);
+	    assert(t == NULL);
+	    c->max_unpack |= t->unpack;
+	    c->cols[c->l++] = t;
+	    tmp.l = 0;
 	}
     }
+    if (tmp.m) free(tmp.s);
+    return c;
 }
 
 col_t *register_key (char *p)
 {
-    if (p == NULL) return is_unknown;
-    char *q = p;
-    if (!strncmp(q, "FMT/", 4) || !strncmp(q, "FORMAT/", 7)) {
-    } else if (
-	
-    if (*p
-#define same_string(a, b) (!strcmp(a, b))
+    if (p == NULL)
+	error("Empty string");
+
+    col_t *c = (col_t*)malloc(sizeof(col_t));
     
-    if (type == field_format) {
-	if (same_string(p, "GT") || same_string(p, "TGT")) return is_gt;
-	else if (same_string(p, "SAMPLE")) return is_sample;
-	else 
-    } else {
-
+    char *q = p;
+    if (!strncmp(q, "FMT/", 4)) {
+	q += 4;
+	c->type = is_format;
     }
-
-#undef same_string
+    else if (!strncmp(q, "FORMAT/", 7)) {
+	q += 7;
+	c->type = is_format;
+    }
+    else if (!strncmp(q, "INFO/", 5)) {
+	q += 5;
+	c->type = is_info;
+    }
+    else {
+	c->type = is_unknown;
+    }
+    
+    c->key = strdup(q);
+#define same_string(a, b) (!strcmp(a, b))    
+    if (same_string(q, "GT") || same_string(q, "TGT")) {
+	c->setter = setter_gt;
+	c->type = c->type == is_unknown || c->type == is_format ? is_gt : c->type;	
+    }
+    else if (same_string(q, "SAMPLE")) {
+	c->setter = setter_sample;
+	c->type = is_sample;
+    }
+    else if (same_string(q, "CHROM")) {
+	c->setter = setter_chrom;
+	c->type = is_chrom;
+    }
+    else if (same_string(q, "POS")) {
+	c->setter = setter_pos;
+	c->type = is_pos;
+    }
+    else if (same_string(q, "ID")) {
+	c->setter = setter_id;
+	c->type = is_id;
+    }
+    else if (same_string(q, "FILTER")) {
+	c->setter = setter_filter;
+	c->type = is_filter;
+    }
+    else if (same_string(q, "BED")) {
+	c->setter = setter_bed;
+	c->type = is_bed;
+    }
+    else {
+	if (c->type == is_format) {
+	    c->setter = setter_format;
+	} else {
+	    c->type = c->type == is_unknown ? is_info : c->type;
+	    c->setter = setter_info;
+	}
+    }
+#undef same_string	
+    return c;
 }
+
 int init_args(const char* string)
 {
 }
