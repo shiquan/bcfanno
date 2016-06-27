@@ -58,15 +58,16 @@ enum col_type {
     is_bed,
 };
 
-enum field_type {
-    field_fix,
-    field_info,
-    field_format,
-    field_error,
-};
+/* enum field_type { */
+/*     field_fix, */
+/*     field_info, */
+/*     field_format, */
+/*     field_error, */
+/* }; */
 
 typedef struct _col col_t;
-typedef struct _matrix_cache mcache_t;
+typedef struct _multi_cols_cache_per_sample mcache_per_t;
+typedef struct _multi_cols_cache mcache_t;
 typedef struct _convert_cols ccols_t;
 
 struct _col {
@@ -90,11 +91,15 @@ struct mval {
 };
 
 // matrix cache
-struct _matrix_cache {
-    int allele_count;
-    int sample_count;
-    int mmtx, nmtx;
-    struct mval **matrix;
+struct _multi_cols_cache_per_sample {
+    int n_cols;
+    int n_alleles;
+    struct mval *mvals;
+};
+
+struct _multi_cols_cache {
+    int n_samples, m_samples;
+    struct _multi_cols_cache_per_sample *mcols;
 };
 
 // options and handlers
@@ -222,6 +227,57 @@ col_t *register_key (char *p)
 #undef same_string	
     return c;
 }
+/*int sample, the sample number get from header */
+mcache_t *init_mcache(int n_samples)
+{    
+    mcache_t *m = (mcache_t*)calloc(1, sizeof(mcache_t));
+    m->m_samples = n_samples;
+    m->n_samples = 0;
+    m->mcols = (mcache_per_t *)calloc(n_samples, sizeof(mcache_per_t));
+    int i;
+    for (i=0; i<n_samples; ++i) {
+	mcache_per_t *mp = m->mcols[i];
+	mp->n_cols = 0;
+	mp->n_alleles = 0;
+	mp->mvals = 0;
+    }
+    return m;
+}
+
+int set_matrix_cache(mcache_t *m)
+{
+    int i;
+    int j;
+    int k;
+    for (i =0; i< m->n_sample; ++i) {
+	mcache_per_t *mp = m->cols[i];
+	for (j=0; j<mp->n_alleles; ++j) {
+	    for (k=0; k<mp->n_cols; ++k) {
+		
+	    }
+	}
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 int init_args(const char* string)
 {
