@@ -285,10 +285,6 @@ void release_args()
 	free(args.memory_pool->s);    
 }
 
-
-
-
-
 void free_kstring(kstring_t *s)
 {
     if (s->m)
@@ -343,7 +339,7 @@ int init_split_flag(char *s)
 	if (strcmp(list[i], "NONE") == 0) { free_list(list, n); return SPLIT_NONE; }
 	else if (strcmp(list[i], "ALT") == 0) { flag |= SPLIT_ALT; }
 	else if (strcmp(list[i], "SAMPLE") == 0) { flag |= SPLIT_SAMPLE; }
-	else if (strcmp(list[i], "TRANS") == 0) { flag |= (SPLIT_TRANS|SPLIT_ALT); }
+	//else if (strcmp(list[i], "TRANS") == 0) { flag |= (SPLIT_TRANS|SPLIT_ALT); }
 	else if (strcmp(list[i], "ALL") == 0) { flag |= SPLIT_ALL; }
 	else {
 	    fprintf(stderr, "cannot recongize this tag : %s\n", list[i]);
