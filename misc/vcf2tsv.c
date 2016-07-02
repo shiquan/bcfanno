@@ -29,6 +29,7 @@
 #define SPLIT_NONE     1          //  bcftools query mode, one bcf1_t per line
 #define SPLIT_SAMPLE   2          //  flag for spliting by sample
 #define SPLIT_ALT      4          //  flag for split by allele, each alt per line
+#define SPLIT_ALL    (SPLIT_ALT | SPLIT_SAMPLE)
 #define SPLIT_DEFAULT  0
 
 /*
@@ -54,14 +55,14 @@ typedef struct _col col_t;
 typedef struct _multi_cols_cache_per_sample mcache_per_t;
 typedef struct _multi_cols_cache mcache_t;
 typedef struct _convert_cols ccols_t;
-
+typedef struct _mval mval_t;
 struct _col {
     enum col_type type;
     int number; // BCF_VL_*
     int unpack;
     int id; //header index id for INFO/FORMAT
     char *key;
-    void (*setter)(bcf1_t *, col_t *, int ale,  mcache_t*);
+    void (*setter)(bcf1_t *, col_t *, int ale,  mval_t *);
 };
 
 struct _convert_cols {
@@ -71,7 +72,7 @@ struct _convert_cols {
 };
 
 /* value for each node in print cached matrix */
-struct mval {
+struct _mval {
     enum col_type type;
     int m, l; // m : max memory cache
     kstring_t *a;
@@ -81,7 +82,7 @@ struct mval {
 struct _multi_cols_cache_per_sample {
     int n_cols;
     int n_alleles;
-    struct mval *mvals;
+    struct _mval *mvals;
 };
 
 struct _multi_cols_cache {
@@ -120,13 +121,13 @@ ccols_t * ccols_init()
     return c;
 }
 
-ccols_t *format_string_init(char *s, bcf_hdr_t *h)
+ccols_t *format_string_init(char *s, bcf_hdr_t *h, int *n_sample)
 {
     if (s== NULL)
 	error("Empty format string!");
 
     ccols_t *c = ccols_init();
-
+    int has_sample = 0, has_format = 0;
     kstring tmp = KSTRING_INIT;
     char *p = s;
     for (; *p; ++p) {
@@ -140,12 +141,31 @@ ccols_t *format_string_init(char *s, bcf_hdr_t *h)
 	    }
 	    col_t *t = register_key(tmp.s, h);
 	    assert(t == NULL);
+	    
+	    if (t->type == is_sample) has_sample = 1;
+	    else if (t->type == is_format) has_format = 1;
+
 	    c->max_unpack |= t->unpack;
 	    c->cols[c->l++] = t;
 	    tmp.l = 0;
 	}
     }
     if (tmp.m) free(tmp.s);
+    if (has_format) {
+	if ( has_sample ) {
+	    *sample = h->nsamples_ori;
+	} else {
+	    warnings("no SAMPLE tag in the format string, only output first sample %s", h->samples[0]);
+	    *sample = 1;
+	}
+    } else {
+	*sample = 1;
+    }
+    
+    int i;
+    for (i=0; i<c->l; ++i) {
+	debug_print("tag : %s\n", c->cols[i].key);
+    }
     return c;
 }
 
@@ -160,14 +180,17 @@ col_t *register_key (char *p, bcf_hdr_t *h)
     if (!strncmp(q, "FMT/", 4)) {
 	q += 4;
 	c->type = is_format;
+	c->unpack |= BCF_UN_FMT;
     }
     else if (!strncmp(q, "FORMAT/", 7)) {
 	q += 7;
 	c->type = is_format;
+	c->unpack |= BCF_UN_FMT;
     }
     else if (!strncmp(q, "INFO/", 5)) {
 	q += 5;
 	c->type = is_info;
+	c->unpack |= BCF_UN_INFO;
     }
     else {
 	c->type = is_unknown;
@@ -177,15 +200,17 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 #define same_string(a, b) (!strcmp(a, b))
     if (same_string(q, "GT") || same_string(q, "TGT")) {
 	c->setter = setter_gt;
-	c->type = c->type == is_unknown || c->type == is_format ? is_gt : c->type;	
+	c->type = c->type == is_unknown || c->type == is_format ? is_gt : c->type;
+	c->unpack |= BCF_UN_FMT;
     }
     else if (same_string(q, "SAMPLE")) {
 	c->setter = setter_sample;
 	c->type = is_sample;
+	c->unpack |= BCF_UN_FMT;
     }
     else if (same_string(q, "CHROM")) {
 	c->setter = setter_chrom;
-	c->type = is_chrom;
+	c->type = is_chrom;	
     }
     else if (same_string(q, "POS")) {
 	c->setter = setter_pos;
@@ -198,6 +223,7 @@ col_t *register_key (char *p, bcf_hdr_t *h)
     else if (same_string(q, "FILTER")) {
 	c->setter = setter_filter;
 	c->type = is_filter;
+	c->unpack |= BCF_UN_FLT;
     }
     else if (same_string(q, "BED")) {
 	c->setter = setter_bed;
@@ -215,16 +241,17 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	    c->id = bcf_hdr_id2int(h, BCF_DT_ID, q);
 	    if (c->id == -1)
 		error("Tag %s not exists in header!", q);
+	    c->unpack |= BCF_UN_SHR;
 	}
     }
 #undef same_string	
     return c;
 }
 /*int sample, the sample number get from header */
-mcache_t *mcache_init(bcf_hdr_t *hdr)
+mcache_t *mcache_init(int nsamples)
 {
     mcache_t *m = (mcache_t*)calloc(1, sizeof(mcache_t));
-    m->m_samples = bcf_hdr_nsamples(hdr);
+    m->m_samples = nsamples;
     m->n_samples = 0;
     m->mcols = (mcache_per_t *)calloc(m->m_samples, sizeof(mcache_per_t));
     int i;
@@ -320,6 +347,7 @@ int convert_header()
     }
     printf("%s\n",args.mempool->s);
     args.mempool->l = 0;
+    return 0;
 }
 
 void free_list(char **s, int n)
@@ -338,9 +366,8 @@ int init_split_flag(char *s)
     for (i = 0; i < n; ++i) {
 	if (strcmp(list[i], "NONE") == 0) { free_list(list, n); return SPLIT_NONE; }
 	else if (strcmp(list[i], "ALT") == 0) { flag |= SPLIT_ALT; }
-	else if (strcmp(list[i], "SAMPLE") == 0) { flag |= SPLIT_SAMPLE; }
-	//else if (strcmp(list[i], "TRANS") == 0) { flag |= (SPLIT_TRANS|SPLIT_ALT); }
-	else if (strcmp(list[i], "ALL") == 0) { flag |= SPLIT_ALL; }
+	//else if (strcmp(list[i], "SAMPLE") == 0) { flag |= SPLIT_SAMPLE; }
+	//else if (strcmp(list[i], "ALL") == 0) { flag |= SPLIT_ALL; }
 	else {
 	    fprintf(stderr, "cannot recongize this tag : %s\n", list[i]);
 	    exit(1);
@@ -348,6 +375,34 @@ int init_split_flag(char *s)
     }
     free_list(list, n);
     return flag;
+}
+
+int convert_line(bcf1_t *line)
+{
+    assert(line == NULL);
+    mcache_t *cache = args.cache;
+    ccols_t *cols = args.convert;
+    set_matrix_cache(cache);
+    int i, j,k;
+    for (i=0; i<cache->m_samples; ++i) {
+	// iterate samples
+	mcache_per_t *mp = &m->mcols[i];	
+	j = mp->n_alleles == -1 ? -1 : 0;
+	for (; j<mp->n_alleles; ++j) { // ???
+	    assert(mp->n_cols == cols->l);
+	    for (k=0; k<mp->n_cols; ++k) {		
+		col_t *col = &cols->cols[k];
+		mval_t *val = &mp->mval[k];
+		col->setter(line, col, j, val);
+	    }
+	}
+    }
+    
+    return 0;
+}
+void setter_chrom(bcf1_t *line, col_t *c, int ale, mval_t *val)
+{
+    
 }
 static void process_first_alt(bcf1_t *line, fmt_t *fmt, int iala, int isample, tags_t *tag)
 {
@@ -741,255 +796,14 @@ static void process_sep(bcf1_t *line, fmt_t *fmt, int iala, int isample, tags_t 
     }
 }
 
-/* The register_tag and parse_tag functions are adapted from pd3's convert.c
- * use TAGS-tags instead of T-tags
- */
-fmt_t *register_tag(int type, char *key, int is_gtf)
-{
-    convert->nfmt++;
-    if (convert->nfmt == convert->mfmt) {
-	convert->mfmt += 10;
-	convert->fmt = (fmt_t*)realloc(convert->fmt, convert->mfmt*sizeof(fmt_t));
-    }
-    fmt_t *fmt = &convert->fmt[ convert->nfmt-1 ];
-    fmt->type = type;
-    fmt->is_gtf = is_gtf;
-    fmt->key = key ? strdup(key) : NULL;
-    // allow non-format tags to appear amongst the format fields, split-samples mode
-    if ( key ) {
-	fmt->id = bcf_hdr_id2int(header, BCF_DT_ID, fmt->key);
-	if (fmt->type==TAG_FORMAT && !bcf_hdr_idinfo_exists(header, BCF_HL_FMT, fmt->id)) {
-
-	    if ( !strcmp("CHROM", key) ) fmt->type = TAG_CHROM;
-	    else if ( !strcmp("POS", key) ) fmt->type = TAG_POS;
-	    else if ( !strcmp("BED", key) ) fmt->type = TAG_BED;
-	    else if ( !strcmp("ID", key) ) fmt->type = TAG_ID;
-	    else if ( !strcmp("REF", key) ) fmt->type = TAG_REF;
-	    else if ( !strcmp("ALT", key) ) fmt->type = TAG_ALT;
-	    //else if ( !strcmp("FIRST_ALT", key) ) fmt->type = TAG_FIRST_ALT;
-	    else if ( !strcmp("QUAL", key) ) fmt->type = TAG_QUAL;
-	    else if ( !strcmp("FILTER", key) ) fmt->type = TAG_FILTER;
-	    else if ( !strcmp("SAMPLE", key) ) fmt->type = TAG_SAMPLE;
-	    //else if ( !strcmp("HGVS", key) ) fmt->type = TAG_TRANS;
-	    else if ( fmt->id>=0 && bcf_hdr_idinfo_exists(header, BCF_HL_INFO, fmt->id)) fmt->type = TAG_INFO;
-	}
-    }
-
-    switch ( fmt->type ) {
-
-	/* case TAG_FIRST_ALT: */
-	/*     fmt->handler = &process_first_alt; */
-	/*     break; */
-	
-	case TAG_CHROM:
-	    fmt->handler = &process_chrom;
-	    break;
-	
-	case TAG_POS:
-	    fmt->handler = &process_pos;
-	    break;
-	
-	case TAG_BED:
-	    fmt->handler = &process_bed;
-	    break;
-
-	case TAG_ID:
-	    fmt->handler = &process_id;
-	    break;
-
-	case TAG_REF:
-	    fmt->handler = &process_ref;
-	    break;
-
-	case TAG_ALT:
-	    fmt->handler = &process_alt;
-	    break;
-
-	case TAG_QUAL:
-	    fmt->handler = &process_qual;
-	    break;
-	
-	case TAG_FILTER:
-	    fmt->handler = &process_filter;
-	    convert->max_unpack |= BCF_UN_FLT;
-	    break;
-	
-	case TAG_INFO:
-	    fmt->handler = &process_info;
-	    convert->max_unpack |= BCF_UN_INFO;
-	    break;
-	
-	/* case TAG_TRANS: */
-	/*     fmt->handler = &process_trans; */
-	/*     convert->max_unpack |= BCF_UN_INFO; */
-	/*     break; */
-	
-	case TAG_FORMAT:
-	    fmt->handler = &process_format;
-	    convert->max_unpack |= BCF_UN_FMT;
-	    break;
-	
-	case TAG_SAMPLE:
-	    fmt->handler = &process_sample;
-	    break;
-	
-	case TAG_SEP:
-	    fmt->handler = &process_sep;
-	    break;
-	
-	case TAG_TGT:
-	    fmt->handler = &process_tgt;
-	    convert->max_unpack |= BCF_UN_FMT;
-	    break;
-	
-	default:
-	    error("TODO: handler for type %d\n", fmt->type);
-    }
-    if ( key ) {
-	if ( fmt->type==TAG_INFO ) {
-	    fmt->id = bcf_hdr_id2int(header, BCF_DT_ID, key);
-	    if ( fmt->id==-1 ) error("Error: no such tag defined in the VCF header: INFO/%s\n", key);
-	}
-    }
-    return fmt;
-}
-
-static char *parse_tag(char *p, int is_gtf)
-{
-    char *q = ++p;
-    while ( *q && (isalnum(*q) || *q=='_' || *q=='.')) q++;
-    kstring_t str = {0,0,0};
-    if ( q-p==0 ) error("Could not parse format string: %s\n", convert->format_str);
-    kputsn(p, q-p, &str);
-
-    if ( is_gtf ) {
-	if ( !strcmp(str.s, "GT") || !strcmp(str.s, "TGT")) {
-	    register_tag(TAG_TGT, "GT", is_gtf);
-	}
-	else if ( !strcmp(str.s, "SAMPLE") ) {
-	    register_tag(TAG_SAMPLE, "SAMPLE", is_gtf); // is_gtf ==> 0
-	}
-	//else if ( !strcmp(str.s, "IUPACGT") ) register_tag(TAG_IUPAC_GT, "GT", is_gtf);
-	else {
-	    register_tag(TAG_FORMAT, str.s, is_gtf);
-	}
-    } else {
-	if ( !strcmp(str.s, "CHROM") ) {
-	    register_tag(TAG_CHROM, "CHROM", is_gtf);
-	}
-	else if ( !strcmp(str.s, "POS") ) {
-	    register_tag(TAG_POS, "POS", is_gtf);
-	}
-	else if ( !strcmp(str.s, "BED") ) {
-	    register_tag(TAG_BED, "BED", is_gtf);
-	}
-	else if ( !strcmp(str.s, "POS") ) {
-	    register_tag(TAG_CHROM, "POS", is_gtf);
-	}
-	else if ( !strcmp(str.s, "REF") ) {
-	    register_tag(TAG_REF, "REF", is_gtf);
-	}
-	else if ( !strcmp(str.s, "ALT") ) {
-	    register_tag(TAG_ALT, "ALT", is_gtf);
-	}
-	//else if ( !strcmp(str.s, "HGVS") ) register_tag(TAG_TRANS, "HGVS", is_gtf);
-	else if ( !strcmp(str.s, "GT") || !strcmp(str.s, "TGT")) {
-	    split_flag |= SPLIT_SAMPLE;
-	    register_tag(TAG_TGT, "GT", is_gtf);
-	}
-	//else if ( !strcmp(str.s, "IUPACGT") ) { split_flag |= SPLIT_SAMPLE; register_tag(TAG_IUPAC_GT, "GT", is_gtf); }
-	//else if ( !strcmp(str.s, "FUNC") ) register_tag(TAG_TRANS, "FUNC", is_gtf);
-	else if ( !strcmp(str.s, "SAMPLE") ) {
-	    split_flag |= SPLIT_SAMPLE;
-	    register_tag(TAG_SAMPLE, "SAMPLE", is_gtf);
-	}
-	//else if ( !strcmp(str.s, "FIRST_ALT") ) register_tag(TAG_FIRST_ALT, "FIRST_ALT", is_gtf);
-	else if ( !strcmp(str.s, "QUAL") ) {
-	    register_tag(TAG_QUAL, "QUAL", is_gtf);
-	}
-	else if ( !strcmp(str.s, "INFO") ) {
-	    if ( *q=='/' ) error("Could not parse format string: %s\n", convert->format_str);
-	    p = ++q;
-	    str.l = 0;
-	    while ( *q && (isalnum(*q) || *q=='_' || *q=='.') ) q++;
-	    if ( q-p==0 ) error("Could not parse format string: %s\n", convert->format_str);
-	    kputsn(p, q-p, &str);
-	    register_tag(TAG_INFO, str.s, is_gtf);
-	} else {
-	    register_tag(TAG_INFO, str.s, is_gtf);
-	}
-    }
-    free(str.s);
-    return q;
-}
-static char *parse_sep(char *p, int is_gtf)
-{
-    char *q = p;
-    kstring_t str = { 0, 0, 0};
-    while ( *q && *q!='[' && *q!=']' && *q!='%' ) {
-	if ( *q=='\\' ) {
-	    q++;
-	    if ( *q=='n' ) kputc('\n', &str);
-	    else if ( *q == 't') kputc('\t', &str);
-	    else kputc(*q, &str);
-	} else {
-	    kputc(*q, &str);
-	}
-	q++;
-    }
-    if ( !str.l )
-	error("Could not parse format string: %s\n", convert->format_str);
-
-    register_tag(TAG_SEP, str.s, is_gtf);
-    free(str.s);
-    return q;
-}
-void convert_init(char *s)
-{
-    convert = (convert_t*)malloc(sizeof(convert_t));
-    convert->format_str = strdup(s);
-    convert->nfmt = 0;
-    convert->mfmt = 2;
-    convert->fmt = (fmt_t*)calloc(convert->mfmt, sizeof(fmt_t));
-    convert->max_unpack = 0;
-    int is_gtf = 0;
-    char *p = convert->format_str;
-    while ( *p ) {
-	switch (*p) {
-	case '[':
-	    is_gtf = 1;
-	    p++;
-	    break;
-	
-	case ']':
-	    is_gtf = 0;
-	    p++;
-	    break;
-	
-	case '%':
-	    p = parse_tag(p, is_gtf);
-	    break;
-	
-	default:
-	    p = parse_sep(p, is_gtf);
-	    break;
-	}
-    }
-}
-const char *about(void)
-{
-    return "Select tags in pre-defined format.\n";
-}
-
 int usage(void)
 {
-    fprintf(stderr,"About : Select tags from VCF/BCF file.\n");
+    fprintf(stderr,"About : Convert BCF/VCF to tsv file by selecting tags.\n");
     fprintf(stderr,"Usage:\n");
-    fprintf(stderr,"Standalone mode:\n");
-    fprintf(stderr,"\tbcfselect [Options] in.vcf.gz\n");
+    fprintf(stderr,"\tvcf2tsv -f string [Options] in.vcf.gz\n");
     fprintf(stderr,"Options:\n");
     fprintf(stderr,"\t-f, --format   see man page for deatils.\n");
-    fprintf(stderr,"\t-s, --split    split by [ALT,SAMPLE].\n");
+    fprintf(stderr,"\t-s, --split    split by [ALT].\n");
     fprintf(stderr,"\t-p, --print-header  print the header comment.\n");
     fprintf(stderr,"Website :\n");
     fprintf(stderr,"https://github.com/shiquan/vcfanno\n");
@@ -1038,8 +852,6 @@ int run(int argc, char**argv)
     if (format == NULL)
 	error("-f is required by vcf2tsv.");
 
-
-
     char *input = NULL;
 
     if (argc == optind) {
@@ -1063,23 +875,26 @@ int run(int argc, char**argv)
 	split_flag = init_split_flag(flag);
 	free(flag);
     }
-
-    args.convert = format_string_init(format, header);
+    int nsamples = 0;
+    args.convert = format_string_init(format, header, &nsamples);
     free(format);
 
     args.mempool = (kstring_t*)malloc(sizeof(kstring_t));
     args.mempool->m = args.mempool->l = 0;
 
-    args.cache = mcache_init(header);
+    args.cache = mcache_init(nsamples);
+    
     if (args.print_header)
 	convert_header();
-    
-    do {
+     
+    while (bcf_sr_next_line(sr)) {
 	bcf1_t *line = bcf_sr_get_line(sr, 0);
-	convert_line(line, args.mempool);
+	convert_line(line);
+	if (args.mempool->l) printf("%s\n", args.mempool->s);
+	args.mempool->l = 0;
     }
-    while (bcf_sr_next_line(sr));
-
+    if (args.mempool->l) printf("%s\n", args.mempool->s);
+    args.mempool->l = 0;
     release_args();
     bcf_sr_destroy(sr);
 
