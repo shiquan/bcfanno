@@ -44,6 +44,8 @@ enum col_type {
     is_pos,
     is_id,
     is_filter,
+    is_ref,
+    is_alt,
     is_info,
     is_gt,
     is_format,
@@ -107,6 +109,8 @@ struct _multi_cols_cache {
 void setter_gt(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_sample(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_pos(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
+void setter_ref(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
+void setter_alt(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_chrom(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_id(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_filter(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
@@ -164,7 +168,7 @@ ccols_t *format_string_init(char *s, bcf_hdr_t *h, int *n_sample)
 	    else *q = '\0';
 	    if (c->l == c->m) {
 		c->m = c->l == 0 ? 2 : c->m << 1;
-		c->cols = (col_t **)realloc(c->cols, sizeof(col_t*)*c->l);
+		c->cols = (col_t **)realloc(c->cols, sizeof(col_t*)*c->m);
 	    }
 	    col_t *t = register_key(p, h);
 	    if(t == NULL)
@@ -181,7 +185,7 @@ ccols_t *format_string_init(char *s, bcf_hdr_t *h, int *n_sample)
 
     if (has_format) {
 	if ( has_sample ) {
-	    *n_sample = h->nsamples_ori;
+	    *n_sample = bcf_hdr_nsamples(h);
 	} else {
 	    warnings("no SAMPLE tag in the format string, only output first sample %s", h->samples[0]);
 	    *n_sample = 1;
@@ -189,6 +193,9 @@ ccols_t *format_string_init(char *s, bcf_hdr_t *h, int *n_sample)
     } else {
 	*n_sample = 1;
     }
+    /* int i; */
+    /* for (i=0; i<c->l; ++i) */
+    /* 	debug_print("key : %s", c->cols[i]->key); */
     return c;
 }
 
@@ -219,12 +226,14 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	c->type = is_unknown;
     }
     
-    c->key = strdup(q);
+    c->key = strdup(p);
+    c->id = -1;
 #define same_string(a, b) (!strcmp(a, b))
     if (same_string(q, "GT") || same_string(q, "TGT")) {
 	c->setter = setter_gt;
 	c->type = c->type == is_unknown || c->type == is_format ? is_gt : c->type;
 	c->unpack |= BCF_UN_FMT;
+	c->id = bcf_hdr_id2int(h, BCF_DT_ID, "GT");
     }
     else if (same_string(q, "SAMPLE")) {
 	c->setter = setter_sample;
@@ -243,6 +252,15 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	c->setter = setter_id;
 	c->type = is_id;
     }
+    else if (same_string(q, "REF")) {
+	c->setter = setter_ref;
+	c->type = is_ref;
+    }
+    else if (same_string(q, "ALT")) {
+	c->setter = setter_alt;
+	c->type = is_alt;
+    }
+
     else if (same_string(q, "FILTER")) {
 	c->setter = setter_filter;
 	c->type = is_filter;
@@ -256,6 +274,7 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	if (c->type == is_format) {
 	    c->setter = setter_format;
 	    c->id = bcf_hdr_id2int(h, BCF_DT_ID, q);
+	    c->unpack |= BCF_UN_FMT;
 	    if (c->id == -1)
 		error("Tag %s not exists in header!", q);		
 	} else {
@@ -289,12 +308,23 @@ void set_matrix_cache(mcache_t *m, int n_alleles)
 {
     int i, j, k;
     for (i =0; i< m->m_samples; ++i) {
+	// enlarger memory cache
 	mcache_ps_t *ps = &m->mcols[i];
-	ps->n_alleles = n_alleles;
-	if (ps->m_alleles <= ps->n_alleles) {
-	    ps->m_alleles = n_alleles + 1;
-	    ps->alvals = (mcache_pa_t*)realloc(ps->alvals, ps->m_alleles *sizeof(mcache_pa_t));	
+	if (ps->m_alleles <= n_alleles) {
+	    ps->m_alleles = n_alleles;
+	    ps->alvals = (mcache_pa_t*)realloc(ps->alvals, ps->m_alleles *sizeof(mcache_pa_t));
+	    for (j=ps->n_alleles; j< ps->m_alleles; ++j) {
+		mcache_pa_t *pa = &ps->alvals[j];
+		pa->n_cols = args.convert->l;
+		pa->mvals = (mval_t*)calloc(pa->n_cols, sizeof(mval_t));
+		for (k=0; k<pa->n_cols; ++k) {
+		    pa->mvals[k].a.l = pa->mvals[k].a.m = 0;
+		    pa->mvals[k].a.s = 0; 
+		}
+	    }
 	}
+	
+	ps->n_alleles = n_alleles;
 	for (j=0; j<ps->n_alleles; ++j) {
 	    mcache_pa_t *pa = &ps->alvals[j];
 	    for (k=0; k<pa->n_cols; ++k)
@@ -311,7 +341,8 @@ void release_mcache(mcache_t *m)
 	for (j=0; j<ps->n_alleles; ++j) {
 	    mcache_pa_t *pa = &ps->alvals[j];
 	    for (k=0; k<pa->n_cols; ++k) {
-		if (pa->mvals[k].a.m) free(pa->mvals[k].a.s);		
+		if (pa->mvals[k].a.m)
+		    free(pa->mvals[k].a.s);		
 	    }
 	    free(pa->mvals);
 	}
@@ -335,6 +366,8 @@ void release_args()
 
     if (args.mempool->m)
 	free(args.mempool->s);
+    args.mempool->l = args.mempool->m = 0;
+    args.mempool->s = 0;
 }
 
 // convert the header of output
@@ -356,6 +389,8 @@ int convert_header()
 		
 	    case is_chrom:
 	    case is_pos:
+	    case is_ref:
+	    case is_alt:
 	    case is_id:
 	    case is_filter:
 	    case is_info:
@@ -409,13 +444,13 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
     set_matrix_cache(cache, n_alleles);
 
     int i, j,k;
-    debug_print("samples : %d,n_allele : %d", cache->m_samples, n_alleles);
+
     for (i=0; i<cache->m_samples; ++i) { 
 	// iterate samples
 	mcache_ps_t *ps = &cache->mcols[i];
-
-	ps->n_alleles = n_alleles;
+	//ps->n_alleles = n_alleles;
 	for (j=0; j < ps->n_alleles; ++j) { // ???
+	    
 	    if (n_alleles > 1 && args.skip_ref && j==0) continue;
 	    mcache_pa_t *pa = &ps->alvals[j];
 	    int iallele = -1;
@@ -424,12 +459,14 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 		col_t *col = args.convert->cols[k];
 		mval_t *val = &pa->mvals[k];		
 		val->type = col->type;
-		val->sample_id = i;
-		
+		val->sample_id = i;		
 		/* setter function */
 		col->setter(hdr, line, col, iallele, val);
-		
+		if (k) kputc('\t', args.mempool);
+		kputs(val->a.s, args.mempool);
+		//debug_print("%s", val->a.s);
 	    } // end cols
+	    kputc('\n', args.mempool);
 	} // end alleles
     }  // end samples
     return 0;
@@ -442,7 +479,6 @@ void setter_sample(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 void setter_chrom(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
     kputs(hdr->id[BCF_DT_CTG][line->rid].key, &val->a);
-    debug_print("%s", val->a.s);
 }
 void setter_pos(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
@@ -512,14 +548,14 @@ void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	error ("no found TG tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
 
     int sample_id = val->sample_id;
-
+    
 #define BRANCH(type_t, missing, vector_end) do {		\
 	type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size);\
 	int i;\
 	for (i=0; i<fmt->n; ++i) {\
 	    if ( i ) kputc("/|"[ptr[i]&1], &val->a);\
 	    if ( !ptr[i]>>1) kputc('.', &val->a);\
-	    else kputs(line->d.allele[ptr[i]>>1], &val->a); \
+	    else kputs(line->d.allele[(ptr[i]>>1)-1], &val->a);	\
 	}\
 } while(0)
 
@@ -537,7 +573,7 @@ void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	      break;
 
 	  default:
-	      error("FIXME: type %d in bcf_format_gt?\n", fmt->type);
+	      error("FIXME: type %d in bcf_format_gt?", fmt->type);
       }
 #undef BRANCH
 }
@@ -555,8 +591,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 		if (p[i] == is_missing) kputc('.', string);		\
 		else kputw(p[i], string);			\
 	    }								\
-	} else {							\
-	    assert(iallele < n);					\
+	} else {\
 	    if (p[iallele] == is_vector_end || p[iallele] == is_missing) kputc('.', string); \
 	    else kputw(p[iallele], string);				\
 	}								\
@@ -613,7 +648,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 	      break;
 
 	  default:
-	      error("todo: type %d\n", type);
+	      error("todo: type %d", type);
       }
 #undef BRANCH
 
@@ -671,6 +706,7 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 void setter_format(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
     bcf_fmt_t *fmt = bcf_get_fmt_id (line, c->id);
+    //debug_print("id: %d", c->id);
     if (fmt == NULL) {
 	kputc('.', &val->a);
 	return;
@@ -776,17 +812,16 @@ int run(int argc, char**argv)
     args.mempool->m = args.mempool->l = 0;
     args.mempool->s = 0;
     args.cache = mcache_init(nsamples);
-
     if (args.print_header)
 	convert_header();
 
     while ( bcf_sr_next_line(sr) ) {
 	bcf1_t *line = bcf_sr_get_line(sr, 0);
 	convert_line(header, line);
-	if (args.mempool->l) printf("%s\n", args.mempool->s);
+	if (args.mempool->l) printf("%s",args.mempool->s);
 	args.mempool->l = 0;
     }
-    if (args.mempool->l) printf("%s\n", args.mempool->s);
+    if (args.mempool->l) printf("%s",args.mempool->s);
     release_args();
     bcf_sr_destroy(sr);
     return 0;
