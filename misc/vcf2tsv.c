@@ -183,16 +183,15 @@ ccols_t *format_string_init(char *s, bcf_hdr_t *h, int *n_sample)
 	p = q+1;
     }
 
-    if (has_format) {
-	if ( has_sample ) {
-	    *n_sample = bcf_hdr_nsamples(h);
-	} else {
-	    warnings("no SAMPLE tag in the format string, only output first sample %s", h->samples[0]);
-	    *n_sample = 1;
-	}
+
+    if ( has_sample ) {
+      *n_sample = bcf_hdr_nsamples(h);
     } else {
-	*n_sample = 1;
+      if (has_format)
+	warnings("no SAMPLE tag in the format string, only output first sample %s", h->samples[0]);
+      *n_sample = 1;
     }
+
     /* int i; */
     /* for (i=0; i<c->l; ++i) */
     /* 	debug_print("key : %s", c->cols[i]->key); */
@@ -601,17 +600,20 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 	  case BCF_BT_CHAR:
 	      do {
 		  char *p = (char*)data;
+		  int i;
 		  if (iallele == -1) {
-		      int i;
 		      for (i=0; i<n && *p; ++i,++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
 		      }
 		  } else {
-		      assert(iallele<n);
 		      p += iallele;
-		      if (*p) kputc(*p, string);
-		      else kputc('.', string);
+		      for (i=0; i<n && *p; ++i,++p) {
+			  if (*p == bcf_str_missing) kputc('.', string);
+			  else kputc(*p, string);
+		      }
+		      /* if (*p) kputc(*p, string); */
+		      /* else kputc('.', string); */
 		  }
 	      } while(0);
 	      break;
