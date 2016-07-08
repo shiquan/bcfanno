@@ -602,16 +602,19 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 	      do {
 		  char *p = (char*)data;
 		  if (iallele == -1) {
-		      int i;
-		      for (i=0; i<n && *p; ++i,++p) {
+		      for (int i=0; i<n && *p; ++i,++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
 		      }
 		  } else {
-		      assert(iallele<n);
 		      p += iallele;
-		      if (*p) kputc(*p, string);
-		      else kputc('.', string);
+		      for (int i=0; i<n && *p; ++i,++p) {
+			  if (*p == bcf_str_missing) kputc('.', string);
+			  else kputc(*p, string);
+		      }
+
+		      /* if (*p) kputc(*p, string); */
+		      /* else kputc('.', string); */
 		  }
 	      } while(0);
 	      break;
