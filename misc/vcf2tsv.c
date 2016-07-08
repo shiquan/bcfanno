@@ -553,7 +553,7 @@ void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	int i;\
 	for (i=0; i<fmt->n; ++i) {\
 	    if ( i ) kputc("/|"[ptr[i]&1], &val->a);\
-	    if ( !ptr[i]>>1) kputc('.', &val->a);\
+	    if ( !(ptr[i]>>1) ) kputc('.', &val->a); \
 	    else kputs(line->d.allele[(ptr[i]>>1)-1], &val->a);	\
 	}\
 } while(0)
