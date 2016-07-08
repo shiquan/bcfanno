@@ -601,18 +601,18 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 	  case BCF_BT_CHAR:
 	      do {
 		  char *p = (char*)data;
+		  int i;
 		  if (iallele == -1) {
-		      for (int i=0; i<n && *p; ++i,++p) {
+		      for (i=0; i<n && *p; ++i,++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
 		      }
 		  } else {
 		      p += iallele;
-		      for (int i=0; i<n && *p; ++i,++p) {
+		      for (i=0; i<n && *p; ++i,++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
 		      }
-
 		      /* if (*p) kputc(*p, string); */
 		      /* else kputc('.', string); */
 		  }
