@@ -607,7 +607,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 			  else kputc(*p, string);
 		      }
 		  } else {
-		      p += iallele;
+		      //p += iallele;
 		      for (i=0; i<n && *p; ++i,++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
