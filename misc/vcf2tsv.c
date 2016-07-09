@@ -183,16 +183,15 @@ ccols_t *format_string_init(char *s, bcf_hdr_t *h, int *n_sample)
 	p = q+1;
     }
 
-    if (has_format) {
-	if ( has_sample ) {
-	    *n_sample = bcf_hdr_nsamples(h);
-	} else {
-	    warnings("no SAMPLE tag in the format string, only output first sample %s", h->samples[0]);
-	    *n_sample = 1;
-	}
+
+    if ( has_sample ) {
+      *n_sample = bcf_hdr_nsamples(h);
     } else {
-	*n_sample = 1;
+      if (has_format)
+	warnings("no SAMPLE tag in the format string, only output first sample %s", h->samples[0]);
+      *n_sample = 1;
     }
+
     /* int i; */
     /* for (i=0; i<c->l; ++i) */
     /* 	debug_print("key : %s", c->cols[i]->key); */
@@ -554,7 +553,7 @@ void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	int i;\
 	for (i=0; i<fmt->n; ++i) {\
 	    if ( i ) kputc("/|"[ptr[i]&1], &val->a);\
-	    if ( !ptr[i]>>1) kputc('.', &val->a);\
+	    if ( !(ptr[i]>>1) ) kputc('.', &val->a); \
 	    else kputs(line->d.allele[(ptr[i]>>1)-1], &val->a);	\
 	}\
 } while(0)
@@ -608,7 +607,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 			  else kputc(*p, string);
 		      }
 		  } else {
-		      p += iallele;
+		      //p += iallele;
 		      for (i=0; i<n && *p; ++i,++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
