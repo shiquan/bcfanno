@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <zlib.h>
 #include "utils.h"
 #include "htslib/hts.h"
@@ -16,13 +17,13 @@ KHASH_MAP_INIT_STR(list, char*)
 
 typedef khash_t(list) glist_t;
 		      
-struct genepred {
+struct genePred {
     int rid;
     uint32_t txstart;
     uint32_t txend;
     char strand;
     char *name;
-    char *name1; // transcript name or null for some genepred file
+    char *name1; // transcript name or null for some genePred file
     uint32_t cdsstart;
     uint32_t cdsend;
     uint32_t exoncount;
@@ -30,35 +31,44 @@ struct genepred {
     uint32_t *exonends;
 };
 
-struct genepred_mempool {
+struct genePred_mempool {
     int rid;
     uint32_t start;
     uint32_t end;
     int n, m;
-    struct genepred *pools;    
+    struct genePred *pools;    
 };
 
 struct args {
-    char *genepred_file;
+    char *genePred_file;
     tbx_t *gpidx;
     faidx_t *faidx;
     glist_t *glist;
 };
 
-
-static glist_t *glist = NULL;
-
-int init_gene_list(const char *list)
+glist_t *init_gene_list(const char *list)
 {
     int i, n = 0;
     char **names = hts_readlist(list, 1, &n);
-    if (n== 0) return 0;
-    if (glist == NULL) glist = kh_init(list);
-    
+    if (n== 0) return NULL;
+    glist_t *glist = kh_init(list);
+    int ig, k;
+    for (i=0; i<n; ++n) {
+	k = kh_put(list, glist, names[i]; &ig);
+    }
+    return glist;
+}
+
+#include <sys/time.h>
+static double get_time() {
+    struct timeval tv;
+    if ( gettimeofday(&tv, 0) != 0 ) 
+	error("Failed to get time of day.");
+    return (double)tv.tv_sec + 1.0e-6 * (double)tv.tv_usec;
 }
 int usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: %s [-h] -data genepred.txt.gz|refgene.txt.gz -O [u|v|z|b] -o output_file in_file.vcf.gz \n", argv[0]);
+    fprintf(stderr, "Usage: %s [-h] -data genePred.txt.gz|refgene.txt.gz -O [u|v|z|b] -o output_file in_file.vcf.gz \n", argv[0]);
     return 0;
 }
 
@@ -78,7 +88,7 @@ int main(int argc, char **argv)
     const char *in_file = 0; // stdin in default
     const char *out_file = 0; // stdout in default
     const char *out_type = 0; // output format, u in default
-    const char *gp_file = 0; // error abort if not set genepred file
+    const char *gp_file = 0; // error abort if not set genePred file
 
     for (int i = 1; i< argc;) {
 	const char *a = argv[i++];
@@ -116,12 +126,6 @@ int main(int argc, char **argv)
     htsFormat type = *hts_get_format(fp);
     if (type->format  != vcf && type->format != bcf)
 	error("Unsupported input format! %s", input_fname);
-    
-    const bcf_hdr_t *hdr = bcf_hdr_read(fp);
-    
-    /* duplicate header file and sync new tag in the output header .
-     * assuming output is stdout in Vcf format in default. */
-    bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);	
     int type = FT_VCF;
     if (out_type != 0) {
 	switch (out_type[0]) {
@@ -137,9 +141,15 @@ int main(int argc, char **argv)
 		error("The output type \"%s\" not recognised\n", out_type);
 	};
     }
+
+    double c0 = get_time();    
+    const bcf_hdr_t *hdr = bcf_hdr_read(fp);    
+    /* duplicate header file and sync new tag in the output header .
+     * assuming output is stdout in Vcf format in default. */
+    bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);	
     htsFile *fout = out_file == 0 ? hts_open("-", hts_bcf_wmode(type)) : hts_open(out_file, hts_bcf_wmode(type));
     
-    /* init genepred or refgene database, hold tabix index cache and faidx cache in memory */
+    /* init genePred or refgene database, hold tabix index cache and faidx cache in memory */
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) ) {
 	anno_hgvs_core(line);
@@ -151,5 +161,7 @@ int main(int argc, char **argv)
     bcf_hdr_destroy(hdr_out);
     hts_close(fout);
     hts_close(fp);
+    double c1 = get_time();
+    fprintf(stderr, "Run time: %ds\n", c1 -c0);
     return 0;
 }
