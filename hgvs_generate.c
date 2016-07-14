@@ -544,7 +544,7 @@ void check_cnv_hgvs_names_descriptions(struct hgvs_names_description *des, struc
 //  l_name          l_type
 //  |               |
 //  [chrom]:"prefix".postion...
-struct hgvs_core {    
+struct hgvs_names_core {    
     uint16_t l_name; // name offset in the data cahce, for chrom l_name == 0;
     uint16_t l_type; // the byte after type offset, usually offset of '.'
     uint8_t *data;
@@ -552,15 +552,54 @@ struct hgvs_core {
 
 struct hgvs_names_compact {
     int l, m;
-    struct hgvs_core *a;
+    struct hgvs_names_core *a;
 };
 
 struct simple_list {
     struct simple_list *next;
     void *data;
 };
-struct hgvs_core *generate_hgvs_names_core(struct gene_predictions_line *line, struct hgvs_names_description *des)
+struct hgvs_names_core *hgvs_names_core_init(void)
 {
+    struct hgvs_names_core *c = (struct hgvs_names_core*)malloc(sizeof(struct hgvs_names_core));
+    c->l_name = 0;
+    c->l_type = 0;
+    c->data = NULL;
+    return c;
+}
+void clean_hgvs_names_core(struct hgvs_names_core *c)
+{
+    if (c->data != NULL)
+	free(c->data);
+    c->data = NULL;
+    c->l_name = 0;
+    c->l_type = 0;    
+}
+
+void clean_hgvs_names_compact(struct hgvs_names_compact *compact)
+{
+    int i;
+    for (i=0; i<compact->l; ++i)
+	clean_hgvs_names_core(&compact->a[i]);
+    
+    if (compact->m) free(compact->a);
+    compact->m = 0;
+    compact->l = 0;
+}
+
+void generate_hgvs_names_core(struct gene_predictions_line *line, struct hgvs_names_description *des, struct hgvs_names_core *c, int *valid)
+{
+    clean_hgvs_names_core(c);
+    *valid = 0;
+    if (des->start > line->txend || des->end < line->txstart) return;
+
+    int exIn_id; // exon / intron id
+    for (exIn_id = 0; exIn_id < 
+
+
+    
+
+    
 }
 
 // -- assuming type of hgvs.name tag is string and number is R. this is mandontary for VCF file 
@@ -595,8 +634,9 @@ struct hgvs_names_compact *generate_hgvs_names(struct gene_predictions_memory_po
     // roadmap : snv -> del -> ins -> dup ->delins
     int i, j;
     for (i=1; i<line->n_allele; ++i) {
+
 	if (list->data == NULL) {
-	    list->data = strdup(line->name1);
+	    list->data = (void*)strdup(line->name1);
 	} else {
 	    struct simple_list **ll = &head;
 	    while (*ll) {
@@ -610,27 +650,27 @@ struct hgvs_names_compact *generate_hgvs_names(struct gene_predictions_memory_po
 		list->next = NULL;
 	    }		    
 	}
+	struct hgvs_names_compact *c1 = &compact[i-1];
 	struct hgvs_names_description *des = describe_variants(d->allele[0], d->allele[i], line->pos +1);
-	kstring_t str1 = KSTRING_INIT;
-	kstring_t str2 = KSTRING_INIT;
+	
 	for (j=0; j<pool->l; ++j) {
 	    int valid = 0;
-	    char *name = generate_hgvs_names_core(&pool->a[i], des, &valid);
+	    if (c1->l == c1->m) {
+		c1->m = c1->m == 0 ? 2 : c1->m <<1;
+		c1->a = (struct hgvs_names_core*)realloc(c1->a, sizeof(struct hgvs_names_core)*c1->m);
+	    }
+	    struct hgvs_names_core *c = &c1->a[c1->l];
+	    generate_hgvs_names_core(&pool->a[i], des, c, &valid);
 	    if (valid == 0) continue;
-	    kputs(name, &str1);
-	    kputs("; ", &str1);	    
-	    kputs(line->name2, &str2);
-	    kputs("; ", &str2);
+	    c1->l++;
 	}
-	hgvs_names[i] = str1.s;
-	names2[i] = str2.s;
     }
     list = head;
-    kstring_t str3 = KSTRING_INIT;
+    kstring_t str = KSTRING_INIT;
     int n = 0;
     while (list) {
-	kputs(list->data, &str3);
-	kputc(',', &str3);
+	kputs(list->data, &str);
+	kputc(',', &str);
 	n++;	    
 	head = list;
 	list = list->next;
@@ -638,8 +678,7 @@ struct hgvs_names_compact *generate_hgvs_names(struct gene_predictions_memory_po
 	free(head);
     }
     *n_names1 = n;
-    names1 = str3.s;     
-    
+    names1 = str.s;         
 }
 // number : R, type : string
 static void setter1_hgvs_names(bcf_hdr_t *hdr, bcf1_t *line, char *string) 
@@ -685,16 +724,39 @@ void setter_hgvs_string(bcf_hdr_t *hdr, bcf1_t *line, const char *key, char *str
 	error("Unrecongnized tag %s, only Gene, HGVSDNA, and Transcript are supported for now.", key);
     }
 }
-char *generate_transcript_string(struct hgvs_names_compact *compact)
+char *generate_transcript_string(struct hgvs_names_compact *compact, int n)
 {
-    if (compact == NULL) return NULL;
-    int i;
-    for (i=0; i<compact->l; ++l) {
+    kstring_t str = KSTRING_INIT;
+    int i, j;    
+    for (i=0; i<n; ++l) {
+	if (i) kputc(',', &str);
+	// foreach allele
+	struct hgvs_names_compact *compact1 = &compact[i];
+	for ( j = 0; j < compact1->l; ++j ) {
+	    struct hgvs_names_core *line = &compact1->a[j];
+	    if (line->l_name) kputsn(line->data, line->l_name-1, &str);
+	    else kputc('.', &str);
+	    kputs("; ", &str);
+	}
     }
-	
+    return str.s;
 }
-char *generate_hgvsvarnomen_string(struct hgvs_names_compact *compact)
+char *generate_hgvsvarnomen_string(struct hgvs_names_compact *compact,int n)
 {
+    kstring_t str = KSTRING_INIT;
+    int i, j;    
+    for (i=0; i<n; ++l) {
+	if (i) kputc(',', &str);
+	// foreach allele
+	struct hgvs_names_compact *compact1 = &compact[i];
+	for ( j = 0; j < compact1->l; ++j ) {
+	    struct hgvs_names_core *line = &compact1->a[j];
+	    if (line->l_name) kputs(line->data, &str);
+	    else kputc('.', &str);
+	    kputs("; ", &str);
+	}
+    }
+    return str.s;
 }
 // anno_hgvs_core() only used to annotate bcf/vcf standalone, all the valid tags-added functions will be called in 
 // this function, to annotate the vcf more specification, use setter_genepred_* functions instead of it. 
@@ -712,16 +774,20 @@ void anno_hgvs_core(struct gene_predictions_memory_pool *pool, htsFile *fp, tbx_
     if (pool->l == 0) return;
     int n_names1 = 0;
     char *names1 = NULL;
-    char *hgvsdna = NULL;
-    char *transcript = NULL;
-    struct hgvs_names_compact *c = generate_hgvs_names(pool, line, &n_names1, names1, hgvsdna, transcript);
+    int n_ale = 0;
     
-    char *trans_string = generate_transcript_string(c);
-    char *hgvs_string = generate_hgvsvarnomen_string(c);
+    struct hgvs_names_compact *c = generate_hgvs_names(pool, line, &n_names1, names1, &n_ale);
+    if (n_ale == 0) return;
+    char *trans_string = generate_transcript_string(c, n_ale);
+    char *hgvs_string = generate_hgvsvarnomen_string(c, n_ale);
     
     setter_hgvs_string(hdr, line, "Transcript", trans_string);
     setter_hgvs_string(hdr, line, "HGVSDNA", hgvs_string);
-    setter_hgvs_string(hdr, line, "Gene", names1);    
+    setter_hgvs_string(hdr, line, "Gene", names1);
+    int i;
+    for ( i = 0; i < n_ale; ++i )
+	clean_hgvs_names_compact(&c[i]);
+    free(c);
 }
 
 #include <sys/time.h>
