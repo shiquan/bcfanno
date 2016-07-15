@@ -53,8 +53,7 @@ struct exon_offset_pair {
 
 struct gene_predictions_line {
     // mark the memory is allocated or not inside this struct, clear == 0 is empty, clear == 1 recall clear_gene_predictions_line to free it.
-    int clear;
-    
+    int clear;    
     char *chrom;
     uint32_t txstart;
     uint32_t txend;
@@ -286,6 +285,7 @@ void generate_dbref_database(struct gene_predictions_line *line)
     	types[0] = line->dna_ref_offsets[i].start & FUNC_REGION_MASK;
     	types[1] = line->dna_ref_offsets[i].end & FUNC_REGION_MASK;
     	int j;
+	// [start, end] 
     	for (j=0; j<2; ++j) {
     	    kstring_t *temp1 = &temp[j];
     	    int type = types[j];
@@ -310,11 +310,8 @@ void generate_dbref_database(struct gene_predictions_line *line)
     	kputw((line->dna_ref_offsets[i].end>>DNA_REF_OFFSETS_BITS), &temp[1]);
 
 	// format: CHROM,START,END,STRAND, GENE, TRANSCRIPT, EXON, START_LOC, END_LOC 
-    	fprintf(
-	    stderr, "%s\t%u\t%u\t%c\t%s\t%s\tEX%d\t%s\t%s\n",
-	    line->chrom, line->exons[i].start, line->exons[i].end, line->strand,
-	    line->name1, line->name2, i+1, temp[0].s, temp[1].s
-	    );
+    	fprintf(stderr, "%s\t%u\t%u\t%c\t%s\t%s\tEX%d\t%s\t%s\n",
+		line->chrom, line->exons[i].start, line->exons[i].end, line->strand, line->name1, line->name2, i+1, temp[0].s, temp[1].s);
     	free(temp[0].s);
     	free(temp[1].s);
     }
@@ -535,7 +532,15 @@ void check_cnv_hgvs_names_descriptions(struct hgvs_names_description *des, struc
 
     }
 }
-
+enum func_region_type {
+    func_region_unknown,
+    func_region_split_sites,
+    func_region_cds,
+    func_region_intron,
+    func_region_utr5,
+    func_region_utr3,
+    func_region_intergenic,
+};
 //  hgvs_core keeps transcript/protein name, the format of hgvs name is construct by
 //                                    l_name   l_type
 //                                    |        |
@@ -548,6 +553,7 @@ struct hgvs_names_core {
     uint16_t l_name; // name offset in the data cahce, for chrom l_name == 0;
     uint16_t l_type; // the byte after type offset, usually offset of '.'
     uint8_t *data;
+    enum func_region_type type;
 };
 
 struct hgvs_names_compact {
@@ -586,16 +592,43 @@ void clean_hgvs_names_compact(struct hgvs_names_compact *compact)
     compact->m = 0;
     compact->l = 0;
 }
-
+void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, int *l1, int *l2 )
+{
+    *l1 = 0;
+    *l2 = exoncount*2 -1;
+    // init          l1
+    //       start   |       |       |
+    //       end     |       |       |
+    //                               l2
+    // result:               l2
+    //               |       |       |
+    //               |       |       |
+    //                       l1    
+    do {
+	if ( *l2 - *l1 == 1 ) break;
+	int l = *l1 + *l2;
+	uint32_t iter = l & 1 ?  pair[l/2].end : pair[l/2].start;
+	if ( iter > pos ) *l2 = l;
+	else *l1 = l;
+    } while(*l1 < *l2);
+}
 void generate_hgvs_names_core(struct gene_predictions_line *line, struct hgvs_names_description *des, struct hgvs_names_core *c, int *valid)
 {
     clean_hgvs_names_core(c);
     *valid = 0;
     if (des->start > line->txend || des->end < line->txstart) return;
+    // purpose: find the most nearest edge for variant position
+    // init:   l1                     l2
+    //         |----|   |----|  |-----|  
+    // End:         |  .|
+    //             l2   l1
+    // for iter l1 and l2, if even iter come from start array, if odd iter come from end array    
+    uint32_t start_var = (uint32_t)des->start;
+    uint32_t end_var = (uint32_t)des->end;
 
-    int exIn_id; // exon / intron id
-    for (exIn_id = 0; exIn_id < 
-
+    int l1, l2;
+    find_exons_loc(start_var, line->exoncount, line->exons, &l1, &l2);
+    debug_print("l1 : %d, l2: %d", l1, l2);
 
     
 
