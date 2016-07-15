@@ -478,7 +478,7 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	des->type = var_type_dels;
 	while ( *r ) r++;
 	des->start = pos;
-	des->ref_length = (r-ref) - (a->alt);
+	des->ref_length = (r-ref) - (a-alt);
 	des->end = pos + des->ref_length -1;
 	des->alt_length = 0;
 	des->alt = 0;
@@ -515,7 +515,7 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	return des;
     }
 
-    var->type = var_type_delins;
+    des->type = var_type_delins;
     des->start = pos;
     des->ref_length = re-r;
     des->ref = strndup(r, re-r);
@@ -552,7 +552,7 @@ enum func_region_type {
 struct hgvs_names_core {    
     uint16_t l_name; // name offset in the data cahce, for chrom l_name == 0;
     uint16_t l_type; // the byte after type offset, usually offset of '.'
-    uint8_t *data;
+    char *data;
     enum func_region_type type;
 };
 
@@ -565,6 +565,20 @@ struct simple_list {
     struct simple_list *next;
     void *data;
 };
+struct simple_list_init()
+{
+    struct simple_list *node = (struct simple_list *)malloc(sizeof(struct simple_list));
+    node->next = NULL;
+    node->data = NULL;
+    return node;
+}
+typedef void *free_func(void *)
+void free_list(struct simple_list *list, )
+{
+    while (list) {
+	
+    }
+}
 struct hgvs_names_core *hgvs_names_core_init(void)
 {
     struct hgvs_names_core *c = (struct hgvs_names_core*)malloc(sizeof(struct hgvs_names_core));
@@ -630,11 +644,20 @@ void generate_hgvs_names_core(struct gene_predictions_line *line, struct hgvs_na
     find_exons_loc(start_var, line->exoncount, line->exons, &l1, &l2);
     debug_print("l1 : %d, l2: %d", l1, l2);
 
-    
-
-    
+        
 }
-
+struct hgvs_names_compact *hgvs_names_compact_init(int n)
+{
+    if (n == 0)
+	error("Allele number is empty ! Failed to allocate memory for hgvs_names_compact.");
+    struct hgvs_names_compact *compact = (struct hgvs_names_compact *)malloc(n * sizeof(struct hgvs_names_compact));
+    int i;
+    for (i = 0; i < n; ++i) {
+	compact[i].l = compact[i].m = 0;
+	compact[i].a = NULL;
+    }
+    return compact;
+}
 // -- assuming type of hgvs.name tag is string and number is R. this is mandontary for VCF file 
 // @pool        cached memory pool for gene predictions records
 // @line        input variant record
@@ -656,52 +679,53 @@ struct hgvs_names_compact *generate_hgvs_names(struct gene_predictions_memory_po
     if (*n_ale == 0) return NULL;
     bcf_dec_t *d = &line->d;
 
-    struct hgvs_names_compact * compact = (struct hgvs_names_compact*)calloc(*n_ale, sizeof(struct hgvs_names_compact));
+    struct hgvs_names_compact * compact = hgvs_names_compact_init(*n_ale);
     
     // a simple list structure inited for caching gene names and de-duplicate 
-    struct simple_list *list = (struct simple_list*)malloc(sizeof(struct simple_list));
+    struct simple_list *list = simple_list_init();
     struct simple_list *head = list;
-    list->next = NULL;
-    list->data = NULL;
     
     // roadmap : snv -> del -> ins -> dup ->delins
     int i, j;
-    for (i=1; i<line->n_allele; ++i) {
+    for (i = 1; i < line->n_allele; ++i) {
 
-	if (list->data == NULL) {
-	    list->data = (void*)strdup(line->name1);
-	} else {
-	    struct simple_list **ll = &head;
-	    while (*ll) {
-		if (memcmp((char*)(*ll)->data, line->name1, strlen(line->name1))) *ll = (*ll)->next;
-		else break;
-	    }
-	    if (*ll) {
-		list->next = (struct simple_list*)malloc(sizeof(struct simple_list));
-		list = list->next;
-		list->data = (void*)strdup(line->name1);
-		list->next = NULL;
-	    }		    
-	}
 	struct hgvs_names_compact *c1 = &compact[i-1];
 	struct hgvs_names_description *des = describe_variants(d->allele[0], d->allele[i], line->pos +1);
 	
-	for (j=0; j<pool->l; ++j) {
+	for (j = 0; j < pool->l; ++j) {
 	    int valid = 0;
 	    if (c1->l == c1->m) {
 		c1->m = c1->m == 0 ? 2 : c1->m <<1;
 		c1->a = (struct hgvs_names_core*)realloc(c1->a, sizeof(struct hgvs_names_core)*c1->m);
 	    }
+
 	    struct hgvs_names_core *c = &c1->a[c1->l];
-	    generate_hgvs_names_core(&pool->a[i], des, c, &valid);
+	    struct gene_predictions_line *gp = &pool->a[i];
+
+	    generate_hgvs_names_core(gp, des, c, &valid);
 	    if (valid == 0) continue;
+
+	    if (list->data == NULL) {
+		list->data = strdup(gp->name1);
+	    } else {
+		struct simple_list **ll = &head;
+		while (*ll) {
+		    if (memcmp((char*)(*ll)->data, gp->name1, strlen(gp->name1))) *ll = (*ll)->next;
+		    else break;
+		}
+		if (*ll) {
+		    list->next = simple_list_init();		    
+		    list = list->next;
+		    list->data = strdup(gp->name1);
+		}		    
+	    }	    
 	    c1->l++;
 	}
     }
     list = head;
     kstring_t str = KSTRING_INIT;
     int n = 0;
-    while (list) {
+    while (list->data) {
 	kputs(list->data, &str);
 	kputc(',', &str);
 	n++;	    
@@ -711,7 +735,8 @@ struct hgvs_names_compact *generate_hgvs_names(struct gene_predictions_memory_po
 	free(head);
     }
     *n_names1 = n;
-    names1 = str.s;         
+    names1 = str.s;
+    return compact;
 }
 // number : R, type : string
 static void setter1_hgvs_names(bcf_hdr_t *hdr, bcf1_t *line, char *string) 
@@ -761,7 +786,7 @@ char *generate_transcript_string(struct hgvs_names_compact *compact, int n)
 {
     kstring_t str = KSTRING_INIT;
     int i, j;    
-    for (i=0; i<n; ++l) {
+    for (i=0; i<n; ++i) {
 	if (i) kputc(',', &str);
 	// foreach allele
 	struct hgvs_names_compact *compact1 = &compact[i];
@@ -778,7 +803,7 @@ char *generate_hgvsvarnomen_string(struct hgvs_names_compact *compact,int n)
 {
     kstring_t str = KSTRING_INIT;
     int i, j;    
-    for (i=0; i<n; ++l) {
+    for (i=0; i<n; ++i) {
 	if (i) kputc(',', &str);
 	// foreach allele
 	struct hgvs_names_compact *compact1 = &compact[i];
@@ -814,9 +839,12 @@ void anno_hgvs_core(struct gene_predictions_memory_pool *pool, htsFile *fp, tbx_
     char *trans_string = generate_transcript_string(c, n_ale);
     char *hgvs_string = generate_hgvsvarnomen_string(c, n_ale);
     
-    setter_hgvs_string(hdr, line, "Transcript", trans_string);
-    setter_hgvs_string(hdr, line, "HGVSDNA", hgvs_string);
-    setter_hgvs_string(hdr, line, "Gene", names1);
+    if ( hgvs_string )
+	setter_hgvs_string(hdr, line, "Transcript", trans_string);
+    if ( trans_string )
+	setter_hgvs_string(hdr, line, "HGVSDNA", hgvs_string);
+    if ( n_names1 )
+	setter_hgvs_string(hdr, line, "Gene", names1);
     int i;
     for ( i = 0; i < n_ale; ++i )
 	clean_hgvs_names_compact(&c[i]);
@@ -828,7 +856,7 @@ static double get_time() {
     struct timeval tv;
     if ( gettimeofday(&tv, 0) != 0 ) 
 	error("Failed to get time of day.");
-    return (double)tv.tv_sec + 1.0e-6// (double)tv.tv_usec;
+    return (double)tv.tv_sec + 1.0e-6 *(double)tv.tv_usec;
 }
 
 struct args {
@@ -874,8 +902,8 @@ int main(int argc, char **argv)
 	.faidx = 0,
 	.glist = 0,
     };
-        
-    for (int i = 1; i< argc;) {
+    int i;        
+    for (i = 1; i< argc;) {
 	const char *a = argv[i++];
 	if (strcmp(a, "-h") == 0) 
 	    return usage(argc, argv);
@@ -927,7 +955,7 @@ int main(int argc, char **argv)
     // 	error("Failed to load index of %s", args.refseq_file); 
     
     // assuming input file is stdin, only vcf, gzipped vcf, bcf file is accept,
-       err msg will output if file type unrecongnized
+    // err msg will output if file type unrecongnized
     if (args.input_fname == 0 && (!isatty(fileno(stdin)))) args.input_fname = "-";
     debug_print("input_fname : %s", args.input_fname);
     htsFile *fp = hts_open(args.input_fname, "r");
@@ -968,10 +996,10 @@ int main(int argc, char **argv)
     htsFile *fout = args.out_file == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.out_file, hts_bcf_wmode(out_type));
     
     // init gene_predictions or refgene database, hold tabix index cache and faidx cache in memory 
-    bcf1_T *line = bcf_init();
+    bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {     
 	anno_hgvs_core(mempool, fgp, args.gpidx, hdr, line);	
-	bcf_write1(fout, hdr_out, line);
+	//bcf_write1(fout, hdr_out, line);
     }
 
     clear_args(&args);
