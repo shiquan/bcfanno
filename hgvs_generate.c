@@ -176,12 +176,12 @@ void gene_predictions_prase_line(kstring_t *str, struct gene_predictions_line *l
     // -2                                          *2
     // -93   -45 -44       -1 1                187 188           351 *1   *96 *97    *223
     // |_______|____________|====================|=================|________|_______|
-    // / \            ATG                / \             TGA        / \
-    // /   \                             /   \                      /   \
-    // /gtga,,,g                         /gta,,,act                 /gtag,,,cc
-    // -45+1        -44-1                187+1        188-1         *96+1        *97-1
-    // -45+2      -44-2                  187+2      188-2           *96+2      *97-2
-    // -45+3    -44-3                    187+3    188-3             *96+3    *97-3
+    //        / \            ATG                / \             TGA        / \
+    //       /   \                             /   \                      /   \
+    //      /gtga,,,g                         /gta,,,act                 /gtag,,,cc
+    //  -45+1        -44-1                187+1        188-1         *96+1        *97-1
+    //   -45+2      -44-2                  187+2      188-2           *96+2      *97-2
+    //    -45+3    -44-3                    187+3    188-3             *96+3    *97-3
     // 
     // 
     // Noncoding DNA reference:
@@ -565,20 +565,14 @@ struct simple_list {
     struct simple_list *next;
     void *data;
 };
-struct simple_list_init()
+struct simple_list* simple_list_init()
 {
     struct simple_list *node = (struct simple_list *)malloc(sizeof(struct simple_list));
     node->next = NULL;
     node->data = NULL;
     return node;
 }
-typedef void *free_func(void *)
-void free_list(struct simple_list *list, )
-{
-    while (list) {
-	
-    }
-}
+
 struct hgvs_names_core *hgvs_names_core_init(void)
 {
     struct hgvs_names_core *c = (struct hgvs_names_core*)malloc(sizeof(struct hgvs_names_core));
@@ -931,7 +925,12 @@ int main(int argc, char **argv)
 	}
 	error("Unknown arg : %s", a);
     }
-
+    // assuming input file is stdin, only vcf, gzipped vcf, bcf file is accept,
+    // err msg will output if file type unrecongnized
+    if (args.input_fname == 0 && (!isatty(fileno(stdin)))) args.input_fname = "-";
+    if (args.input_fname == 0)
+	error("No input file ! Use -h for more informations.");
+ 
     if (args.gene_predictions_file == 0)
 	error("Reasons :\n"
 	      "-data gene preditions database is needed.\n"
@@ -954,10 +953,6 @@ int main(int argc, char **argv)
     // if (args.faidx == NULL) 
     // 	error("Failed to load index of %s", args.refseq_file); 
     
-    // assuming input file is stdin, only vcf, gzipped vcf, bcf file is accept,
-    // err msg will output if file type unrecongnized
-    if (args.input_fname == 0 && (!isatty(fileno(stdin)))) args.input_fname = "-";
-    debug_print("input_fname : %s", args.input_fname);
     htsFile *fp = hts_open(args.input_fname, "r");
     if (fp == NULL)
 	error("Failed to open %s.", args.input_fname);
