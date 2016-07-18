@@ -666,6 +666,27 @@ struct hgvs_names_compact *hgvs_names_compact_init(int n)
     }
     return compact;
 }
+struct simple_list *simple_list_push(struct simple_list *head, char *name)
+{
+    if (head == 0) head = init_simple_list();
+
+    if (head->data == NULL) {
+	head->data = strdup(name);
+	return head;
+    }
+    
+    struct simple_list **ll = &head;
+    for (; ll && *ll && *ll->data; ll = &*ll->next) {
+	if (strcmp((char*)*ll->data, name) == 0)
+	    return *ll;
+    }
+    if (*ll = NULL) *ll = init_simple_list();
+    if (*ll->data == NULL) {
+	*ll->data = strdup(name);
+	return *ll;
+    }
+    return NULL;
+}
 // -- assuming type of hgvs.name tag is string and number is R. this is mandontary for VCF file 
 // @pool        cached memory pool for gene predictions records
 // @line        input variant record
