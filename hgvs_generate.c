@@ -12,7 +12,7 @@
 #include "htslib/tbx.h"
 #include "htslib/faidx.h"
 
-#define KSTRING_INIT {0, 0, 0}
+#define INIT_KSTRING {0, 0, 0}
 
 KHASH_MAP_INIT_STR(list, char*)
 typedef khash_t(list) glist_t;
@@ -72,11 +72,33 @@ struct gene_predictions_memory_pool {
     uint32_t start;
     uint32_t end;
     int l, m;
-    struct gene_predictions_line *a;
+    struct gene_predictions_line **a;
 };
-
-void clear_gene_predictions_line(struct gene_predictions_line *);
-
+struct gene_predictions_line *init_gene_predictions_line()
+{
+    struct gene_predictions_line *l = (struct gene_predictions_line *)malloc(sizeof(struct gene_predictions_line));
+    l->clear = 1;
+    l->chrom = NULL;
+    l->name1 = l->name2 = NULL;
+    l->exons = NULL;
+    l->txstart = l->txend = 0;
+    l->cdsstart = l->cdsend = 0;
+    l->exoncount = 0;
+    return l;
+}
+void clear_gene_predictions_line(struct gene_predictions_line *l)
+{
+    if (l->clear == 1) return;
+    free(l->chrom);
+    free(l->name1);
+    free(l->name2);
+    free(l->exons);
+    free(l->dna_ref_offsets);
+    l->txstart = l->txend = 0;
+    l->cdsstart = l->cdsend = 0;
+    l->exoncount = 0;
+    l->clear = 1;
+}
 glist_t *init_gene_list(const char *list)
 {
     int i, n = 0;
@@ -280,7 +302,7 @@ void generate_dbref_database(struct gene_predictions_line *line)
     if (line->clear == 1) return;
     int i, j;
     for (i=0; i<line->exoncount; ++i) {
-    	kstring_t temp[2] = {KSTRING_INIT, KSTRING_INIT};
+    	kstring_t temp[2] = {INIT_KSTRING, INIT_KSTRING};
     	int types[2];
     	types[0] = line->dna_ref_offsets[i].start & FUNC_REGION_MASK;
     	types[1] = line->dna_ref_offsets[i].end & FUNC_REGION_MASK;
@@ -321,29 +343,30 @@ void push_mempool(struct gene_predictions_memory_pool *pool, kstring_t *str)
 {
     if (pool->m == pool->l) {
 	pool->m = pool->m == 0 ? 2 : pool->m << 1;
-	pool->a = (struct gene_predictions_line *)realloc(pool->a, sizeof(struct gene_predictions_line)*pool->m);
+	pool->a = (struct gene_predictions_line **)realloc(pool->a, sizeof(struct gene_predictions_line*)*pool->m);
     }
-    // the prase func must return a point or go abort 
-    gene_predictions_prase_line(str, &pool->a[pool->l]);
+    // the prase func must return a point or go abort
+    pool->a[pool->l] = init_gene_predictions_line();
+    gene_predictions_prase_line(str, pool->a[pool->l]);
     pool->l++;
 }
 void update_mempool(struct gene_predictions_memory_pool *pool)
 {    
     if (pool->l == 0) return;
     // try to loop this pool and find the edges
-    pool->start = pool->a[0].txstart;
-    pool->end = pool->a[0].txend;
+    pool->start = pool->a[0]->txstart;
+    pool->end = pool->a[0]->txend;
     int i;    
     for (i=1; i<pool->l; ++i) {
 	// if (pool->a[i] == NULL) continue;
-	if (pool->a[i].txstart < pool->start) pool->start = pool->a[i].txstart;
-	if (pool->a[i].txend > pool->end) pool->end = pool->a[i].txend;
+	if (pool->a[i]->txstart < pool->start) pool->start = pool->a[i]->txstart;
+	if (pool->a[i]->txend > pool->end) pool->end = pool->a[i]->txend;
     }
 }
 void fill_mempool(struct gene_predictions_memory_pool *pool, htsFile *fp, tbx_t *tbx, int tid, uint32_t start, uint32_t end)
 {
     hts_itr_t *itr = tbx_itr_queryi(tbx, tid, start, end);
-    kstring_t str = KSTRING_INIT;
+    kstring_t str = INIT_KSTRING;
     if (tid == -1) return;
     
     while (tbx_itr_next(fp, tbx, itr, &str) >= 0) {
@@ -355,24 +378,13 @@ void fill_mempool(struct gene_predictions_memory_pool *pool, htsFile *fp, tbx_t 
     tbx_itr_destroy(itr);
     update_mempool(pool);    
 }
-void clear_gene_predictions_line(struct gene_predictions_line *line)
-{
-    if (line->clear == 1) return;
-    free(line->chrom);
-    free(line->name1);
-    free(line->name2);
-    free(line->exons);
-    free(line->dna_ref_offsets);
-    line->txstart = line->txend = 0;
-    line->cdsstart = line->cdsend = 0;
-    line->exoncount = 0;
-    line->clear = 1;
-}
 void clear_memory_pool(struct gene_predictions_memory_pool *pool)
 {
     int i;
-    for (i=0; i<pool->m; ++i)
-	clear_gene_predictions_line(&pool->a[i]);
+    for (i=0; i<pool->l; ++i) {
+	clear_gene_predictions_line(pool->a[i]);
+	free(pool->a[i]);
+    }
     pool->l = 0;
     pool->m = 0;
     free(pool->a);
@@ -558,14 +570,14 @@ struct hgvs_names_core {
 
 struct hgvs_names_compact {
     int l, m;
-    struct hgvs_names_core *a;
+    struct hgvs_names_core **a;
 };
 
 struct simple_list {
     struct simple_list *next;
     void *data;
 };
-struct simple_list* simple_list_init()
+struct simple_list* init_simple_list()
 {
     struct simple_list *node = (struct simple_list *)malloc(sizeof(struct simple_list));
     node->next = NULL;
@@ -573,7 +585,7 @@ struct simple_list* simple_list_init()
     return node;
 }
 
-struct hgvs_names_core *hgvs_names_core_init(void)
+struct hgvs_names_core *init_hgvs_names_core(void)
 {
     struct hgvs_names_core *c = (struct hgvs_names_core*)malloc(sizeof(struct hgvs_names_core));
     c->l_name = 0;
@@ -593,8 +605,10 @@ void clean_hgvs_names_core(struct hgvs_names_core *c)
 void clean_hgvs_names_compact(struct hgvs_names_compact *compact)
 {
     int i;
-    for (i=0; i<compact->l; ++i)
-	clean_hgvs_names_core(&compact->a[i]);
+    for (i=0; i<compact->l; ++i) {
+	clean_hgvs_names_core(compact->a[i]);
+	free(compact->a[i]);
+    }
     
     if (compact->m) free(compact->a);
     compact->m = 0;
@@ -616,8 +630,8 @@ void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, int *l1
 	if ( *l2 - *l1 == 1 ) break;
 	int l = *l1 + *l2;
 	uint32_t iter = l & 1 ?  pair[l/2].end : pair[l/2].start;
-	if ( iter > pos ) *l2 = l;
-	else *l1 = l;
+	if ( iter > pos ) *l2 = l/2;
+	else *l1 = l/2;
     } while(*l1 < *l2);
 }
 void generate_hgvs_names_core(struct gene_predictions_line *line, struct hgvs_names_description *des, struct hgvs_names_core *c, int *valid)
@@ -638,7 +652,7 @@ void generate_hgvs_names_core(struct gene_predictions_line *line, struct hgvs_na
     find_exons_loc(start_var, line->exoncount, line->exons, &l1, &l2);
     debug_print("l1 : %d, l2: %d", l1, l2);
 
-        
+    *valid = 1;
 }
 struct hgvs_names_compact *hgvs_names_compact_init(int n)
 {
@@ -676,50 +690,52 @@ struct hgvs_names_compact *generate_hgvs_names(struct gene_predictions_memory_po
     struct hgvs_names_compact * compact = hgvs_names_compact_init(*n_ale);
     
     // a simple list structure inited for caching gene names and de-duplicate 
-    struct simple_list *list = simple_list_init();
+    struct simple_list *list = init_simple_list();
     struct simple_list *head = list;
     
     // roadmap : snv -> del -> ins -> dup ->delins
     int i, j;
     for (i = 1; i < line->n_allele; ++i) {
 
-	struct hgvs_names_compact *c1 = &compact[i-1];
+	struct hgvs_names_compact *c1 = &compact[i];
 	struct hgvs_names_description *des = describe_variants(d->allele[0], d->allele[i], line->pos +1);
 	
 	for (j = 0; j < pool->l; ++j) {
 	    int valid = 0;
 	    if (c1->l == c1->m) {
 		c1->m = c1->m == 0 ? 2 : c1->m <<1;
-		c1->a = (struct hgvs_names_core*)realloc(c1->a, sizeof(struct hgvs_names_core)*c1->m);
+		c1->a = (struct hgvs_names_core**)realloc(c1->a, sizeof(struct hgvs_names_core*)*c1->m);
 	    }
 
-	    struct hgvs_names_core *c = &c1->a[c1->l];
-	    struct gene_predictions_line *gp = &pool->a[i];
-
+	    struct hgvs_names_core *c = init_hgvs_names_core();
+	    struct gene_predictions_line *gp = pool->a[j];
+	    // debug_print("start : %u, end : %u, txstart : %u, txend : %u", des->start, des->end, gp->txstart, gp->txend);
 	    generate_hgvs_names_core(gp, des, c, &valid);
+
 	    if (valid == 0) continue;
 
 	    if (list->data == NULL) {
-		list->data = strdup(gp->name1);
+		list->data = (void *)strdup(gp->name1);
 	    } else {
-		struct simple_list **ll = &head;
-		while (*ll) {
-		    if (memcmp((char*)(*ll)->data, gp->name1, strlen(gp->name1))) *ll = (*ll)->next;
+		struct simple_list *ll = head;
+		while (ll && ll->data) {
+		    if (memcmp((char*)ll->data, gp->name1, strlen(gp->name1))) ll = ll->next;
 		    else break;
 		}
-		if (*ll) {
-		    list->next = simple_list_init();		    
+		if (ll == NULL)  {
+		    list->next = init_simple_list();		    
 		    list = list->next;
-		    list->data = strdup(gp->name1);
-		}		    
-	    }	    
-	    c1->l++;
+		}
+		list->data = (void*)strdup(gp->name1);
+	    }
+	    debug_print("name : %s, name : %s", (char*)list->data, gp->name1);
+	    c1->a[c1->l++] = c;
 	}
     }
     list = head;
-    kstring_t str = KSTRING_INIT;
+    kstring_t str = INIT_KSTRING;
     int n = 0;
-    while (list->data) {
+    while (list && list->data) {
 	kputs(list->data, &str);
 	kputc(',', &str);
 	n++;	    
@@ -778,14 +794,14 @@ void setter_hgvs_string(bcf_hdr_t *hdr, bcf1_t *line, const char *key, char *str
 }
 char *generate_transcript_string(struct hgvs_names_compact *compact, int n)
 {
-    kstring_t str = KSTRING_INIT;
+    kstring_t str = INIT_KSTRING;
     int i, j;    
     for (i=0; i<n; ++i) {
 	if (i) kputc(',', &str);
 	// foreach allele
 	struct hgvs_names_compact *compact1 = &compact[i];
 	for ( j = 0; j < compact1->l; ++j ) {
-	    struct hgvs_names_core *line = &compact1->a[j];
+	    struct hgvs_names_core *line = compact1->a[j];
 	    if (line->l_name) kputsn(line->data, line->l_name-1, &str);
 	    else kputc('.', &str);
 	    kputs("; ", &str);
@@ -795,14 +811,14 @@ char *generate_transcript_string(struct hgvs_names_compact *compact, int n)
 }
 char *generate_hgvsvarnomen_string(struct hgvs_names_compact *compact,int n)
 {
-    kstring_t str = KSTRING_INIT;
+    kstring_t str = INIT_KSTRING;
     int i, j;    
     for (i=0; i<n; ++i) {
 	if (i) kputc(',', &str);
 	// foreach allele
 	struct hgvs_names_compact *compact1 = &compact[i];
 	for ( j = 0; j < compact1->l; ++j ) {
-	    struct hgvs_names_core *line = &compact1->a[j];
+	    struct hgvs_names_core *line = compact1->a[j];
 	    if (line->l_name) kputs(line->data, &str);
 	    else kputc('.', &str);
 	    kputs("; ", &str);
