@@ -102,92 +102,6 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 	    str.l -= 4;
 
 	    int hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
-	    /* if(!strncasecmp("RefGene", str.s, 7)) {
-		// RefGene.FuncRegion      RefGene.ExIn   RefGene.Function RefGene.Gene RefGene.HGVS
-		// All tags with RefGene started name will construct from one or more transcripts and be splited by '|'
-
-		if ( !strncasecmp("RefGene.HGVS", str.s, 12)) {
-		    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
-			bcf_hdr_append(header_out,"##INFO=<ID=RefGene.HGVS,Number=A,Type=String,Description=\"HGVS nomenclature annotated by VCFANNO\">");
-			bcf_hdr_sync(header_out);
-			hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
-			assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
-		    }
-		    nc++;
-		    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-		    struct annot_col *col = &cols[nc-1];
-		    col->icol = i;
-		    col->replace = replace;
-		    col->hdr_key = strdup(str.s);
-		    col->number = bcf_hdr_id2length(header_out, BCF_HL_INFO, hdr_id);
-		    col->setter = local_setter_hgvs_names;
-		} else if ( !strncasecmp("RefGene.FuncRegion", str.s, 18)) {
-		    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
-			bcf_hdr_append(header_out,"##INFO=<ID=RefGene.FuncRegion,Number=A,Type=String,Description=\"Function region annotated by VCFANNO\">");
-			bcf_hdr_sync(header_out);
-			hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
-			assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
-		    }
-		    nc++;
-		    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-		    struct annot_col *col = &cols[nc-1];
-		    col->icol = i;
-		    col->replace = replace;
-		    col->hdr_key = strdup(str.s);
-		    col->number = bcf_hdr_id2length(header_out, BCF_HL_INFO, hdr_id);
-		    col->setter = local_setter_refgene_funcreg;
-		} else if ( !strncasecmp("RefGene.ExIn", str.s, 12)) {
-		    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
-			bcf_hdr_append(header_out, "##INFO=<ID=RefGene.FuncRegion,Number=A,Type=String,Description=\"Exon or intron id annotated by VCFANNO\">");
-			bcf_hdr_sync(header_out);
-			hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
-			assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
-		    }
-		    nc++;
-		    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-		    struct annot_col *col = &cols[nc-1];
-		    col->icol = i;
-		    col->replace = replace;
-		    col->hdr_key = strdup(str.s);
-		    col->number = bcf_hdr_id2length(header_out, BCF_HL_INFO, hdr_id);
-		    col->setter = local_setter_refgene_exin;
-		} else if ( !strncasecmp("RefGene.Fuction", str.s, 15)) {
-		    
-		    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
-			bcf_hdr_append(header_out, "##INFO=<ID=RefGene.FuncRegion,Number=A,Type=String,Description=\"Function annotated by VCFANNO\">");
-			bcf_hdr_sync(header_out);
-			hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
-			assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
-		    }
-		    nc++;
-		    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-		    struct annot_col *col = &cols[nc-1];
-		    col->icol = i;
-		    col->replace = replace;
-		    col->hdr_key = strdup(str.s);
-		    col->number = bcf_hdr_id2length(header_out, BCF_HL_INFO, hdr_id);
-		    col->setter = local_setter_refgene_function;	      
-		} else if ( !strcasecmp("Refgene.Gene", str.s)) {
-		    // Usually a mutation localed in one gene
-		    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
-			bcf_hdr_append(header_out,"##INFO=<ID=RefGene.Gene,Number=1,Type=String,Description=\"Gene name annotated by VCFANNO\">");
-			bcf_hdr_sync(header_out);
-			hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
-			assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
-		    }
-		    
-		    nc++;
-		    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-		    struct annot_col *col = &cols[nc-1];
-		    col->icol = i;
-		    col->replace = replace;
-		    col->hdr_key = strdup(str.s);
-		    col->number = bcf_hdr_id2length(header_out, BCF_HL_INFO, hdr_id);
-		    col->setter = local_setter_hgvs_gene;
-		} else {
-		    error("The tag %s not support yet (send an email to the mail list for function request please.)", str.s);
-		}		
-		} else { */
 
 	    if ( !bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) ) {
 		if ( type == anno_is_vcf ) {
@@ -236,8 +150,6 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 		default:
 		    error("The type of %s not recognised (%d)\n", str.s, bcf_hdr_id2type(header_out, BCF_HL_INFO, hdr_id));
 	    }
-
-	    /* } */
 	}
 	if ( !*se ) break;
         ss = ++se;
