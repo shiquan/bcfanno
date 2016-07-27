@@ -198,25 +198,91 @@ uint32_t bcf_calend(bcf1_t *line)
 {
     return line->pos + line->rlen;
 }
-
+struct format_type {
+    int chrom_col;
+    int name1_col;
+    int name2_col; // name2 could be empty;
+    int strand_col;
+    int txstart_col;
+    int txend_col;
+    int cdsstart_col;
+    int cdsend_col;
+    int exoncount_col;
+    int exonstarts_col;
+    int exonends_col;
+};
+const struct format_type refgene_format_cols = {
+    .chrom_col = 2,
+    .name1_col = 1,
+    .name2_col = 12,
+    .strand_col = 3,
+    .txstart_col = 4,
+    .txend_col = 5,
+    .cdsstart_col = 6,
+    .cdsend_col = 7,
+    .exoncount_col = 8,
+    .exonstarts_col = 9,
+    .exonends_col = 10,
+};
+const struct format_type genepred_format_cols = {
+    .chrom_col = 1,
+    .name1_col = 0,
+    .name2_col = 11,
+    .strand_col = 2,
+    .txstart_col = 3,
+    .txend_col = 4,
+    .cdsstart_col = 5,
+    .cdsend_col = 6,
+    .exoncount_col = 7,
+    .exonstarts_col = 8,
+    .exonends_col = 9,
+};
+struct anno_data_file_handler {
+    struct format_type type;
+    const char *fn;
+    htsFile *fp;
+    tbx_t *tbx;
+};
+// test the format of anno dataset, usually genePred or refgene
+void test_annodata_file_type(struct anno_data_file_handler *handler)
+{
+    
+}
 void gene_pred_line_praser(kstring_t *str, struct gene_pred_line *line)
 {
     int nfields = 0;
     int *splits = ksplit(str, 0, &nfields);
     if (line->clear != 1) gene_pred_line_clear(line);
     line->clear = 0;
+
     // accept any gene_pred-like format, like refGene, ensGene, gene_pred
-    assert(nfields == 16);
+    // assert(nfields == 16);
+
     char *s = str->s;
-    line->chrom = strdup(s + splits[2]);
-    line->name1 = strdup(s + splits[1]);
-    line->strand = memcmp(s + splits[3], "+", 1) ? '-' : '+';
-    line->txstart = atoi(s + splits[4]);
-    line->txend = atoi(s + splits[5]);
-    line->cdsstart = atoi(s + splits[6]);
-    line->cdsend = atoi(s + splits[7]);
-    line->exoncount = atoi(s + splits[8]);
-    line->name2 = strdup(s + splits[12]);
+    char *chrom = s + splits[refgene_format_cols.chrom_col];
+    char *name1 = s + splits[refgene_format_cols.name1_col];
+    char *strand = s + splits[refgene_format_cols.strand_col];
+    char *txstart = s + splits[refgene_format_cols.txstart_col];
+    char *txend = s + splits[refgene_format_cols.txend_col];
+    char *cdsstart = s + splits[refgene_format_cols.cdsstart_col];
+    char *cdsend = s + splits[refgene_format_cols.cdsend_col];
+    char *exoncount = s + splits[refgene_format_cols.exoncount_col];   
+    char *name2 = NULL;
+
+    line->chrom = strdup(chrom);
+    line->name1 = strdup(name1);
+    line->strand = memcmp(strand, "+", 1) ? '-' : '+';
+    line->txstart = atoi(txstart);
+    line->txend = atoi(txend);
+    line->cdsstart = atoi(cdsstart);
+    line->cdsend = atoi(cdsend);
+    line->exoncount = atoi(exoncount);
+    // for some genePred file, no name2 specified.
+    line->name2 = NULL;
+    if (refgene_format_cols.name2_col > 0) {
+	name2 = s + splits[refgene_format_cols.name2_col];
+	line->name2 = strdup(s + splits[12]);
+    }
     // the exons region in gene_pred file is like  1,2,3,4,5. try to init the exon_pair[] 
     // and exon_offset_pair[] by exoncount 
     char *ss = s + splits[9];
@@ -1291,9 +1357,10 @@ int main(int argc, char **argv)
     pool->a = NULL;
     pool->cache.i = pool->cache.l = pool->cache.m = 0;
     pool->cache.a = NULL;
-    double c0 = get_time();    
+    double c0 = get_time();
+    LOG_print("Init ...");
     bcf_hdr_t *hdr = bcf_hdr_read(args.fp);    
-
+    LOG_print("Prase header.");
     // duplicate header file and sync new tag in the output header .
     // assuming output is stdout in Vcf format in default. 
     args.fout = args.out_file == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.out_file, hts_bcf_wmode(out_type));
@@ -1330,6 +1397,7 @@ int main(int argc, char **argv)
 	bcf_write1(args.fout, hdr_out, line);
 #endif
     }
+    LOG_print("Clear ...");
     clear_args(&args);
     hts_close(fgp);
     bcf_destroy(line);

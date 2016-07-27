@@ -2,12 +2,9 @@
 #define UTILS_COMMON_HEADER
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <time.h>
 
 #define check_double_free(p) do {\
         void **_pp = (void**)&(p);                                      \
@@ -55,9 +52,14 @@
 
 #define error(line, ...) do						\
     {									\
-	fprintf(stderr, "[error] func : %s, line : %d, errno : %s. " line "\n", __FUNCTION__, __LINE__, str_errno(), ##__VA_ARGS__); \
+	fprintf(stderr, "[error] [func: %s, line: %d] " line "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
 	errno = 0;							\
 	exit(EXIT_FAILURE);						\
+    }while(0)
+
+#define error_print(line, ...) do						\
+    {									\
+	fprintf(stderr, "[error] [func: %s, line: %d] " line "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
     }while(0)
 
 #define warnings(line, ...) do						\
@@ -70,9 +72,17 @@
     }while(0)
 
 #define debug_print(line, ...) do {\
-	fprintf(stderr, "[ ** DEBUG ** func : %s, line : %d ] " line "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+	fprintf(stderr, "[ ** DEBUG ** func: %s, line: %d ] " line "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
     } while(0)
 
+#define LOG_print(line, ...) do {\
+	time_t second;\
+	time(&second);\
+	char _time_buff[100];							\
+	strftime (_time_buff, 100, "%Y-%m-%d %H:%M:%S", localtime (&second));	\
+	fprintf(stderr, "[%s] " line "\n", _time_buff, ##__VA_ARGS__); \
+    } while(0)
 
+#define BE_SMART_STRING "Please DONOT post this error message on the forum or copy it into the emails. Try to figure out this issue by youself by reading the log information carefully and checking you input arguments."
 
 #endif
