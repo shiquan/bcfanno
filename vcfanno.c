@@ -18,11 +18,13 @@ static void prase_argv(int argc, char **argv)
     kstring_t str = KSTRING_INIT;
     int i;
     
+
     if (silence_mode == 0) {
 	LOG_print("Compile platform: %s, complie time: %s", COMPLIE_OS, COMPLIE_TIME);
 	LOG_print("Args: %s", avs);
     }
 }
+
 int main(int argc, char **argv)
 {
     prase_argv(argc, argv);

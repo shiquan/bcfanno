@@ -115,7 +115,7 @@ int parse_columns(struct vcf_sql_api *api)
 }
 int init_data(const char *json, const char *fname)
 {
-    if ( load_config(json) ) {
+    if ( load_config(json) != 0 ) {
 	error("Load JSON file failed");
     }
     // assume input is VCF/BCF file
@@ -141,7 +141,7 @@ int init_data(const char *json, const char *fname)
 	    if ( !bcf_sr_add_reader(hand.files, anno_config_file.apis[i].vfile) ) 
 		error("Failed to open %s: %s\n", fname, bcf_sr_strerror(hand.files->errnum));
 	    
-	    hand.ti = i+1;
+	    hand.ti = i;
 	    parse_columns(&anno_config_file.apis[i]);
 	    
 	}
@@ -203,7 +203,7 @@ bcf1_t *anno_core(bcf1_t *line)
     /* } */
 
     for (i=0; i < hand.vcf_cols->n; ++i) {
-	hand.ti = i+1;
+	hand.ti = i;
 	if ( bcf_sr_has_line(hand.files, hand.ti) ) {
 	    bcf1_t *aline = bcf_sr_get_line(hand.files, hand.ti);
 	    struct annot_cols *cols = &hand.vcf_cols->vcols[i];
@@ -291,7 +291,7 @@ int paras_praser(int argc, char **argv)
 	error("Failed to open : %s", input_fname);
     
     htsFormat type = *hts_get_format(fp);
-
+    
     if (type.format != vcf && type.format != bcf) {
 	error("Unsupported input format! %s", input_fname);
     }
@@ -301,21 +301,74 @@ int paras_praser(int argc, char **argv)
     if (hand.out_fh == NULL)
 	error("cannot write to %s", hand.out);
     
-    int ret = init_data(config_file, input_fname);
-    free(config_file);
-    return ret;
+    return 0;
 }
 
+void bcf_srs_regions_update(bcf_sr_regions_t *reg, const char *chr, int start, int end)
+{
+    if (start == -1 || end == -1) return;
+
+    start--; end--; // 1based to 0based
+    if ( !reg->seq_hash )
+	reg->seq_hash = khash_str2int_init();
+
+    int iseq;
+    if ( khash_str2int_get(reg->seq_hash, chr, &iseq) < 0 ) {
+	iseq = reg->nseqs++;
+	
+    }
+}
 
 int main(int argc, char **argv)
 {
-    if ( paras_praser(argc, argv) ) {
+    if ( paras_praser(argc, argv) != 0)
 	return EXIT_FAILURE;
-    }
-    //check_environ_paras();
-    if ( bcf_hdr_write(hand.out_fh, hand.hdr_out) )
-	error("failed to write header.");
+
+    if ( load_config(config_file) != 0)
+	error("Failed to load configure file : %s", config_file);
+
+    free(config_file);
+
+    hand.files = bcf_sr_init();
+    hand.files->require_index = 1;
+    hand.vcf_cols = acols_vector_init();
+    hand.sql_cols = acols_vector_init();
+    hand.vcmp = vcmp_init();
+    hand.tmpks.l = hand.tmpks.m = 0;
+
+
+    htsFile *fp = hts_open(input_fname, "r");
+    bcf_hdr_t *hdr = bcf_hdr_read(fp);
+    hand.hdr_out = bcf_hdr_dup(hdr);
+
+    int i;
+    for (i = 0; i > anno_config_file.n_apis; ++i) {
+	if (anno_config_file.apis[i].type == anno_is_vcf) {
+	    if ( !bcf_sr_add_reader(hand.files, anno_config_file.apis[i].vfile) )
+		error("Failed to open %s : %s !", anno_config_file.apis[i].vfile, bcf_sr_strerror(hand.files->errnum));
+
+	    hand.ti = i;
+	    parse_columns(&anno_config_file.apis[i]);
 	    
+	}	
+    }
+
+    
+    //check_environ_paras();
+    if ( bcf_hdr_write(hand.out_fh, hand.hdr_out) != 0 )
+	error("failed to write header.");
+
+    bcf1_t *line = bcf_init();
+
+    while ( bcf_read(fp, hdr, line) == 0 ) {
+
+	if (line->errcode)
+	    error("Encountered error, cannot proceed. Please check the error output above.");
+
+	
+		  
+    }
+    
     while ( bcf_sr_next_line(hand.files)) {
 	
 	if ( !bcf_sr_has_line(hand.files, 0) ) continue;
