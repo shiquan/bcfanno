@@ -6,11 +6,24 @@
 #define KSTRING_INIT {0, 0, 0}
 #endif
 
-const char *config_file = NULL;
-const char *input_fname = NULL;
-const char *output_fname = NULL;
-int silence_mode = 0;
-int file_type = 0;
+struct args {
+    const char *config_file;
+    const char *input_fname;
+    const char *output_fname;
+    
+    int silence_mode;
+    int file_type;
+    int test_mode;
+};
+
+struct args args = {
+    .config_file = 0,
+    .input_fname = 0,
+    .output_fname = 0,
+    .silence_mode = 0,
+    .file_type = 0,
+    .test_mode = 0,
+};
 
 static void prase_argv(int argc, char **argv)
 {

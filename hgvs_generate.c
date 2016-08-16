@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <zlib.h>
 #include "utils.h"
 #include "htslib/hts.h"
@@ -11,182 +10,96 @@
 #include "htslib/vcf.h"
 #include "htslib/tbx.h"
 #include "htslib/faidx.h"
+#include "hgvs.h"
 
 #define KSTRING_INIT {0, 0, 0}
 
 char str_init[2];
 
-KHASH_MAP_INIT_STR(list, char*)
+KHASH_MAP_INIT_STR(name, char*)
 
-typedef khash_t(list) glist_t;
+typedef khash_t(name) namehash_type;
 
 typedef char *(*copy_seqs_func)(const char*, unsigned long n);
 		      
-//  for each transcript, the region span several exon partial regions, use exon_pair[] stand each exons
-// and exon_offset_pair[] is the offset / coding coordiante consider of cdsstart 
-struct exon_pair {
-    uint32_t start;
-    uint32_t end;
-};
-
-// 
-// The dna reference offset for DNA coding and noncoding transcript consist of two parts. the offset value
-// and the function region construct a 32-bits value.
-// coding/nocoding coordinate
-// 32                        4321
-// |_________________________||||
-// ONLY one-bit below is accept per value
-// 
-// offset 1:  is_noncoding
-// offset 2:  is_coding
-// offset 3:  is_utr5
-// offset 4:  is_utr3
-// 
-
-#define OFFSET_BITWISE   4
-#define REG_NONCODING  1
-#define REG_CODING     2
-#define REG_UTR5       4
-#define REG_UTR3       8
-#define REG_MASK       0xF
-
-struct exon_offset_pair {
-    uint32_t start;
-    uint32_t end;
-};
-
-struct gene_pred_line {
-    // mark the memory is allocated or not inside this struct, clear == 0 is empty, clear == 1 recall clear_gene_pred_line to free it.
-    int clear;    
-    char *chrom;
-    uint32_t txstart;
-    uint32_t txend;
-    char strand;
-    char *name1;
-    char *name2; // transcript name or null for some gene_pred file
-    uint32_t cdsstart;
-    uint32_t cdsend;
-    uint32_t exoncount;
-    struct exon_pair *exons;
-    struct exon_offset_pair *dna_ref_offsets;
-};
-enum func_region_type {
-    func_region_unknown,
-    func_region_split_sites,
-    func_region_cds,
-    func_region_intron,
-    func_region_utr5,
-    func_region_utr3,
-    func_region_intergenic,
-};
-//  hgvs_core keeps transcript/protein name, the format of hgvs name is construct by
-//                                    l_name   l_type
-//                                    |        |
-//  [transcript|protein|gene|ensemble]:"prefix".postion...
-//
-//  l_name          l_type
-//  |               |
-//  [chrom]:"prefix".postion...
-struct hgvs_names_core {    
-    uint16_t l_name; // name offset in the data cahce, for chrom l_name == 0;
-    uint16_t l_type; // the byte after type offset, usually offset of '.'
-    kstring_t str;
-    enum func_region_type type;
-};
-
-// Dynamic allocate and init technology.
-// For struct { int l, m, i; void *a }, a is the cached array of predefined type. l for used length, m for max length,
-// i for inited length. And i always >= l, and m always >= i. If l == m, the cache array should be reallocated by a new
-// memory size. This structure used to reuse the cache complex structures other than points.
-struct hgvs_names {
-    int l, m, i; 
-    struct hgvs_names_core *a;
-};
-struct hgvs_names_cache {
-    int l, m, i; // l == n_allele -1
-    struct hgvs_names *a;
-};
-struct name_list {
-    int l, m;
-    char **a;
-};
-
-struct gene_pred_memory_pool {
-    int rid;
-    uint32_t start;
-    uint32_t end;
-    int l, m, i; // l for used length, m for max length, i for inited length
-    struct gene_pred_line *a;
-    struct hgvs_names_cache cache;
-};
-void gene_pred_line_clear(struct gene_pred_line *l)
+void genepred_line_clear(struct genepred_line *line)
 {
-    if (l->clear == 1) return;
-    if (l->clear == 0) {
-	free(l->chrom);
-	free(l->name1);
-	free(l->name2);
-	free(l->exons);
-	free(l->dna_ref_offsets);
+    if ( line->clear == 1 )
+	return;
+
+    if ( line->clear == 0 ) {
+	free(line->chrom);
+	free(line->name1);
+	if ( line->name2 )
+	    free(line->name2);
+	free(line->exons);
+	free(line->dna_ref_offsets);
     }
-    l->chrom = NULL;
-    l->name1 = NULL;
-    l->name2 = NULL;
-    l->exons = NULL;
-    l->dna_ref_offsets = NULL;
-    l->txstart = l->txend = 0;
-    l->cdsstart = l->cdsend = 0;
-    l->exoncount = 0;
-    l->clear = 1;
+    // set all value empty
+    line->chrom = NULL;
+    line->name1 = NULL;
+    line->name2 = NULL;
+    line->exons = NULL;
+    line->dna_ref_offsets = NULL;
+    line->txstart = line->txend = 0;
+    line->cdsstart = line->cdsend = 0;
+    line->exoncount = 0;
+    line->clear = 1;
 }
-void hgvs_names_core_clear(struct hgvs_names_core *c)
+static void hgvs_core_clear(struct hgvs_core *c)
 {
     c->str.l = 0;
     c->l_name = 0;
     c->l_type = 0;
     c->type = func_region_unknown;
 }
-void hgvs_names_clear(struct hgvs_names *hn)
+void hgvs_clear(struct hgvs *name)
 {
     int i;
-    for (i = 0; i < hn->l; ++i) {
-	hgvs_names_core_clear(&hn->a[i]);				   
-    }
-    hn->l = 0;
+    for ( i = 0; i < name->l; ++i )
+	hgvs_core_clear(&name->a[i]);				   
+    name->l = 0;
 }
-void hgvs_names_cache_clear(struct hgvs_names_cache *cache)
+void hgvs_cache_clear(struct hgvs_cache *cache)
 {
     int i;
-    for (i = 0; i < cache->l; ++i)
-	hgvs_names_clear(&cache->a[i]);
+    for ( i = 0; i < cache->l; ++i )
+	hgvs_clear(&cache->a[i]);
     cache->l = 0;
 }
-void hgvs_names_cache_destroy(struct hgvs_names_cache *cache)
+void hgvs_cache_destroy(struct hgvs_cache *cache)
 {
     int i, j;
-    for (i = 0; i < cache->i; ++i) {
-	struct hgvs_names *hn = &cache->a[i];
-	for (j = 0; j < hn->i; ++j) {
-	    if (hn->a[j].str.m) free(hn->a[j].str.s);	    
+    for ( i = 0; i < cache->i; ++i ) {
+	struct hgvs *name = &cache->a[i];
+	for ( j = 0; j < name->i; ++j ) {
+	    kstring_t *str = &name->a[j].str;
+	    if ( str->m ) 
+		free(str->s);	    
 	}
-	free(hn->a);	    
+	free(name->a);	    
     }
     free(cache->a);
 }
-glist_t *init_gene_list(const char *list)
+namehash_type *init_gene_name(const char *name)
 {
     int i, n = 0;
-    char **names = hts_readlist(list, 1, &n);
-    if (n== 0) return NULL;
-    glist_t *glist = kh_init(list);
-    int ig, k;
-    for (i=0; i<n; ++n) {
-       k = kh_put(list, glist, names[i], &ig);
+    khiter_t k;
+    int ret;
+    namehash_type *hash;
+    char **names = hts_readname(name, 1, &n);
+
+    if ( n == 0 )
+	return NULL;
+    hash = kh_init(name);
+
+    for ( i = 0; i < n; ++n ) {
+       k = kh_put(name, hash, names[i], &ret);
     }
-    return glist;
+    return hash;
 }
 
-tbx_t *load_gene_pred_file(const char *fn)
+tbx_t *load_genepred_file(const char *fn)
 {
     return tbx_index_load(fn);
 }
@@ -198,109 +111,82 @@ uint32_t bcf_calend(bcf1_t *line)
 {
     return line->pos + line->rlen;
 }
-struct format_type {
-    int chrom_col;
-    int name1_col;
-    int name2_col; // name2 could be empty;
-    int strand_col;
-    int txstart_col;
-    int txend_col;
-    int cdsstart_col;
-    int cdsend_col;
-    int exoncount_col;
-    int exonstarts_col;
-    int exonends_col;
+
+const struct format_type refgene_formats = {
+    .chrom = 2,
+    .name1 = 1,
+    .name2 = 12,
+    .strand = 3,
+    .txstart = 4,
+    .txend = 5,
+    .cdsstart = 6,
+    .cdsend = 7,
+    .exoncount = 8,
+    .exonstarts = 9,
+    .exonends = 10,
 };
-const struct format_type refgene_format_cols = {
-    .chrom_col = 2,
-    .name1_col = 1,
-    .name2_col = 12,
-    .strand_col = 3,
-    .txstart_col = 4,
-    .txend_col = 5,
-    .cdsstart_col = 6,
-    .cdsend_col = 7,
-    .exoncount_col = 8,
-    .exonstarts_col = 9,
-    .exonends_col = 10,
+const struct format_type genepred_formats = {
+    .chrom = 1,
+    .name1 = 0,
+    .name2 = 11,
+    .strand = 2,
+    .txstart = 3,
+    .txend = 4,
+    .cdsstart = 5,
+    .cdsend = 6,
+    .exoncount = 7,
+    .exonstarts = 8,
+    .exonends = 9,
 };
-const struct format_type genepred_format_cols = {
-    .chrom_col = 1,
-    .name1_col = 0,
-    .name2_col = 11,
-    .strand_col = 2,
-    .txstart_col = 3,
-    .txend_col = 4,
-    .cdsstart_col = 5,
-    .cdsend_col = 6,
-    .exoncount_col = 7,
-    .exonstarts_col = 8,
-    .exonends_col = 9,
-};
-struct anno_data_file_handler {
-    struct format_type type;
-    const char *fn;
-    htsFile *fp;
-    tbx_t *tbx;
-};
-// test the format of anno dataset, usually genePred or refgene
-void test_annodata_file_type(struct anno_data_file_handler *handler)
-{
-    
-}
-void gene_pred_line_praser(kstring_t *str, struct gene_pred_line *line)
+
+/* struct anno_data_file_handler { */
+/*     struct format_type type; */
+/*     const char *fn; */
+/*     htsFile *fp; */
+/*     tbx_t *tbx; */
+/* }; */
+/* // test the format of anno dataset, usually genePred or refgene */
+/* void test_annodata_file_type(struct anno_data_file_handler *handler) */
+/* { */    
+/* } */
+void genepred_prase_core(kstring_t *string, struct genepred_line *line, struct format_type *type)
 {
     int nfields = 0;
-    int *splits = ksplit(str, 0, &nfields);
-    if (line->clear != 1) gene_pred_line_clear(line);
-    line->clear = 0;
-
-    // accept any gene_pred-like format, like refGene, ensGene, gene_pred
-    // assert(nfields == 16);
-
-    char *s = str->s;
-    char *chrom = s + splits[refgene_format_cols.chrom_col];
-    char *name1 = s + splits[refgene_format_cols.name1_col];
-    char *strand = s + splits[refgene_format_cols.strand_col];
-    char *txstart = s + splits[refgene_format_cols.txstart_col];
-    char *txend = s + splits[refgene_format_cols.txend_col];
-    char *cdsstart = s + splits[refgene_format_cols.cdsstart_col];
-    char *cdsend = s + splits[refgene_format_cols.cdsend_col];
-    char *exoncount = s + splits[refgene_format_cols.exoncount_col];   
-    char *name2 = NULL;
-
-    line->chrom = strdup(chrom);
-    line->name1 = strdup(name1);
-    line->strand = memcmp(strand, "+", 1) ? '-' : '+';
-    line->txstart = atoi(txstart);
-    line->txend = atoi(txend);
-    line->cdsstart = atoi(cdsstart);
-    line->cdsend = atoi(cdsend);
-    line->exoncount = atoi(exoncount);
+    genepred_line_clear(line);
+    
+    // accept any gene_pred-like format, like refGene, ensGene, gene_pred, see our manual how to get these databases
+    // split the string by tab
+    int *splits = ksplit(string, 0, &nfields);
+    // chromosome name
+    line->chrom = strdup(string->s + splits[type->chrom]);
+    // usually gene names or ensemble gene id
+    line->name1 = strdup(string->s + splits[type->name1]);
+    // strand, char '+' or '-'    
+    line->strand = memcmp(string->s + splits[type->strand], "+", 1) ? '-' : '+';
+    // trans start
+    line->txstart = atoi(string->s + splits[type->txstart]);
+    // trans end
+    line->txend = atoi(string->s + splits[type->txend]);
+    // cds start, for mRNA cds start should greater than txstart, for ncRNA cdsstart should equal to txend
+    line->cdsstart = atoi(string->s + splits[type->cdsstart]);
+    // cds end, for ncRNA cdsend == cdsstart == txend
+    line->cdsend = atoi(string->s + splits[type->cdsend]);;
+    // exon number
+    line->exoncount = atoi(string->s + splits[type->exoncount]);   
     // for some genePred file, no name2 specified.
-    line->name2 = NULL;
-    if (refgene_format_cols.name2_col > 0) {
-	name2 = s + splits[refgene_format_cols.name2_col];
-	line->name2 = strdup(s + splits[12]);
-    }
+    line->name2 = strdup(string->s + splits[type->name2]);
+    
     // the exons region in gene_pred file is like  1,2,3,4,5. try to init the exon_pair[] 
     // and exon_offset_pair[] by exoncount 
-    char *ss = s + splits[9];
-    char *se = s + splits[10];
+    char *ss = string->s + splits[type->exonstarts];
+    char *se = string->s + splits[type->exonends];
+    
     line->exons = (struct exon_pair*)calloc(line->exoncount, sizeof(struct exon_pair));
     line->dna_ref_offsets = (struct exon_offset_pair*)calloc(line->exoncount, sizeof(struct exon_offset_pair));
     free(splits);
     int i;
     char *ss1, *se1;
-
-    // calculate the length of function regions 
-    int dna_reference_length = 0;
-    int dna_read_reference_length = 0;
-    int dna_forward_reference_length = 0;
-    int dna_backward_reference_length = 0;
-    int is_coding_reference = line->cdsstart == line->cdsend ? 0 : 1;
-    
-    for (i = 0; i < line->exoncount; ++i) {
+    for ( i = 0; i < line->exoncount; ++i ) {
 	// start
 	ss1 = ss;
 	while(*ss1 && *ss1 != ',') ss1++;
@@ -313,33 +199,51 @@ void gene_pred_line_praser(kstring_t *str, struct gene_pred_line *line)
 	se1[0] = '\0';
 	line->exons[i].end = atoi(se);	
 	se = ++se1; // skip ','
-	
+    }
+    line->clear = 0;
+}
+void genepred_line_praser(kstring_t *string, struct genepred_line *line, struct format_type *type)
+{
+    // prase string into genepred line struct
+    genepred_prase_core(string, line, type);
+    // calculate the length of function regions, for plus strand, forward length is the length of UTR5, and
+    // backward length is the length of UTR3, for minus strand 
+    int ref_len = 0;
+    int read_len = 0;
+    int forward_len = 0;
+    int backward_len = 0;
+    int is_coding = line->cdsstart == line->cdsend ? 0 : 1;
+    int i;
+    for ( i = 0; i < line->exoncount; ++i ) {
+	// in genepred format, start is 0 based, end is 1 based
+	int exon_len = line->exons[i].end - line->exons[i].start;
 	// add exon length to dna reference length
-	dna_reference_length += line->exons[i].end - line->exons[i].start;
-
-	if (is_coding_reference == 0) continue;
+	ref_len += exon_len;	
+	// only mRNA has UTRs
+	if (is_coding == 0) continue;
 
 	if (line->exons[i].end < line->cdsstart) {
-	    dna_forward_reference_length += line->exons[i].end - line->exons[i].start;
-	} else {
-	    // first cds 
-	    if (line->cdsstart > line->exons[i].start) {
-		dna_forward_reference_length += line->cdsstart - line->exons[i].start;
-	    } else {
-		// come to end regions 
-		if (line->cdsend <= line->exons[i].start) {
-		    dna_backward_reference_length += line->exons[i].end - line->exons[i].start;
-		} else {
-		    if (line->cdsend < line->exons[i].end) {
-			dna_backward_reference_length += line->exons[i].end - line->cdsend;
-		    }		   
-		}
-	    }
+	    forward_len += exon_len;
+	    continue;
 	}
-    } // end for
+	// first cds 
+	if (line->cdsstart > line->exons[i].start) {
+	    forward_len += line->cdsstart - line->exons[i].start;
+	    continue;
+	} 
+	// come to end regions
+	if (line->cdsend <= line->exons[i].start) {
+	    backward_len += exon_len;
+	    continue;
+	}
+	// last cds
+	if (line->cdsend < line->exons[i].end) {
+	    backward_len += line->exons[i].end - line->cdsend;
+	}		   
+    }
 
-    // dna_read_reference_length is the coding reference length for coding transcript or length of noncoding transcript 
-    dna_read_reference_length = dna_reference_length - dna_forward_reference_length - dna_backward_reference_length;
+    // read_len is the coding reference length for coding transcript or length of noncoding transcript 
+    read_len = ref_len - forward_len - backward_len;
 
     // Coding DNA reference:
     //                   -3                                            *3
@@ -362,104 +266,88 @@ void gene_pred_line_praser(kstring_t *str, struct gene_pred_line *line)
      
     int l1 = 0, l2 = line->exoncount - 1;
     // count forward
-    int dna_read_reference_forward_offset = 0;
-    int dna_read_reference_backward_offset = 0;
-    for (; l1<line->exoncount && dna_forward_reference_length; ++l1) {
-	int32_t length_exon = line->exons[l1].end - line->exons[l1].start;
-	line->dna_ref_offsets[l1].start =
-	    (dna_forward_reference_length << OFFSET_BITWISE) |
-	    (line->strand == '+' ? REG_UTR5 : REG_UTR3);
+    int forward_offset = 0;
+    int backward_offset = 0;
+    for ( ; l1 < line->exoncount && forward_len; ++l1 ) {
+	int32_t exon_len = line->exons[l1].end - line->exons[l1].start;
 
-	if (dna_forward_reference_length > length_exon) {
-	    dna_forward_reference_length -= length_exon;		
-	    line->dna_ref_offsets[l1].end =
-		((dna_forward_reference_length+1) << OFFSET_BITWISE) |
-		(line->strand == '+' ? REG_UTR5 : REG_UTR3);
-	} else {
-	    if (line->strand == '+') {
-		dna_read_reference_forward_offset = length_exon - dna_forward_reference_length;
-	    } else {
-		dna_read_reference_forward_offset = dna_read_reference_length + dna_forward_reference_length - length_exon +1; // for minus strand count from backward
-	    }
-	    line->dna_ref_offsets[l1].end = (dna_read_reference_forward_offset<<OFFSET_BITWISE)| REG_CODING;
-	    dna_forward_reference_length = 0;
-	    ++l1;
-	    break;
+	line->dna_ref_offsets[l1].start = (forward_len<<OFFSET_BITWISE) | (line->strand == '+' ? REG_UTR5 : REG_UTR3);
+
+	if ( forward_len > exon_len ) {
+	    forward_len -= exon_len;	
+	    line->dna_ref_offsets[l1].end = ((forward_len+1)<<OFFSET_BITWISE) |(line->strand == '+' ? REG_UTR5 : REG_UTR3);
+	    continue;
 	}
+	if (line->strand == '+') {
+	    forward_offset = exon_len - forward_len;
+	} else {
+	    forward_offset = read_len + forward_len - exon_len +1; // for minus strand count from backward
+	}
+	line->dna_ref_offsets[l1].end = (forward_offset<<OFFSET_BITWISE)| REG_CODING;
+	forward_len = 0;
+	++l1;
+	break;
     }
 
     // count backward
-    for (; l2 > 0 && dna_backward_reference_length; --l2) {
+    for ( ; l2 > 0 && backward_len; --l2 ) {
+	int32_t exon_len = line->exons[l2].end - line->exons[l2].start;
 
-	int32_t length_exon = line->exons[l2].end - line->exons[l2].start;
+	line->dna_ref_offsets[l2].end = (backward_len<<OFFSET_BITWISE) |(line->strand == '+' ? REG_UTR3 : REG_UTR5);
 
-	line->dna_ref_offsets[l2].end =
-	    (dna_backward_reference_length << OFFSET_BITWISE) |
-	    (line->strand == '+' ? REG_UTR3 : REG_UTR5);
-
-	if (dna_backward_reference_length > length_exon) {
-	    dna_backward_reference_length -= length_exon;
-	    line->dna_ref_offsets[l2].start =
-		((dna_backward_reference_length+1) << OFFSET_BITWISE) |
-		(line->strand == '+' ? REG_UTR3 : REG_UTR5);
+	if (backward_len > exon_len) {
+	    backward_len -= exon_len;
+	    line->dna_ref_offsets[l2].start = ((backward_len+1)<<OFFSET_BITWISE) |(line->strand=='+' ? REG_UTR3 : REG_UTR5);
+	    continue;
+	} 
+	if (line->strand == '+') {
+	    backward_offset = read_len + backward_len - exon_len + 1;
 	} else {
-	    if (line->strand == '+') {
-		dna_read_reference_backward_offset = dna_read_reference_length + dna_backward_reference_length - length_exon + 1;
-	    } else {
-		dna_read_reference_backward_offset = length_exon - dna_backward_reference_length;
-	    }
-	    line->dna_ref_offsets[l2].start = (dna_read_reference_backward_offset<<OFFSET_BITWISE) | REG_CODING;
-	    dna_backward_reference_length = 0;
-	    --l2;
-	    break;
+	    backward_offset = exon_len - backward_len;
 	}
+	line->dna_ref_offsets[l2].start = (backward_offset<<OFFSET_BITWISE) | REG_CODING;
+	backward_len = 0;
+	--l2;
+	break;
     }
 
     // count inter regions
     if (line->strand == '+') {
-	if (is_coding_reference)
-	    dna_read_reference_length = dna_read_reference_backward_offset -1;       
+	if (is_coding)
+	    read_len = backward_offset -1;       
 	int l;
-	for (l=l2; l>=l1;  l--) {
-	    int32_t length_exon = line->exons[l].end - line->exons[l].start;
-	    line->dna_ref_offsets[l].end =
-		(dna_read_reference_length << OFFSET_BITWISE) |
-		(is_coding_reference ? REG_CODING : REG_NONCODING);
-
-	    dna_read_reference_length -= length_exon;
-
-	    line->dna_ref_offsets[l].start = ((dna_read_reference_length+1)<< OFFSET_BITWISE) |
-		(is_coding_reference ? REG_CODING : REG_NONCODING);
+	for ( l = l2; l >= l1;  l-- ) {
+	    int32_t exon_len = line->exons[l].end - line->exons[l].start;
+	    line->dna_ref_offsets[l].end = (read_len<<OFFSET_BITWISE) |	(is_coding ? REG_CODING : REG_NONCODING);
+	    read_len -= exon_len;
+	    line->dna_ref_offsets[l].start = ((read_len+1)<< OFFSET_BITWISE) | (is_coding ? REG_CODING : REG_NONCODING);
 	}
     } else {
-	if (is_coding_reference) {
-	    dna_read_reference_length = dna_read_reference_forward_offset -1;
+	if (is_coding) {
+	    read_len = forward_offset -1;
 	}
 	int l;
-	for (l=l1; l<=l2; l++) {
-	    int32_t length_exon = line->exons[l].end - line->exons[l].start;
-	    
-	    line->dna_ref_offsets[l].start = (dna_read_reference_length << OFFSET_BITWISE) |
-		(is_coding_reference ? REG_CODING : REG_NONCODING);
-
-	    dna_read_reference_length -= length_exon;
-	    line->dna_ref_offsets[l].end = ((dna_read_reference_length+1) << OFFSET_BITWISE) |
-		(is_coding_reference ? REG_CODING : REG_NONCODING);
+	for ( l = l1; l <= l2; l++ ) {
+	    int32_t exon_len = line->exons[l].end - line->exons[l].start;
+	    line->dna_ref_offsets[l].start = (read_len<<OFFSET_BITWISE) |(is_coding ? REG_CODING : REG_NONCODING);
+	    read_len -= exon_len;
+	    line->dna_ref_offsets[l].end = ((read_len+1)<<OFFSET_BITWISE) |(is_coding ? REG_CODING : REG_NONCODING);
 	}
-    }
+    }    
 }
-void generate_dbref_database(struct gene_pred_line *line)
+
+void generate_dbref_database(struct genepred_line *line)
 {
     if (line->clear == 1) return;
     int i, j;
-    for (i=0; i<line->exoncount; ++i) {
-    	kstring_t temp[2] = {KSTRING_INIT, KSTRING_INIT};
+    for ( i = 0; i < line->exoncount; ++i ) {
+    	kstring_t temp[2] = { KSTRING_INIT, KSTRING_INIT };
     	int types[2];
     	types[0] = line->dna_ref_offsets[i].start & REG_MASK;
     	types[1] = line->dna_ref_offsets[i].end & REG_MASK;
     	int j;
 	// [start, end] 
-    	for (j=0; j<2; ++j) {
+    	for ( j = 0; j < 2; ++j ) {
     	    kstring_t *temp1 = &temp[j];
     	    int type = types[j];
     	    switch (type) {
@@ -487,120 +375,71 @@ void generate_dbref_database(struct gene_pred_line *line)
     	free(temp[1].s);
     }
 }
-void push_mempool(struct gene_pred_memory_pool *pool, kstring_t *str)
+void push_mempool(struct genepred_memory_pool *pool, kstring_t *str, struct format_type *type)
 {
     if (pool->m == pool->l) {
 	pool->m = pool->m == 0 ? 2 : pool->m << 1;
-	pool->a = (struct gene_pred_line *)realloc(pool->a, sizeof(struct gene_pred_line)*pool->m);
+	pool->a = (struct genepred_line *)realloc(pool->a, sizeof(struct genepred_line)*pool->m);
     }
     // i should always greater than l. if i == l increase i to init a new line for future use. go abort if i < l
     if (pool->i == pool->l) {
 	pool->a[pool->i++].clear = -1;
     }
     // the prase func must return a point or go abort
-    gene_pred_line_praser(str, &pool->a[pool->l]);
+    genepred_line_praser(str, &pool->a[pool->l], type);
     pool->l++;
 }
-void update_mempool(struct gene_pred_memory_pool *pool)
+void update_mempool(struct genepred_memory_pool *pool)
 {    
-    if (pool->l == 0) return;
+    if (pool->l == 0)
+	return;
     // try to loop this pool and find the edges
     pool->start = pool->a[0].txstart;
     pool->end = pool->a[0].txend;
     int i;    
-    for (i=1; i<pool->l; ++i) {
-	// if (pool->a[i] == NULL) continue;
-	if (pool->a[i].txstart < pool->start) pool->start = pool->a[i].txstart;
-	if (pool->a[i].txend > pool->end) pool->end = pool->a[i].txend;
+    for ( i = 1; i < pool->l; ++i ) {
+	if ( pool->a[i].txstart < pool->start )
+	    pool->start = pool->a[i].txstart;
+	if ( pool->a[i].txend > pool->end )
+	    pool->end = pool->a[i].txend;
     }
 }
-void fill_mempool(struct gene_pred_memory_pool *pool, htsFile *fp, tbx_t *tbx, int rid, uint32_t start, uint32_t end)
+void fill_mempool(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, int rid, uint32_t start, uint32_t end, struct format_type *type)
 {
     hts_itr_t *itr = tbx_itr_queryi(tbx, rid, start, end);
     kstring_t str = KSTRING_INIT;
     if (rid == -1) return;
     
-    while (tbx_itr_next(fp, tbx, itr, &str) >= 0) {
-	push_mempool(pool, &str);
+    while ( tbx_itr_next(fp, tbx, itr, &str) >= 0) {
+	push_mempool(pool, &str, type);
 	str.l = 0;
     }
     pool->rid = rid;
-    if (str.m) free(str.s);
+    if ( str.m )
+	free(str.s);
     tbx_itr_destroy(itr);
     update_mempool(pool);    
 }
-void memory_pool_clear(struct gene_pred_memory_pool *pool)
+void memory_pool_clear(struct genepred_memory_pool *pool)
 {
     int i;
-    for (i=0; i<pool->l; ++i) {
-	gene_pred_line_clear(&pool->a[i]);
-    }
+    for ( i = 0; i < pool->l; ++i)
+	genepred_line_clear(&pool->a[i]);
+    
     pool->l = 0;
     // i and m should be kept for future use
     pool->start = 0;
     pool->end = 0;
     pool->rid = -1;
-    hgvs_names_cache_destroy(&pool->cache);
+    hgvs_cache_destroy(&pool->cache);
 }
 
-// HGVS nomenclature : 
-// DNA recommandations *
-// - substitution variant, 
-// Format: “prefix”“position_substituted”“reference_nucleoride””>”new_nucleoride”, e.g. g.123A>G
-// - deletion variant, 
-// Format: “prefix”“position(s)_deleted”“del”, e.g. g.123_127del
-// - duplication variant,
-// Format: “prefix”“position(s)_duplicated”“dup”, e.g. g.123_345dup
-// - insertion variant,
-// Format: “prefix”“positions_flanking”“ins”“inserted_sequence”, e.g. g.123_124insAGC
-// - inversion variant,
-// Format: “prefix”“positions_inverted”“inv”, e.g. g.123_345inv
-// - conversion variant,
-// Format: “prefix”“positions_converted”“con”“positions_replacing_sequence”, e.g. g.123_345con888_1110
-// - deletion-insertion variant,
-// Format: “prefix”“position(s)_deleted”“delins”“inserted_sequence”, e.g. g.123_127delinsAG
-// - repeated sequences variant,
-// Format (repeat position): “prefix”“position_repeat_unit””["”copy_number””]”, e.g. g.123_125[36]
-// 
-// [ reference : http:// www.HGVS.org/varnomen ]
-enum hgvs_variant_type {
-    var_type_ref = 0,
-    var_type_snp,
-    var_type_dels,
-    var_type_ins,
-    var_type_delins,
-    var_type_copy, // dup for ins
-    var_type_complex, 
-    var_type_unknow,
-};
-
-struct hgvs_names_description {
-    // if type ==  var_type_ref, hgvs name generater will skip to construct a name, only type will be inited, 
-    // DONOT use any other value in this struct then 
-    enum hgvs_variant_type type;
-    uint8_t strand; // for plus strand start <= end, for minus start >= end
-    int32_t start; // position on ref
-    // for var_type_snp end == start, for var_type_dels end > start, for var_type_ins end = start +1, 
-    // for delvar_type_ins end > start 
-    int32_t end;
-    // for var_type_snp ref_length == 1, for var_type_dels ref_length == length(dels),
-    // for var_type_ins ref_length == 0, for var_type_delins ref_length == length(var_type_dels) 
-    int ref_length;
-    char *ref;
-    // for var_type_snp alt_length == 1, for var_type_dels alt_length == 0, for var_type_ins alt_length ==
-    // length(var_type_ins), for delvar_type_ins alt_length == length(var_type_ins) 
-    int alt_length;
-    char *alt;
-    // the copy number only valid if variants type is var_type_copy, for most case, my algrithm only check
-    // mark var_type_dels or var_type_ins in the first step, and check the near sequences from refseq 
-    // databases and if there is copy number changed (more or less), the variants will update to var_type_copy 
-    int copy_number;
-    int copy_number_ori;
-};
-void hgvs_names_description_destory(struct hgvs_names_description *des)
+void hgvs_des_destory(struct hgvs_des *des)
 {
-    if (des->ref_length) free(des->ref);
-    if (des->alt_length) free(des->alt);
+    if ( des->ref_length > 0 )
+	free(des->ref);
+    if ( des->alt_length > 0 )
+	free(des->alt);
     free(des);
 }
 static char *rev_seqs(const char *dna_seqs, unsigned long n)
@@ -627,45 +466,50 @@ static char *rev_seqs(const char *dna_seqs, unsigned long n)
     if (n == 0) return NULL;
     char *rev = (char*)calloc(n+1, sizeof(char));
     int i;
-    for (i = 0; i < n; ++i) {
-	//debug_print("i : %d, n : %d", i, n);
-	//debug_print("rev : %c, seq : %c,",rev[i], dna_seqs[n-i-1]);
-	rev[i] = rev_seqs_matrix[dna_seqs[n-i-1]];
-	//debug_print("i : %d, rev : %c, seq : %c, n : %d", i, rev[i], dna_seqs[n-i-1], n);
-    }
+    for ( i = 0; i < n; ++i )
+	rev[i] = rev_seqs_matrix[dna_seqs[n-i-1]];    
     rev[n] = '\0';
     return rev;
 }
-void hgvs_names_description_reverse(struct hgvs_names_description *des, uint8_t strand)
+void hgvs_des_reverse(struct hgvs_des *des, uint8_t strand)
 {
-    if (des->type == var_type_ref) return;
-    if (des->strand == strand) return;
-    if (des->strand == 0 && strand == '+') return;
+    if ( des->type == var_type_ref )
+	return;
+    if ( des->strand == strand )
+	return;
+    if ( des->strand == 0 && strand == '+' )
+	return;
     des->strand = strand;
     char *ref = des->ref;
     char *alt = des->alt;
     int32_t start = des->end;
     des->end = des->start;
     des->start = start;
-    //debug_print("ref : %s, %d, alt : %s, %d", des->ref, des->ref_length, des->alt, des->alt_length);
     des->ref = rev_seqs(des->ref, des->ref_length);
     des->alt = rev_seqs(des->alt, des->alt_length);
-    if (des->ref_length) free(ref);
-    if (des->alt_length) free(alt);
+    if ( des->ref_length > 0 )
+	free(ref);
+    if ( des->alt_length > 0 )
+	free(alt);
 }
-struct hgvs_names_description *describe_variants(const char *ref, const char *alt, int _pos)
+struct hgvs_des *describe_variants(const char *ref, const char *alt, int _pos)
 {
-    struct hgvs_names_description *des = (struct hgvs_names_description*)malloc(sizeof(struct hgvs_names_description));
+    struct hgvs_des *des = (struct hgvs_des*)malloc(sizeof(struct hgvs_des));
     const char *a = alt;
     const char *r = ref;
-    int pos = _pos; // pos may differ from _pos, but _pos will not change in this strnduption
+    // pos may differ from _pos, but _pos will not change in this function
+    int pos = _pos;
+    // skip same string from start
     while (*a && *r && toupper(*a) == toupper(*r)) { a++; r++; pos++; }
-    if (!a[0] && !r[0]) {
+    
+    if ( !a[0] && !r[0] ) {
 	des->type = var_type_ref;
 	return des;
     }
+    
     des->strand = 0; // 0 for unknown, '+' for plus, '-' for minus
-    if (*a && *r && !a[1] && !r[1] ) {
+    // if ref and alternative allele are 1 base, take it as snp
+    if ( *a && *r && !a[1] && !r[1] ) {
 	// mpileip may output X allele, treat as ref
 	if ( *a == '.' || *a == 'X' || *a == '*') {
 	    des->type = var_type_ref;
@@ -679,8 +523,8 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	des->alt = strndup(a, 1);
 	return des;
     }
-
-    if (*a && !*r) {
+    // if alternate allele longer than ref, take it as insertion
+    if ( *a && !*r ) {
 	des->type = var_type_ins;
 	while ( *a ) a++;
 	des->start = pos;
@@ -690,7 +534,10 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	des->alt_length = (a-alt) - (r-ref);
 	des->alt = strndup(a-des->alt_length, des->alt_length);
 	return des;
-    } else if (!*a && *r) {
+    }
+    // if ref allele longer than alt, should be deletion
+    if ( !*a && *r) {
+	
 	des->type = var_type_dels;
 	while ( *r ) r++;
 	des->start = pos;
@@ -702,11 +549,12 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	return des;
     }
 
+    // trim tails if ends are same
     const char *ae = a;
     const char *re = r;
     while ( ae[1] ) ae++;
     while ( re[1] ) re++;
-    while ( re > r && ae > a && toupper(*re) == toupper(*ae)) {
+    while ( re > r && ae > a && toupper(*re) == toupper(*ae) ) {
 	re--;
 	ae--;
     }
@@ -721,7 +569,8 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	des->alt_length = 0;
 	des->alt = str_init;
 	return des;
-    } else if (re == r) {
+    }
+    if (re == r) {
 	des->type = var_type_ins;
 	des->start = pos;
 	des->end = pos+1;
@@ -731,7 +580,7 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
 	des->alt = strndup(a, ae-a);
 	return des;
     }
-
+    // delins
     des->type = var_type_delins;
     des->start = pos;
     des->ref_length = re-r;
@@ -741,7 +590,7 @@ struct hgvs_names_description *describe_variants(const char *ref, const char *al
     des->end = pos + des->ref_length -1;
     return des;
 }
-void check_cnv_hgvs_names_descriptions(struct hgvs_names_description *des, struct gene_pred_line *line, faidx_t *fai, htsFile *fp)
+void check_cnv_hgvs_des(struct hgvs_des *des, struct genepred_line *line, faidx_t *fai, htsFile *fp)
 {
     if (des->type == var_type_ins) {
 
@@ -761,19 +610,18 @@ void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, int *l1
     //               |       |       |
     //               |       |       |
     //                       l1    
-    while(*l1 < *l2) {
+    while ( *l1 < *l2 ) {
 	if ( *l2 - *l1 == 1 ) break;
-	/* uint32_t start = (*l1) & 1 ? pair[(*l1)/2].end : pair[(*l1)/2].start; */
-	/* uint32_t end =  (*l2) & 1 ? pair[(*l2)/2].end : pair[(*l2)/2].start; */
-	/* debug_print("start : %u, end : %u, pos : %u", start, end, pos); */
-	/* assert(pos >= start && pos <= end); */
 	int l = *l1 + *l2;
 	l = l & 1 ? l/2 + 1 : l/2;
 	uint32_t iter = l & 1 ?  pair[l/2].end : pair[l/2].start;
-	if ( iter > pos ) *l2 = l;
-	else *l1 = l;
+	if ( iter > pos )
+	    *l2 = l;
+	else
+	    *l1 = l;
     } 
 }
+// convert pos to hgvs pos string
 enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct exon_pair *pair, struct exon_offset_pair *locs, int *is_coding, char **cpos)
 {
     // purpose: find the most nearest edge for variant position
@@ -786,6 +634,7 @@ enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct
     int l1, l2;    
     find_exons_loc(pos, exoncount, pair, &l1, &l2);
     assert(l2 - l1 == 1);
+    
     enum func_region_type ftype = func_region_unknown;
     kstring_t str = KSTRING_INIT; 
     // offset[1,2] are the length between pos and near edges
@@ -812,17 +661,18 @@ enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct
 	*cpos = str.s;
 	return ftype;
     }
+
     int32_t offset_start = pos - pos_start;
-    int32_t offset_end = pos_end - pos;
-    
+    int32_t offset_end = pos_end - pos;    
     // if pos in Intron, check the nearest edge
-    if (l1 & 1) {	
+    if ( l1 & 1 ) {	
 	// the nestest edge is start of exon l2/2
 	uint32_t loc;
 	uint8_t type;
 	int offset;
 	// find the most nearest edge
-	if (offset_start > offset_end) { // cap to end
+	// cap to end
+	if ( offset_start > offset_end ) {
 	    loc = loc_end;
 	    type = type_end;
 	    offset = strand == '+' ? -offset_end : offset_end;
@@ -832,7 +682,7 @@ enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct
 	    offset = strand == '+' ? offset_start : -offset_start;
 	}
 
-	if (type & REG_NONCODING) {
+	if ( type & REG_NONCODING ) {
 	    *is_coding = 0;
 	    kputw(loc, &str);
 	} else {
@@ -859,82 +709,93 @@ enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct
     //    offset_start offset_end
     int loc;
     uint8_t type;
-    if (type_start == type_end) {
+    if ( type_start == type_end ) {
 	loc = loc_end > loc_start ?  loc_end - offset_end : loc_start - offset_start;
 	type = type_start;
-    } else {
-
-	if (type_start == REG_UTR5) { // should only be plus strand
+	goto generate_cpos;
+    }
+    // edge stituation. if start and end come to different function regions.
+    if ( !(type_start & (REG_UTR3 | REG_UTR5 | REG_CODING)) )
+	error("Unknown type. type_start : %d", type_start);
+    if ( !(type_end & (REG_UTR3 | REG_UTR5 | REG_CODING)) )	
+	error("Unknown type. type_end : %d", type_end);
+    
+    if ( type_start & REG_UTR5) {
+	// should only be plus strand
+	loc = loc_start - offset_start;
+	type = type_start;
+	if ( type_end & REG_CODING ) {
+	    if ( loc <= 0 ) {
+		loc = -loc +1;
+		type = type_end;
+	    }
+	} else if ( type_end == REG_UTR3 ) {
+	    // the cds region inside one exon, closed with UTRs
+	    if (loc <= 0) {
+		int loc1 = loc_end - offset_end;
+		if (loc1 <= 0) {
+		    loc = -loc + 1;
+		    type = REG_CODING;
+		} else {
+		    loc = loc1;
+		    type = type_end;
+		}			    
+	    }		    
+	}
+	goto generate_cpos;
+    }
+    if ( type_start & REG_CODING ) {	    
+	if ( type_end & REG_UTR3) {
+	    // strand plus
+	    loc = loc_end - offset_end;
+	    type = type_end;
+	    if ( loc <= 0 ) {
+		loc = loc_start + offset_start;
+		type = type_start;
+	    }
+	} else if (type_end & REG_UTR5) {
+	    // strand minus
 	    loc = loc_start - offset_start;
 	    type = type_start;
-	    if (type_end == REG_CODING) {
-		if (loc <= 0) {
-		    loc = -loc +1;
-		    type = type_end;
-		}
-	    } else if(type_end == REG_UTR3) { // the cds region inside one exon, closed with UTRs
-		if (loc <= 0) {
-		    int loc1 = loc_end - offset_end;
-		    if (loc1 <= 0) {
-			loc = -loc + 1;
-			type = REG_CODING;
-		    } else {
-			loc = loc1;
-			type = type_end;
-		    }			    
-		}		    
-	    } else {
-		// impossible
-		error("This is a impossible stituation. type_end : %d", type_end);
-	    }		
-	} else if (type_start == REG_CODING) {
-
-	    if (type_end == REG_UTR3) { // strand plus
-		loc = loc_end - offset_end;
-		type = type_end;
-		if (loc <= 0) {
-		    loc = loc_start + offset_start;
-		    type = type_start;
-		}
-	    } else if (type_end == REG_UTR5) { // strand minus
-		loc = loc_start - offset_start;
-		type = type_start;
-		if (loc <= 0) {
-		    loc = -loc + 1;
-		    loc = type_end;
-		}
-	    } else {
-		error("This is a impossible stituation. type_end : %d", type_end);
+	    if ( loc <= 0 ) {
+		loc = -loc + 1;
+		loc = type_end;
 	    }
-	} else if (type_start == REG_UTR3) { // should only be minus strand
-	    if (type_end == REG_CODING) {
-		loc = loc_start - offset_start;
-		type = type_start;
-		if (loc <= 0) {
-		    loc = -loc + 1;
-		    type = type_end;
-		}		    
-	    } else if (type_end == REG_UTR5) { // cds region inside one exon
-		loc = loc_start - offset_start;
-		type = type_start;
-		if (loc <= 0) {
-		    int loc1 = loc_end - offset_end;
-		    if (loc1 <= 0) {
-			loc = -loc + 1;
-			type = REG_CODING;			    
-		    } else {
-			loc = loc1;
-			type = type_end;
-		    }
-		}
-	    } else {
-		error("This is a impossible stituation. type_end : %d", type_end);
-	    }
-	} else {
-	    error("This is a impossible stituation. type_start : %d", type_start);
 	}
+	goto generate_cpos;
     }
-    assert(loc>0);
+    
+    if (type_start == REG_UTR3) {
+	// should only be minus strand
+	if ( type_end == REG_CODING ) {
+	    loc = loc_start - offset_start;
+	    type = type_start;
+	    if (loc <= 0) {
+		loc = -loc + 1;
+		type = type_end;
+	    }		    
+	} else if (type_end == REG_UTR5) {
+	    // cds region inside one exon
+	    loc = loc_start - offset_start;
+	    type = type_start;
+	    if ( loc <= 0 ) {
+		int loc1 = loc_end - offset_end;
+		if (loc1 <= 0) {
+		    loc = -loc + 1;
+		    type = REG_CODING;			    
+		} else {
+		    loc = loc1;
+		    type = type_end;
+		}
+	    }
+	}
+	goto generate_cpos;
+    }
+    // if not found the type of start 
+    error("This is a impossible stituation. type_start : %d", type_start);
+
+  generate_cpos:
+    assert(loc > 0);    
     ftype = func_region_cds;	
     if (type & REG_NONCODING) {
 	*is_coding = 0;
@@ -952,87 +813,104 @@ enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct
     *cpos = str.s;
     return ftype;
 }
-void generate_hgvs_names_core(struct gene_pred_line *gp, struct hgvs_names_description *des, struct hgvs_names_core *c, int *valid)
+void generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct hgvs_core *c, int *valid)
 {
-    hgvs_names_core_clear(c);
+    hgvs_core_clear(c);
     *valid = 0;
-    if (des->start > gp->txend || des->end < gp->txstart) return;    
+    if (des->start > line->txend || des->end < line->txstart)
+	return;    
     uint32_t start_var = (uint32_t)des->start;
     uint32_t end_var = (uint32_t)des->end;
-    kstring_t *str = &c->str;
+    kstring_t *string = &c->str;
+    // put names into string, usually transcript 
     // if no transcript name, use gene name then
-    char *name = gp->name1 == NULL || gp->name1[0] == '.' ? gp->name2 : gp->name1;
-    kputs(name, str);
-    c->l_name = str->l;    
+    char *name = line->name1 == NULL || line->name1[0] == '.' ? line->name2 : line->name1;    
+    kputs(name, string);
+    c->l_name = string->l;    
     assert(c->l_name);
-    kputc(':', str);
+    kputc(':', string);
+
+    // put hgvs pos into string
     char *pos1;
     int is_coding = -1;
-
-    c->type = pos_convert(des->start, gp->exoncount, gp->strand, gp->exons, gp->dna_ref_offsets, &is_coding, &pos1);
-    if (is_coding == 1) kputs("c.", str);
-    else if (is_coding == 0) kputs("n.", str);
-    else error("Unknown transcript type! %s", name);
-    kputs(pos1, str);
-
-    c->l_type = str->l -1;
-    copy_seqs_func func = gp->strand == '+' ? strndup : rev_seqs;
+    c->type = pos_convert(des->start, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding, &pos1);
+    if (is_coding == 1)
+	kputs("c.", string);
+    else if (is_coding == 0)
+	kputs("n.", string);
+    else
+	error("Unknown transcript type! %s", name);
+    kputs(pos1, string);
+    // put offsets into string
+    c->l_type = string->l -1;
+    copy_seqs_func func = line->strand == '+' ? strndup : rev_seqs;
     char *ref = des->ref_length == 0 ? NULL : func(des->ref, des->ref_length);
     char *alt = des->alt_length == 0 ? NULL : func(des->alt, des->alt_length);
     int is_coding1;
     if (des->type == var_type_snp) {
-	ksprintf(str, "%s>%s", ref, alt);
+	ksprintf(string, "%s>%s", ref, alt);
     } else if (des->type == var_type_dels) {
+	// for one base deletion, format like NM_0001:c.123del
 	if (des->ref_length == 1) {
-	    ksprintf(str, "del%s", des->ref);
+	    ksprintf(string, "del%s", des->ref);
 	} else {
-	    kputc('_', str);
+	    // for two bases or more, format like NM_0001:c.123_125del
+	    kputc('_', string);
 	    char *pos2;
-	    pos_convert(des->end, gp->exoncount, gp->strand, gp->exons, gp->dna_ref_offsets, &is_coding1, &pos2);
-	    kputs(pos2, str);
+	    pos_convert(des->end, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding1, &pos2);
+	    kputs(pos2, string);
 	    free(pos2);
-	    kputs("del", str);
+	    kputs("del", string);
 	}
     } else if (des->type == var_type_ins) {
+	// insertion format should be NM_0001:c.123_124insXX
 	kputc('_', str);
 	char *pos2;
-	pos_convert(des->end, gp->exoncount, gp->strand, gp->exons, gp->dna_ref_offsets, &is_coding1, &pos2);
+	pos_convert(des->end, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding1, &pos2);
 	kputs(pos2, str);
-	free(pos2);	
-	if ( des->alt_length < 20) ksprintf(str, "ins%s", alt);
-	else ksprintf(str, "ins%d", des->alt_length);
+	free(pos2);
+	// if insertion sequences is small show sequences directly. for long sequences show number.
+	if ( des->alt_length < 20)
+	    ksprintf(str, "ins%s", alt);
+	else
+	    ksprintf(str, "ins%d", des->alt_length);
     } else if (des->type == var_type_delins) {
-	if (des->ref_length > 1) {
+	// delins format should be NM_0001:c.123_125delinsXX
+	if ( des->ref_length > 1 ) {
 	    kputc('_', str);
 	    char *pos2;
-	    pos_convert(des->end, gp->exoncount, gp->strand, gp->exons, gp->dna_ref_offsets, &is_coding1, &pos2);
+	    pos_convert(des->end, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding1, &pos2);
 	    kputs(pos2, str);
-	    free(pos2);		    
+	    free(pos2);
 	}
-	if ( des->alt_length < 20) ksprintf(str, "delins%s", alt);
-	else ksprintf(str, "delins%d", des->alt_length);
+	if ( des->alt_length < 20 )
+	    ksprintf(str, "delins%s", alt);
+	else
+	    ksprintf(str, "delins%d", des->alt_length);
     } else {
 	error("unknow type : %d", des->type);
     }
+    
 #ifdef DEBUG_MODE
     debug_print("%d : %s", des->start,str->s);
 #endif
     free(pos1);
     // it is valid
-    *valid = 1;
-    
-    if (des->ref_length != 0) free(ref);
-    if (des->alt_length != 0) free(alt);    
+    *valid = 1;    
+    if ( des->ref_length != 0 )
+	free(ref);
+    if ( des->alt_length != 0 )
+	free(alt);    
 }
 void name_list_push(struct name_list *names, char *name)
 {
     int i;
-    for (i = 0; i < names->l; ++i) {
-	if (strcmp(names->a[i], name) == 0)
+    for ( i = 0; i < names->l; ++i ) {
+	if ( strcmp(names->a[i], name) == 0 )
 	    return;
     }
-    if (i == names->l) {
-	if (names->m == names->l) {
+    if ( i == names->l ) {
+	if ( names->m == names->l ) {
 	    names->m = names->m == 0 ? 2 : names->m<<1;
 	    names->a = (char**)realloc(names->a, sizeof(char*)*names->m);
 	}
@@ -1046,59 +924,62 @@ void name_list_push(struct name_list *names, char *name)
 // belong to one gene, but for structure variants, this variants may span more than
 // one. Also, there might be some genes located in the introns of another genes. It
 // is rarely happened, but we should consider of it.
-// @names1      list of gene names
+// @names1      name of gene names
 // @n_ales      related allele numbers (R)
 // @n_hgvs      number of hgvs names strings, several transcript for one allele 
 // should be cache into one string like NM_xxxx:c.xx; NC_xxxx:n.xxx; ...; 
-// @hgvs_names  list of hgvs names strings
+// @hgvs  name of hgvs names strings
 // @n_names2    number of transcripts
-// @names2      list of transcripts
-void generate_hgvs_names(struct gene_pred_memory_pool *pool, const bcf1_t *line, int *n_names2, char **names2, int *n_ale)
+// @names2      name of transcripts
+void generate_hgvs(struct genepred_memory_pool *pool, const bcf1_t *line, int *n_names2, char **names2, int *n_ale)
 {
     *n_names2 = 0;
     *n_ale = line->n_allele -1;
-    if (*n_ale == 0) return;
+    if (*n_ale == 0)
+	return;
     //bcf_dec_t *d = &line->d;
-    struct hgvs_names_cache * cache = &pool->cache;
-    // a simple list structure inited for caching gene names and de-duplicate 
-    struct name_list names = KSTRING_INIT;
-    if (cache->m < line->n_allele) {
+    struct hgvs_cache * cache = &pool->cache;
+    // simple name structure inited for caching gene names and de-duplicate 
+    // struct  names = KSTRING_INIT;
+    if ( cache->m < line->n_allele ) {
 	cache->m = line->n_allele;
-	cache->a = (struct hgvs_names*)realloc(cache->a, sizeof(struct hgvs_names)*cache->m);
+	cache->a = (struct hgvs*)realloc(cache->a, sizeof(struct hgvs)*cache->m);
     }
     cache->l = 0;
     // roadmap : snv -> del -> ins -> dup ->delins
+    struct name_list names = { 0, 0, 0};
     int i, j;    
-    for (i = 1; i < line->n_allele; ++i) {
+    for ( i = 1; i < line->n_allele; ++i ) {
+	struct hgvs *name = &cache->a[cache->l++];
 	if (cache->l == cache->i) {
-	    cache->a[cache->i].l = cache->a[cache->i].m = cache->a[cache->i].i = 0;
-	    cache->a[cache->i].a = NULL;
+	    name->l = name->m = name->i = 0;
+	    name->a = NULL;
 	    cache->i++;
 	}
-	struct hgvs_names *hn = &cache->a[cache->l++];
-	hgvs_names_clear(hn);
-	struct hgvs_names_description *des = describe_variants(line->d.allele[0], line->d.allele[i], line->pos +1);
-	for (j = 0; j < pool->l; ++j) {
+	hgvs_clear(name);
+	struct hgvs_des *des = describe_variants(line->d.allele[0], line->d.allele[i], line->pos +1);
+	for ( j = 0; j < pool->l; ++j ) {
 	    int valid = 0;
-	    if (hn->l == hn->m) {
-		hn->m = hn->m == 0 ? 2 : hn->m << 1;
-		hn->a = (struct hgvs_names_core*)realloc(hn->a, sizeof(struct hgvs_names_core)*hn->m);
+	    if (name->l == name->m) {
+		name->m = name->m == 0 ? 2 : name->m<<1;
+		name->a = (struct hgvs_core*)realloc(name->a, sizeof(struct hgvs_core)*name->m);
 	    }
-	    if (hn->i == hn->l) {
-		kstring_t *str = &hn->a[hn->i].str;
-		str->l = str->m = 0;
-		str->s = NULL;
-		hn->i++;
+	    if (name->i == name->l) {
+		kstring_t *string = &name->a[name->i].str;
+		string->l = string->m = 0;
+		string->s = NULL;
+		name->i++;
 	    }
-	    struct hgvs_names_core *core= &hn->a[hn->l];
-	    struct gene_pred_line *gp = &pool->a[j];
-	    hgvs_names_description_reverse(des, gp->strand);
-	    generate_hgvs_names_core(gp, des, core, &valid);
-	    if (valid == 0) continue;
-	    name_list_push(&names, gp->name2);
-	    hn->l++;
+	    struct hgvs_core *core= &name->a[name->l];
+	    struct genepred_line *gl = &pool->a[j];
+	    hgvs_des_reverse(des, gl->strand);
+	    generate_hgvs_core(gl, des, core, &valid);
+	    if (valid == 0)
+		continue;
+	    name_list_push(&names, gl->name2);
+	    name->l++;
 	}
-	hgvs_names_description_destory(des);
+	hgvs_des_destory(des);
 	
     }
 
@@ -1109,12 +990,13 @@ void generate_hgvs_names(struct gene_pred_memory_pool *pool, const bcf1_t *line,
 	kputs(names.a[i], &str);
 	free(names.a[i]);
     }
-    if (names.m) free(names.a);
+    if ( names.m )
+	free(names.a);
     *n_names2 = names.l;
     *names2 = str.l ? str.s : NULL;
 }
 // number : R, type : string
-static void setter1_hgvs_names(bcf_hdr_t *hdr, bcf1_t *line, char *string) 
+static void setter1_hgvs(bcf_hdr_t *hdr, bcf1_t *line, char *string) 
 {
     // the data construct along with alt alleles, so there is no need to remap the order of alleles
     bcf_update_info_string(hdr, line, "HGVSDNA", string);
@@ -1135,42 +1017,48 @@ void setter_hgvs_string(bcf_hdr_t *hdr, bcf1_t *line, const char *key, char *str
     if (strcmp(key, "Gene") == 0) {
 	setter1_gene_names(hdr, line, string);	
     } else if (strcmp(key, "HGVSDNA") == 0) {
-	setter1_hgvs_names(hdr, line, string);		
+	setter1_hgvs(hdr, line, string);		
     } else if (strcmp(key, "Transcript") == 0) {
 	setter1_transcripts_names(hdr, line, string);
     } else {
 	error("Unrecongnized tag %s, only Gene, HGVSDNA, and Transcript are supported for now.", key);
     }    
 }
-char *generate_transcript_string(struct hgvs_names_cache *cache, int n)
+char *generate_transcript_string(struct hgvs_cache *cache, int n)
 {
     kstring_t str = KSTRING_INIT;
     int i, j;    
-    for (i=0; i<n; ++i) {
-	if (i) kputc(',', &str);
+    for ( i = 0; i < n; ++i ) {
+	if ( i )
+	    kputc(',', &str);
 	// foreach allele
-	struct hgvs_names *hn = &cache->a[i];
-	for ( j = 0; j < hn->l; ++j ) {
-	    struct hgvs_names_core *core = &hn->a[j];
-	    if (core->l_name) kputsn(core->str.s, core->l_name-1, &str);
-	    else kputc('.', &str);
+	struct hgvs *name = &cache->a[i];
+	for ( j = 0; j < name->l; ++j ) {
+	    struct hgvs_core *core = &name->a[j];
+	    if (core->l_name)
+		kputsn(core->str.s, core->l_name-1, &str);
+	    else
+		kputc('.', &str);
 	    kputc('|', &str);
 	}
     }
     return str.s;
 }
-char *generate_hgvsvarnomen_string(struct hgvs_names_cache *cache,int n)
+char *generate_hgvsvarnomen_string(struct hgvs_cache *cache,int n)
 {
     kstring_t str = KSTRING_INIT;
     int i, j;    
-    for (i=0; i<n; ++i) {
-	if (i) kputc(',', &str);
+    for ( i = 0; i < n; ++i ) {
+	if ( i )
+	    kputc(',', &str);
 	// foreach allele
-	struct hgvs_names *hn = &cache->a[i];
-	for ( j = 0; j < hn->l; ++j ) {
-	    struct hgvs_names_core *core = &hn->a[j];
-	    if (core->l_name) kputs(core->str.s, &str);
-	    else kputc('.', &str);
+	struct hgvs *name = &cache->a[i];
+	for ( j = 0; j < name->l; ++j ) {
+	    struct hgvs_core *core = &name->a[j];
+	    if (core->l_name)
+		kputs(core->str.s, &str);
+	    else
+		kputc('.', &str);
 	    kputc('|', &str);
 	}
     }
@@ -1179,16 +1067,18 @@ char *generate_hgvsvarnomen_string(struct hgvs_names_cache *cache,int n)
 
 // anno_hgvs_core() only used to annotate bcf/vcf standalone, all the valid tags-added functions will be called in 
 // this function, to annotate the vcf more specification, use setter_genepred_* functions instead of it. 
-void anno_hgvs_core(struct gene_pred_memory_pool *pool, htsFile *fp, tbx_t *tbx, bcf_hdr_t *hdr, bcf1_t *line)
+void anno_hgvs_core(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, bcf_hdr_t *hdr, bcf1_t *line)
 {
     // retrieve the regions this variants located first, check the memory pool and update the pool if the regions is out of
     // cached positions. just skip if the variant type of line is a ref. 
-    if (line->pos <= 0) return;
-    if (bcf_get_variant_types(line) == VCF_REF) return;
+    if (line->pos <= 0)
+	return;
+    if (bcf_get_variant_types(line) == VCF_REF)
+	return;
 
     uint32_t end = bcf_calend(line);
     int id = tbx_name2id(tbx, bcf_hdr_id2name(hdr, line->rid));
-    if (pool->rid == -1 || pool->rid != line->rid || pool->start > line->pos+1 || pool->end < line->pos+1) {
+    if ( pool->rid == -1 || pool->rid != line->rid || pool->start > line->pos+1 || pool->end < line->pos+1 ) {
 	// fill mempool, skip if no record in the memory pool
 	pool->l = 0;
 	fill_mempool(pool, fp, tbx, id, line->pos, end);
@@ -1198,8 +1088,9 @@ void anno_hgvs_core(struct gene_pred_memory_pool *pool, htsFile *fp, tbx_t *tbx,
     char *names2 = NULL;
     int n_ale = 0;
     
-    generate_hgvs_names(pool, line, &n_names2, &names2, &n_ale);
-    if (n_ale == 0) return;
+    generate_hgvs(pool, line, &n_names2, &names2, &n_ale);
+    if (n_ale == 0)
+	return;
     char *trans_string = generate_transcript_string(&pool->cache, n_ale);
     char *hgvs_string = generate_hgvsvarnomen_string(&pool->cache, n_ale);
     //debug_print("trans : %s", trans_string);
@@ -1216,15 +1107,20 @@ void anno_hgvs_core(struct gene_pred_memory_pool *pool, htsFile *fp, tbx_t *tbx,
     free(hgvs_string);
 }
 
+#ifdef _HGVS_MAIN
+
 #include <sys/time.h>
+#include <sys/stat.h>
+
 static double get_time() {
     struct timeval tv;
     if ( gettimeofday(&tv, 0) != 0 ) 
 	error("Failed to get time of day.");
     return (double)tv.tv_sec + 1.0e-6 *(double)tv.tv_usec;
 }
+
 struct args {
-    const char *gene_pred_file;
+    const char *genepred_file;
     const char *refseq_file;
     const char *out_file;
     const char *out_type;
@@ -1233,24 +1129,25 @@ struct args {
     htsFile *fout;
     tbx_t *gpidx;
     faidx_t *faidx;
-    glist_t *glist;
-    struct gene_pred_memory_pool pool;
-} args = {
-    .gene_pred_file = 0,
+    namehash_type *gname;
+    struct genepred_memory_pool pool;
+};
+struct args args = {
+    .genepred_file = 0,
     .refseq_file = 0,
     .out_file = 0,
     .out_type = 0,
     .input_fname = 0,
     .gpidx = 0,
     .faidx = 0,
-    .glist = 0,
+    .gname = 0,
 };
 
 void clear_args(struct args *args)
 {
     tbx_destroy(args->gpidx);
     if (args->faidx) fai_destroy(args->faidx);
-    if (args->glist) kh_destroy(list, args->glist);
+    if (args->gname) kh_destroy(name, args->gname);
     memory_pool_clear(&args->pool);
     hts_close(args->fout);
     hts_close(args->fp);
@@ -1281,8 +1178,8 @@ int main(int argc, char **argv)
 	    arg_var = &args.out_file;
 	else if (strcmp(a, "-O") == 0 && args.out_type == 0)
 	    arg_var = &args.out_type;
-	else if (strcmp(a, "-data") == 0 && args.gene_pred_file == 0)
-	    arg_var = &args.gene_pred_file;
+	else if (strcmp(a, "-data") == 0 && args.genepred_file == 0)
+	    arg_var = &args.genepred_file;
 	else if (strcmp(a, "-refseq") == 0 && args.refseq_file == 0)
 	    arg_var = &args.refseq_file;
 
@@ -1305,23 +1202,18 @@ int main(int argc, char **argv)
     if (args.input_fname == 0)
 	error("No input file ! Use -h for more informations.");
  
-    if (args.gene_pred_file == 0)
+    if (args.genepred_file == 0)
 	error("Reasons :\n"
 	      "-data gene preditions database is needed.\n"
 	      "You could download refGene.txt.gz or ensGene.txt.gz from UCSC websites and sort and indexed by tabix.");
 
-    // if (args.refseq_file == 0) 
-    // 	error("Reasons :\n" 
-    // 	      "-refseq refseq.fa.gz file is need.\n" 
-    // 	      "This is the transcripts reference sequences in fasta format." 
-    // 	      "Notice the transcripts names should be consistance with gene preditions databases."); 
 
-    htsFile *fgp = hts_open(args.gene_pred_file, "r");
+    htsFile *fgp = hts_open(args.genepred_file, "r");
     if (fgp == NULL)
-	error("Failed to open %s", args.gene_pred_file);
-    args.gpidx = load_gene_pred_file(args.gene_pred_file);
+	error("Failed to open %s", args.genepred_file);
+    args.gpidx = load_genepred_file(args.genepred_file);
     if (args.gpidx == NULL)
-	error("Failed to load index of %s", args.gene_pred_file);
+	error("Failed to load index of %s", args.genepred_file);
 
     // args.faidx = load_refseq_file(args.refseq_file); 
     // if (args.faidx == NULL) 
@@ -1350,7 +1242,7 @@ int main(int argc, char **argv)
     }
 
     // init gene predictions memory pool 
-    struct gene_pred_memory_pool *pool = &args.pool;
+    struct genepred_memory_pool *pool = &args.pool;
     pool->m = pool->l = 0;
     pool->rid = -1;
     pool->start = pool->end = 0;
@@ -1407,3 +1299,4 @@ int main(int argc, char **argv)
     fprintf(stderr, "Run time: %.2fs\n", c1 -c0);
     return 0;
 }
+#endif

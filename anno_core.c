@@ -2,30 +2,27 @@
 #include "plugin.h"
 #include "version.h"
 
-/* stat variants positions */
-struct {
-    uint64_t all_sites;
-    uint64_t refs;
-    uint64_t snps;
-    uint64_t mnps;
-    uint64_t ti;
-    uint64_t tv;
-    uint64_t indels;
-    uint64_t other;
-} sites_stat = { 0, 0, 0, 0, 0, 0, 0, 0 };
+struct args {
+    const char *fname_input;
+    const char *fname_output;
+    bcf_hdr_t *hdr, hdr_out;
+    htsFile *fp;
+    htsFile *fp_out;
+    int output_type;
+    struct anno_aux *anno;    
+};
 
-//extern struct configs anno_config_file;
-
-struct anno_handler hand = {
-    .files = NULL,
+struct args args = {
+    .fname_input = 0,
+    .fname_output = 0,
     .hdr = NULL,
     .hdr_out = NULL,
-    .ti = 0,
-    //.sql_anno_count=0,
-    .vcf_cols = NULL,
-    .sql_cols = NULL,
-    //.connects=NULL
+    .fp = NULL,
+    .fp_out = NULL,
+    .output_type = 0,
+    .anno = NULL,
 };
+
 
 int destroy_cols_vector(struct annot_cols_vector *v)
 {
@@ -186,21 +183,6 @@ bcf1_t *anno_core(bcf1_t *line)
 {
     int i, j;
 
-    //int x = bcf_get_variant_types(line); // get the variant type
-    //VARSTAT(x);
-    // get the start position of variant
-    /* int len = 0; */
-    /* for (i=1; i<line->n_allele; i++) { */
-    /* 	if ( len > line->d.var[i].n ) { */
-    /* 	    len = line->d.var[i].n; */
-    /* 	} */
-    /* } */
-    
-    /* int end_pos = len<0 ? line->pos - len: line->pos; */
-    /* init_buffers(line->pos, end_pos); */
-    /* for (i=0; i<hand.sql_anno_count; ++i) { */
-    /* 	anno_sql_line(hand.connects[i], line); */
-    /* } */
 
     for (i=0; i < hand.vcf_cols->n; ++i) {
 	hand.ti = i;
@@ -321,25 +303,22 @@ void bcf_srs_regions_update(bcf_sr_regions_t *reg, const char *chr, int start, i
 
 int main(int argc, char **argv)
 {
+    // init argvs
     if ( paras_praser(argc, argv) != 0)
 	return EXIT_FAILURE;
 
-    if ( load_config(config_file) != 0)
-	error("Failed to load configure file : %s", config_file);
-
-    free(config_file);
-
-    hand.files = bcf_sr_init();
-    hand.files->require_index = 1;
-    hand.vcf_cols = acols_vector_init();
-    hand.sql_cols = acols_vector_init();
-    hand.vcmp = vcmp_init();
-    hand.tmpks.l = hand.tmpks.m = 0;
+    
+    /* hand.files = bcf_sr_init(); */
+    /* hand.files->require_index = 1; */
+    /* hand.vcf_cols = acols_vector_init(); */
+    /* hand.sql_cols = acols_vector_init(); */
+    /* hand.vcmp = vcmp_init(); */
+    /* hand.tmpks.l = hand.tmpks.m = 0; */
 
 
-    htsFile *fp = hts_open(input_fname, "r");
-    bcf_hdr_t *hdr = bcf_hdr_read(fp);
-    hand.hdr_out = bcf_hdr_dup(hdr);
+    args.fp = hts_open(args.input_fname, "r");
+    args.hdr = bcf_hdr_read(args.fp);
+    hand.hdr_out = bcf_hdr_dup(args.hdr);
 
     int i;
     for (i = 0; i > anno_config_file.n_apis; ++i) {
@@ -354,7 +333,6 @@ int main(int argc, char **argv)
     }
 
     
-    //check_environ_paras();
     if ( bcf_hdr_write(hand.out_fh, hand.hdr_out) != 0 )
 	error("failed to write header.");
 

@@ -1,127 +1,215 @@
-/* hgvs
- *
- */
 #ifndef VCFANNO_HGVS_HEADER
 #define VCFANNO_HGVS_HEADER
 
 #include "anno.h"
-#include <htslib/khash.h>
 
-/* split site definition , this definition can be changed by splitsite:(2,2,2,2) in the configure file */ 
-#define SPLITSITE_5_UTR_LEFT  3
-#define SPLITSITE_5_UTR_RIGHT 8
-#define SPLITSITE_3_UTR_LEFT  12
-#define SPLITSITE_3_UTR_RIGHT 2
-
-enum variant_type {
-    is_ref,
-    is_del,
-    is_ins,
-    is_indel,
-    is_snp,
-    is_cnv, // cnv is also a kind of SV
-    is_sv,    
+// for each transcript, the region span several exon partial regions, use exon_pair[] stand each exons
+// and exon_offset_pair[] is the offset / coding coordiante consider of cdsstart 
+struct exon_pair {
+    uint32_t start;
+    uint32_t end;
 };
 
-enum func_type {
-    is_utr5, // ncRNA should not have UTR!
-    is_utr3,
-    is_cds,
-    is_splitsite,
-    is_promotor,
-    is_intron,
-    is_unknown,
+// 
+// The dna reference offset for DNA coding and noncoding transcript consist of two parts. the offset value
+// and the function region construct a 32-bits value.
+// coding/nocoding coordinate
+// 32                        4321
+// |_________________________||||
+// ONLY one-bit below is accept per value
+// 
+// offset 1:  is_noncoding
+// offset 2:  is_coding
+// offset 3:  is_utr5
+// offset 4:  is_utr3
+// 
+
+#define OFFSET_BITWISE   4
+#define REG_NONCODING  1
+#define REG_CODING     2
+#define REG_UTR5       4
+#define REG_UTR3       8
+#define REG_MASK       0xF
+
+struct exon_offset_pair {
+    uint32_t start;
+    uint32_t end;
 };
 
-struct trans {
-    char *hgvs_trans_name;
-    char *alt_seq; // alternative allele sequences
-    int exon_count; // init with -1
-    int cds_count; // init with -1
-    int cds_pos;
-    int cds_shift; // init with 0, no shift
+struct genepred_line {
+    // mark the memory is allocated or not inside this struct,
+    // clear == 0 for empty, clear == 1 recall clear_genepred_line to free it.
+    int clear;
+    // chromosome names, usually names is start with "chr", like chr1, chr2, ..., chrM, which is UCSC style.
+    // however, for other insitutions they have different preference, Ensemble like to use ensemble id, NCBI like
+    // use RefSeq accession to represent the chromosome and updated version. Please make sure all the databases have
+    // same nomenclature before annotation.
+    char *chrom;
+    
+    uint32_t txstart;
+    uint32_t txend;
+    // '-' for minus, '+' for plus strand
+    char strand;
+    // usually gene name, or ensemble gene id
+    char *name1;
+    // transcript name or null for some gene_pred file
+    char *name2; 
+    uint32_t cdsstart;
+    uint32_t cdsend;
+    uint32_t exoncount;
+    struct exon_pair *exons;
+    struct exon_offset_pair *dna_ref_offsets;
 };
 
-struct hgvs_name {
-    char *hgvs_gene_name;
-    int geno_pos_start;
+enum func_region_type {
+    func_region_unknown,
+    func_region_split_sites,
+    func_region_cds,
+    func_region_intron,
+    func_region_utr5,
+    func_region_utr3,
+    func_region_intergenic,
+};
+//  hgvs_core keeps transcript/protein name, the format of hgvs name is construct by
+//                                    l_name   l_type
+//                                    |        |
+//  [transcript|protein|gene|ensemble]:"prefix".postion...
+//
+//  l_name          l_type
+//  |               |
+//  [chrom]:"prefix".postion...
+struct hgvs_core {    
+    uint16_t l_name; // name offset in the data cahce, for chrom l_name == 0;
+    uint16_t l_type; // the byte after type offset, usually offset of '.'
+    kstring_t str;
+    enum func_region_type type;
+};
+
+// Dynamic allocate and init technology.
+// For struct { int l, m, i; void *a }, a is the cached array of predefined type. l for used length, m for max length,
+// i for inited length. And i always >= l, and m always >= i. If l == m, the cache array should be reallocated by a new
+// memory size. This structure used to reuse the cache complex structures other than points.
+struct hgvs {
+    int l, m, i; 
+    struct hgvs_core *a;
+};
+struct hgvs_cache {
+    int l, m, i; // l == n_allele -1
+    struct hgvs *a;
+};
+struct name_list {
+    int l, m;
+    char **a;
+};
+
+struct genepred_memory_pool {
+    int rid;
+    uint32_t start;
+    uint32_t end;
+    // l for used length, m for max length, i for inited length
+    int l, m, i;
+    struct genepred_line *a;
+    struct hgvs_cache cache;
+};
+
+// See UCSC website for more details about refgene format, there is no 
+// version information in refgene file in default, however, we can retrieve
+// this version number from other file in the same directrary. But remeber 
+// to check the names accordly in the refrna file.
+struct refgene_options {
+    // gene prediction file, include exons and cds regions, get it from UCSC, see our manual for details
+    const char *genepred_fname;
+    // transcripts sequences in fasta format, notice the name of transcripts should be exists in gene pred file
+    const char *refseq_fname;
+    // file handler of genepred
+    htsFile *fp;
+    // refgene should be sorted and indexed by tabix
+    tbx_t *genepred_idx;
+    // faidx of refseq
+    faidx_t *refseq_fai;
+    // transcripts list for screening datasets    
+    const char *trans_list_fname;
+    // gene list for screening datasets
+    const char *genes_list_fname;
+    int screen_by_genes;
+    int screen_by_transcripts;
+    // memory pool
+    struct genepred_memory_pool pool;
+};
+
+// map each column right for each format.
+// in default refgene have one more `bin` column in the first column than genepred format
+struct genepred_format {
+    int chrom;
+    int name1;
+    int name2; 
+    int strand;
+    int txstart;
+    int txend;
+    int cdsstart;
+    int cdsend;
+    int exoncount;
+    int exonstarts;
+    int exonends;
+};
+
+
+// HGVS nomenclature : 
+// DNA recommandations *
+// - substitution variant, 
+// Format: “prefix”“position_substituted”“reference_nucleoride””>”new_nucleoride”, e.g. g.123A>G
+// - deletion variant, 
+// Format: “prefix”“position(s)_deleted”“del”, e.g. g.123_127del
+// - duplication variant,
+// Format: “prefix”“position(s)_duplicated”“dup”, e.g. g.123_345dup
+// - insertion variant,
+// Format: “prefix”“positions_flanking”“ins”“inserted_sequence”, e.g. g.123_124insAGC
+// - inversion variant,
+// Format: “prefix”“positions_inverted”“inv”, e.g. g.123_345inv
+// - conversion variant,
+// Format: “prefix”“positions_converted”“con”“positions_replacing_sequence”, e.g. g.123_345con888_1110
+// - deletion-insertion variant,
+// Format: “prefix”“position(s)_deleted”“delins”“inserted_sequence”, e.g. g.123_127delinsAG
+// - repeated sequences variant,
+// Format (repeat position): “prefix”“position_repeat_unit””["”copy_number””]”, e.g. g.123_125[36]
+// 
+// [ reference : http:// www.HGVS.org/varnomen ]
+enum hgvs_variant_type {
+    var_type_ref = 0,
+    var_type_snp,
+    var_type_dels,
+    var_type_ins,
+    var_type_delins,
+    var_type_copy, // dup for ins
+    var_type_complex, 
+    var_type_unknow,
+};
+// descriptions struct of hgvs name
+struct hgvs_des {
+    // if type ==  var_type_ref, hgvs name generater will skip to construct a name, only type will be inited, 
+    // DONOT use any other value in this struct then 
+    enum hgvs_variant_type type;
+    uint8_t strand; // for plus strand start <= end, for minus start >= end
+    int32_t start; // position on ref
+    // for var_type_snp end == start, for var_type_dels end > start, for var_type_ins end = start +1, 
+    // for delvar_type_ins end > start 
+    int32_t end;
+    // for var_type_snp ref_length == 1, for var_type_dels ref_length == length(dels),
+    // for var_type_ins ref_length == 0, for var_type_delins ref_length == length(var_type_dels) 
     int ref_length;
-    enum variant_type vtype;
-    int n_trans; // there are several transcipts for one gene
-    struct trans * trans;
+    char *ref;
+    // for var_type_snp alt_length == 1, for var_type_dels alt_length == 0, for var_type_ins alt_length ==
+    // length(var_type_ins), for delvar_type_ins alt_length == length(var_type_ins) 
+    int alt_length;
+    char *alt;
+    // the copy number only valid if variants type is var_type_copy, for most case, my algrithm only check
+    // mark var_type_dels or var_type_ins in the first step, and check the near sequences from refseq 
+    // databases and if there is copy number changed (more or less), the variants will update to var_type_copy 
+    int copy_number;
+    int copy_number_ori;
 };
 
-
-#define clear_all(x) (x ＝ 0)
-#define clear_flag(x, n) (x &= ~(n))
-
-#define REFGENE_PRASE_NONA   0
-#define REFGENE_PRASE_BIN    1
-#define REFGENE_PRASE_NAME1  2
-#define REFGENE_PRASE_REG    4
-#define REFGENE_PRASE_STRAND 8
-#define REFGENE_PRASE_EXONS  (1<<4 | 8)
-#define REFGENE_PRASE_ALL (REFGENE_PRASE_BIN | REFGENE_PRASE_NAME1 | REFGENE_PRASE_REG| REFGENE_PRASE_EXONS)
-
-struct refgene_entry {
-    int prase_flag;
-    char *buffers;
-    int n_buffer;
-    int m_buffer;
-    int bin; // see USCS bin scheme for details, be used to check regions
-    
-    const char *name1; // rna name usually
-    const char *name2; // gene name
-
-    int rid; // chromosome id, should be one of contigs in the VCF header, -1
-    
-    int strand; // strand_plus, strand_minus, strand_unknown
-    uint32_t exon_begin; // exon region begin from xxx
-    uint32_t exon_end; // exon end to xxx, remember exon contains cds and utr
-    uint32_t cds_start; // cds region start position, 5'UTR is exon_begin to cds_start-1.
-    uint32_t cds_stop; // 3'UTR is cds_end+1 to exon_end in plus strand
-    int total_exons; // exon number
-    struct region *exons;
-    struct region *cds;
-};
-
-#define NAME_HASH_TRANS 0
-#define NAME_HASH_GENES 1
-
-struct anno_hgvs_option {
-    struct refgene_file refgene;
-    struct refrna_file refrna;
-    void *hash[2];
-    struct annot_col *cols;
-    int ncols;
-    struct refgene_entry *buffers;
-    int mbuffer, nbuffer;
-};
-
-/* retrieve data from local tabix indexed refgene database, see manual for more details
-   about databases */
-extern struct refgene_entry * retrieve_refgene_from_local(const char *fname, int rule, int tid, int start, int end, int *nbuffer);
-
-extern void extract_refgene(struct refgene_entry *entry, int type);
-extern int local_setter_hgvs_gene(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-extern int local_setter_hgvs_names(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-extern int local_setter_refgene_funcreg(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-extern int local_setter_refgene_function(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-extern int local_setter_refgene_exin(struct anno_handler *hand, bcf1_t *line, annot_col_t *col, void *data);
-
-extern void refgene_fill_buffers_from_local(struct anno_hgvs_option *hgvs_opts, int prase_flag);
-
-/* genes list and transcript list would be checked in this step, empty file will be warned,
- *
- * Note: 
- * 1. only random one transcript would be listed if no transcript and gene list specified.
- * 2. all transcripts would be listed for the gene specified in the gene list.
- * 3. if transcipt list is specified, only these transcipts would be annotated.
- *
- */
-extern int init_refgene_gene_trans_list(const char *gene_list, const char *nm_list);
-
-//extern bcf_t * insert_hgvs_tag(bcf_t *line);
-
+extern void genepred_line_clear(struct genepred_line *line);
+extern void genepred_line_praser(kstring_t *string, struct genepred_line *line, struct format_type *type);
 
 #endif
