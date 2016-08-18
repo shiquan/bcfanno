@@ -4,7 +4,7 @@
 //#include "hgvs.h"
 
 // only if annotation database is VCF/BCF file, header_in has values or else header_in == NULL
-annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
+anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
 {
     assert(rules != NULL);
     if (type == anno_is_vcf && header_in == NULL) {
@@ -12,7 +12,7 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
     }
     char *ss = (char*)rules, *se = ss;
     int nc = 0;
-    annot_col_t *cols = NULL;
+    anno_col_t *cols = NULL;
     kstring_t tmp = KSTRING_INIT;
     kstring_t str = KSTRING_INIT;
     int i = -1;
@@ -39,8 +39,8 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 	    warnings("Skip tag %s", str.s);
 	} else if ( !strcasecmp("ID", str.s) ) {
 	    nc++;
-            cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)* (nc));
-            struct annot_col *col = &cols[nc-1];
+            cols = (struct anno_col*) realloc(cols, sizeof(struct anno_col)* (nc));
+            struct anno_col *col = &cols[nc-1];
             col->icol = i;
             col->replace = replace;
             col->setter = type == anno_is_vcf ? vcf_setter_id : setter_id;
@@ -73,8 +73,8 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 
             //int hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, key);
             nc++;
-	    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-            struct annot_col *col = &cols[nc-1];
+	    cols = (struct anno_col*) realloc(cols, sizeof(struct anno_col)*(nc));
+            struct anno_col *col = &cols[nc-1];
             col->icol = -1;
             col->replace = replace;
             col->hdr_key = strdup(key);
@@ -121,8 +121,8 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
 		}
 	    }
 	    nc++;
-	    cols = (struct annot_col*) realloc(cols, sizeof(struct annot_col)*(nc));
-	    struct annot_col *col = &cols[nc-1];
+	    cols = (struct anno_col*) realloc(cols, sizeof(struct anno_col)*(nc));
+	    struct anno_col *col = &cols[nc-1];
 	    col->icol = i;
 	    col->replace = replace;
 	    col->hdr_key = strdup(str.s);
@@ -160,11 +160,11 @@ annot_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *he
     return cols;
 }
 
-void print_annot_cols(annot_col_t *cols, int n)    
+void print_anno_cols(anno_col_t *cols, int n)    
 {
     int i;
     for (i=0; i<n; ++i) {
-	annot_col_t *col = &cols[i];
+	anno_col_t *col = &cols[i];
 	fprintf(stderr, "[%s] %d : %s, %p\n",__func__, col->icol, col->hdr_key, col->setter);
     }
     return;
@@ -192,8 +192,8 @@ int main(int argc, char **argv)
     bcf_hdr_t *out = bcf_hdr_dup(h);
     char *string = strdup(argv[2]);
     int ncols = 0;
-    annot_col_t *cols = init_columns(string, h, out, &ncols, anno_is_vcf);
-    print_annot_cols(cols, ncols);
+    anno_col_t *cols = init_columns(string, h, out, &ncols, anno_is_vcf);
+    print_anno_cols(cols, ncols);
     hts_close(fp);
     return 0;
 }

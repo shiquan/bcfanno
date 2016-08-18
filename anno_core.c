@@ -2,28 +2,6 @@
 #include "plugin.h"
 #include "version.h"
 
-struct args {
-    const char *fname_input;
-    const char *fname_output;
-    bcf_hdr_t *hdr, hdr_out;
-    htsFile *fp;
-    htsFile *fp_out;
-    int output_type;
-    struct anno_aux *anno;    
-};
-
-struct args args = {
-    .fname_input = 0,
-    .fname_output = 0,
-    .hdr = NULL,
-    .hdr_out = NULL,
-    .fp = NULL,
-    .fp_out = NULL,
-    .output_type = 0,
-    .anno = NULL,
-};
-
-
 int destroy_cols_vector(struct annot_cols_vector *v)
 {
     if (v == NULL)
@@ -47,27 +25,6 @@ const char *hts_bcf_wmode(int file_type)
     if ( file_type & FT_BCF ) return "wb";      // compressed BCF
     if ( file_type & FT_GZ ) return "wz";       // compressed VCF
     return "w";                                 // uncompressed VCF
-}
-int release_handler()
-{
-    bcf_sr_destroy(hand.files);
-    bcf_hdr_destroy(hand.hdr_out);
-    destroy_cols_vector(hand.vcf_cols);
-    destroy_cols_vector(hand.sql_cols);
-    hts_close(hand.out_fh);
-    ignore_free(hand.sample_map);
-    ignore_free(hand.tmpi);
-    ignore_free(hand.tmpi2);
-    ignore_free(hand.tmpi3);
-    ignore_free(hand.tmpf);
-    ignore_free(hand.tmpf2);
-    ignore_free(hand.tmpf3);
-    ignore_free(hand.tmps);
-    ignore_free(hand.tmps2);
-    ignore_free(hand.tmpp);
-    ignore_free(hand.tmpp2);
-    ignore_free(hand.tmpks.s);
-    return 0;    
 }
 struct annot_cols_vector * acols_vector_init()
 {
@@ -142,64 +99,69 @@ int init_data(const char *json, const char *fname)
 	    parse_columns(&anno_config_file.apis[i]);
 	    
 	}
-	/* else if (anno_config_file.apis[i].type == api_is_sql) { */
-	/*     assert(1); */
-	/*     if (!add_sql_reader(hand.connects, anno_config_file.apis[i].dynlib))  */
-	/* 	error("Failed to open %s: %s\n", fname, str_errno()); */
-	    
-	/*     parse_columns(anno_config_file.apis[i]); */
-	/* } */
     }
     return 0;
 }
+struct args {
+    // input vcf path
+    const char *fname_input;
+    // output vcf path, stdout in default
+    const char *fname_output;
+    // configure path in json format
+    const char *fname_json;
+    // vcf hander of input and output vcf
+    bcf_hdr_t *hdr, hdr_out;
+    // file handler of input vcf
+    htsFile *fp_input; 
+    // file handler of output vcf
+    htsFile *fp_out;
+    // output directory, default is "-" for stdout
+    const char *out;
+    // output format, default is vcf
+    int output_type;
+    struct beddata_options bed_opts;
+    struct vcfdata_options vcf_opts;
+    struct refgene_options hgvs_opts;
+};
 
-/* void init_buffers(int start, int end_pos) */
-/* { */
-/* } */
-/* // check the environment parameters */
-/* void check_environ_paras() */
-/* { */
-/* } */
+struct args args = {
+    .fname_input = 0,
+    .fname_output = 0,
+    .hdr = NULL,
+    .hdr_out = NULL,
+    .fp = NULL,
+    .fp_out = NULL,
+    .output_type = 0,
+    .bed_opts = BED_OPTS_INIT,
+    .vcf_opts = VCF_OPTS_INIT,
+    .hgvs_opts = HGVS_OPTS_INIT,
+};
 
-#define VARSTAT(x) do \
-    {				\
-	sites_stat.all_sites++; \
-	if (x == VCF_REF) { \
-	    sites_stat.refs++;\
-	} else if (x == VCF_SNP) {\
-	    sites_stat.snps++;\
-	} else if (x == VCF_MNP) {\
-	    sites_stat.mnps++;\
-	} else if (x == VCF_INDEL) {\
-	    sites_stat.indels++;\
-	} else if (x == VCF_OTHER) {\
-	    sites_stat.other++;\
-	} else {\
-	    error("VARSTAT: Unknown flag %d", x);\
-	}\
-    } while(0)
-	    
 bcf1_t *anno_core(bcf1_t *line)
 {
-    int i, j;
-
-
-    for (i=0; i < hand.vcf_cols->n; ++i) {
-	hand.ti = i;
-	if ( bcf_sr_has_line(hand.files, hand.ti) ) {
-	    bcf1_t *aline = bcf_sr_get_line(hand.files, hand.ti);
-	    struct annot_cols *cols = &hand.vcf_cols->vcols[i];
-
-	    for (j=0; j<cols->ncols; ++j) {
-		annot_col_t *col = &cols->cols[j];
-		if ( col->setter(&hand, line, col, aline) ) 
-		    warnings("failed to annotate %s at %s:%d",col->hdr_key, bcf_seqname(hand.hdr, line), line->pos+1);
-	    }
-	}
-    }
+    // annotate hgvs name
+    anno_refgene_core(line, &args.hgvs_opts);
+    // annotate vcf files
+    anno_vcfdata_core(line, &args.vcf_opts);
+    // annotate bed format datasets
+    anno_beddata_core(line, &args.bed_opts);
     return line;
+    
+    /* int i, j; */
+    /* for (i=0; i < hand.vcf_cols->n; ++i) { */
+    /* 	hand.ti = i; */
+    /* 	if ( bcf_sr_has_line(hand.files, hand.ti) ) { */
+    /* 	    bcf1_t *aline = bcf_sr_get_line(hand.files, hand.ti); */
+    /* 	    struct annot_cols *cols = &hand.vcf_cols->vcols[i]; */
+    /* 	    for (j=0; j<cols->ncols; ++j) { */
+    /* 		annot_col_t *col = &cols->cols[j]; */
+    /* 		if ( col->setter(&hand, line, col, aline) )  */
+    /* 		    warnings("failed to annotate %s at %s:%d",col->hdr_key, bcf_seqname(hand.hdr, line), line->pos+1); */
+    /* 	    } */
+    /* 	} */
+    /* } */
+    /* return line; */
 }
-#undef VARSTAT
 
 #include <getopt.h>
 

@@ -12,8 +12,6 @@
 #include "htslib/faidx.h"
 #include "hgvs.h"
 
-#define KSTRING_INIT {0, 0, 0}
-
 char str_init[2];
 
 KHASH_MAP_INIT_STR(name, char*)
@@ -21,13 +19,18 @@ KHASH_MAP_INIT_STR(name, char*)
 typedef khash_t(name) namehash_type;
 
 typedef char *(*copy_seqs_func)(const char*, unsigned long n);
-		      
-void genepred_line_clear(struct genepred_line *line)
+
+struct name_list {
+    int l, m;
+    char **a;
+};
+
+static void genepred_line_clear(struct genepred_line *line)
 {
     if ( line->clear == 1 )
 	return;
-
-    if ( line->clear == 0 ) {
+    line->clear = 1;
+    if (line->clear == 0) {
 	free(line->chrom);
 	free(line->name1);
 	if ( line->name2 )
@@ -35,16 +38,7 @@ void genepred_line_clear(struct genepred_line *line)
 	free(line->exons);
 	free(line->dna_ref_offsets);
     }
-    // set all value empty
-    line->chrom = NULL;
-    line->name1 = NULL;
-    line->name2 = NULL;
-    line->exons = NULL;
-    line->dna_ref_offsets = NULL;
-    line->txstart = line->txend = 0;
-    line->cdsstart = line->cdsend = 0;
-    line->exoncount = 0;
-    line->clear = 1;
+    memset(line, 0, sizeof(struct genepred_line));
 }
 static void hgvs_core_clear(struct hgvs_core *c)
 {
@@ -53,7 +47,7 @@ static void hgvs_core_clear(struct hgvs_core *c)
     c->l_type = 0;
     c->type = func_region_unknown;
 }
-void hgvs_clear(struct hgvs *name)
+static void hgvs_clear(struct hgvs *name)
 {
     int i;
     for ( i = 0; i < name->l; ++i )
@@ -87,7 +81,7 @@ namehash_type *init_gene_name(const char *name)
     khiter_t k;
     int ret;
     namehash_type *hash;
-    char **names = hts_readname(name, 1, &n);
+    char **names = hts_readlist(name, 1, &n);
 
     if ( n == 0 )
 	return NULL;
@@ -111,8 +105,41 @@ uint32_t bcf_calend(bcf1_t *line)
 {
     return line->pos + line->rlen;
 }
+int hgvs_bcf_header_add_gene(bcf_hdr_t *hdr)
+{
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Gene");
+    if (id == -1) {
+	bcf_hdr_append(hdr, "##INFO=<ID=Gene,Number=1,Type=String,Description=\"Gene names\">");
+	bcf_hdr_sync(hdr);
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Gene");
+	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
+    return id;
+}
+int hgvs_bcf_header_add_trans(bcf_hdr_t *hdr)
+{
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Transcript");
+    if (id == -1) {
+	bcf_hdr_append(hdr, "##INFO=<ID=Transcript,Number=G,Type=String,Description=\"Transcript names\">");
+	bcf_hdr_sync(hdr);
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Transcript");
+	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
+    return id;
+}
+int hgvs_bcf_header_add_dna(bcf_hdr_t *hdr)
+{
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+    if (id == -1) {
+	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=G,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+	bcf_hdr_sync(hdr);
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
+    return id;
+}
 
-const struct format_type refgene_formats = {
+static struct genepred_format refgene_formats = {
     .chrom = 2,
     .name1 = 1,
     .name2 = 12,
@@ -125,10 +152,10 @@ const struct format_type refgene_formats = {
     .exonstarts = 9,
     .exonends = 10,
 };
-const struct format_type genepred_formats = {
-    .chrom = 1,
+    
+static struct genepred_format genepred_formats = {    
     .name1 = 0,
-    .name2 = 11,
+    .chrom = 1,
     .strand = 2,
     .txstart = 3,
     .txend = 4,
@@ -137,19 +164,10 @@ const struct format_type genepred_formats = {
     .exoncount = 7,
     .exonstarts = 8,
     .exonends = 9,
+    .name2 = 10,
 };
 
-/* struct anno_data_file_handler { */
-/*     struct format_type type; */
-/*     const char *fn; */
-/*     htsFile *fp; */
-/*     tbx_t *tbx; */
-/* }; */
-/* // test the format of anno dataset, usually genePred or refgene */
-/* void test_annodata_file_type(struct anno_data_file_handler *handler) */
-/* { */    
-/* } */
-void genepred_prase_core(kstring_t *string, struct genepred_line *line, struct format_type *type)
+void genepred_prase_core(kstring_t *string, struct genepred_line *line, struct genepred_format *type)
 {
     int nfields = 0;
     genepred_line_clear(line);
@@ -202,7 +220,7 @@ void genepred_prase_core(kstring_t *string, struct genepred_line *line, struct f
     }
     line->clear = 0;
 }
-void genepred_line_praser(kstring_t *string, struct genepred_line *line, struct format_type *type)
+void genepred_line_praser(kstring_t *string, struct genepred_line *line, struct genepred_format *type)
 {
     // prase string into genepred line struct
     genepred_prase_core(string, line, type);
@@ -375,7 +393,7 @@ void generate_dbref_database(struct genepred_line *line)
     	free(temp[1].s);
     }
 }
-void push_mempool(struct genepred_memory_pool *pool, kstring_t *str, struct format_type *type)
+static void push_mempool(struct genepred_memory_pool *pool, kstring_t *str, struct genepred_format *type)
 {
     if (pool->m == pool->l) {
 	pool->m = pool->m == 0 ? 2 : pool->m << 1;
@@ -389,7 +407,7 @@ void push_mempool(struct genepred_memory_pool *pool, kstring_t *str, struct form
     genepred_line_praser(str, &pool->a[pool->l], type);
     pool->l++;
 }
-void update_mempool(struct genepred_memory_pool *pool)
+static void update_mempool(struct genepred_memory_pool *pool)
 {    
     if (pool->l == 0)
 	return;
@@ -404,7 +422,7 @@ void update_mempool(struct genepred_memory_pool *pool)
 	    pool->end = pool->a[i].txend;
     }
 }
-void fill_mempool(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, int rid, uint32_t start, uint32_t end, struct format_type *type)
+void hgvs_fill_memory(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, int rid, uint32_t start, uint32_t end, struct genepred_format *type)
 {
     hts_itr_t *itr = tbx_itr_queryi(tbx, rid, start, end);
     kstring_t str = KSTRING_INIT;
@@ -420,10 +438,10 @@ void fill_mempool(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, in
     tbx_itr_destroy(itr);
     update_mempool(pool);    
 }
-void memory_pool_clear(struct genepred_memory_pool *pool)
+static void hgvs_memory_clear(struct genepred_memory_pool *pool)
 {
     int i;
-    for ( i = 0; i < pool->l; ++i)
+    for ( i = 0; i < pool->i; ++i)
 	genepred_line_clear(&pool->a[i]);
     
     pool->l = 0;
@@ -433,7 +451,46 @@ void memory_pool_clear(struct genepred_memory_pool *pool)
     pool->rid = -1;
     hgvs_cache_destroy(&pool->cache);
 }
-
+void namehash_destroy(void *_hash)
+{
+    namehash_type *hash = (namehash_type*)_hash;
+    khiter_t k;
+    for ( k = 0; k < kh_end(hash); ++k ) {
+	if ( kh_exist(hash, k) ) 
+	    free((char*)kh_key(hash, k));
+    }
+    kh_destroy(name, hash);
+}
+struct refgene_options *refgene_opts_init()
+{
+    struct refgene_options *opts = (struct refgene_options*)malloc(sizeof(struct refgene_options));
+    opts->genepred_fname = 0;
+    opts->refseq_fname = 0;
+    opts->fp = 0;
+    opts->genepred_idx = 0;
+    opts->check_refseq = 0;
+    opts->refseq_fai = 0;
+    opts->trans_list_fname = 0;
+    opts->genes_list_fname = 0;
+    opts->screen_by_genes = 0;
+    opts->screen_by_transcripts = 0;
+    opts->genehash = 0;
+    opts->transhash = 0;
+    return opts;    
+}
+void refgene_opts_destroy(struct refgene_options *opt)
+{
+    hts_close(opt->fp);
+    tbx_destroy(opt->genepred_idx);
+    if ( check_refseq == 1 )
+	fai_destroy(opt->refseq_fai);
+    if ( opt->screen_by_genes == 1 )
+	namehash_destroy(opt->genehash);
+    if ( opt->screen_by_transcripts == 1 )
+	namehash_destroy(opt->transhash);
+    hgvs_memory_clear(&opt->pool);
+    free(opt);
+}
 void hgvs_des_destory(struct hgvs_des *des)
 {
     if ( des->ref_length > 0 )
@@ -492,7 +549,7 @@ void hgvs_des_reverse(struct hgvs_des *des, uint8_t strand)
     if ( des->alt_length > 0 )
 	free(alt);
 }
-struct hgvs_des *describe_variants(const char *ref, const char *alt, int _pos)
+static struct hgvs_des *describe_variants(const char *ref, const char *alt, int _pos)
 {
     struct hgvs_des *des = (struct hgvs_des*)malloc(sizeof(struct hgvs_des));
     const char *a = alt;
@@ -590,7 +647,7 @@ struct hgvs_des *describe_variants(const char *ref, const char *alt, int _pos)
     des->end = pos + des->ref_length -1;
     return des;
 }
-void check_cnv_hgvs_des(struct hgvs_des *des, struct genepred_line *line, faidx_t *fai, htsFile *fp)
+static void check_cnv_hgvs_des(struct hgvs_des *des, struct genepred_line *line, faidx_t *fai, htsFile *fp)
 {
     if (des->type == var_type_ins) {
 
@@ -598,7 +655,7 @@ void check_cnv_hgvs_des(struct hgvs_des *des, struct genepred_line *line, faidx_
 
     }
 }
-void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, int *l1, int *l2 )
+static void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, int *l1, int *l2 )
 {
     *l1 = 0;
     *l2 = exoncount*2 -1;
@@ -622,7 +679,7 @@ void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, int *l1
     } 
 }
 // convert pos to hgvs pos string
-enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct exon_pair *pair, struct exon_offset_pair *locs, int *is_coding, char **cpos)
+static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct exon_pair *pair, struct exon_offset_pair *locs, int *is_coding, char **cpos)
 {
     // purpose: find the most nearest edge for variant position
     // init:   l1                     l2
@@ -813,7 +870,7 @@ enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct
     *cpos = str.s;
     return ftype;
 }
-void generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct hgvs_core *c, int *valid)
+static void generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct hgvs_core *c, int *valid)
 {
     hgvs_core_clear(c);
     *valid = 0;
@@ -864,35 +921,35 @@ void generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct
 	}
     } else if (des->type == var_type_ins) {
 	// insertion format should be NM_0001:c.123_124insXX
-	kputc('_', str);
+	kputc('_', string);
 	char *pos2;
 	pos_convert(des->end, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding1, &pos2);
-	kputs(pos2, str);
+	kputs(pos2, string);
 	free(pos2);
 	// if insertion sequences is small show sequences directly. for long sequences show number.
 	if ( des->alt_length < 20)
-	    ksprintf(str, "ins%s", alt);
+	    ksprintf(string, "ins%s", alt);
 	else
-	    ksprintf(str, "ins%d", des->alt_length);
+	    ksprintf(string, "ins%d", des->alt_length);
     } else if (des->type == var_type_delins) {
 	// delins format should be NM_0001:c.123_125delinsXX
 	if ( des->ref_length > 1 ) {
-	    kputc('_', str);
+	    kputc('_', string);
 	    char *pos2;
 	    pos_convert(des->end, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding1, &pos2);
-	    kputs(pos2, str);
+	    kputs(pos2, string);
 	    free(pos2);
 	}
 	if ( des->alt_length < 20 )
-	    ksprintf(str, "delins%s", alt);
+	    ksprintf(string, "delins%s", alt);
 	else
-	    ksprintf(str, "delins%d", des->alt_length);
+	    ksprintf(string, "delins%d", des->alt_length);
     } else {
 	error("unknow type : %d", des->type);
     }
     
 #ifdef DEBUG_MODE
-    debug_print("%d : %s", des->start,str->s);
+    debug_print("%d : %s", des->start,string->s);
 #endif
     free(pos1);
     // it is valid
@@ -950,12 +1007,13 @@ void generate_hgvs(struct genepred_memory_pool *pool, const bcf1_t *line, int *n
     struct name_list names = { 0, 0, 0};
     int i, j;    
     for ( i = 1; i < line->n_allele; ++i ) {
-	struct hgvs *name = &cache->a[cache->l++];
+	struct hgvs *name = &cache->a[cache->l];
 	if (cache->l == cache->i) {
 	    name->l = name->m = name->i = 0;
 	    name->a = NULL;
 	    cache->i++;
 	}
+	cache->l++;
 	hgvs_clear(name);
 	struct hgvs_des *des = describe_variants(line->d.allele[0], line->d.allele[i], line->pos +1);
 	for ( j = 0; j < pool->l; ++j ) {
@@ -1065,9 +1123,9 @@ char *generate_hgvsvarnomen_string(struct hgvs_cache *cache,int n)
     return str.s;
 }
 
-// anno_hgvs_core() only used to annotate bcf/vcf standalone, all the valid tags-added functions will be called in 
+// hgvs_anno() only used to annotate bcf/vcf standalone, all the valid tags-added functions will be called in 
 // this function, to annotate the vcf more specification, use setter_genepred_* functions instead of it. 
-void anno_hgvs_core(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, bcf_hdr_t *hdr, bcf1_t *line)
+void hgvs_anno(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, bcf_hdr_t *hdr, bcf1_t *line, struct genepred_format *type)
 {
     // retrieve the regions this variants located first, check the memory pool and update the pool if the regions is out of
     // cached positions. just skip if the variant type of line is a ref. 
@@ -1081,7 +1139,7 @@ void anno_hgvs_core(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, 
     if ( pool->rid == -1 || pool->rid != line->rid || pool->start > line->pos+1 || pool->end < line->pos+1 ) {
 	// fill mempool, skip if no record in the memory pool
 	pool->l = 0;
-	fill_mempool(pool, fp, tbx, id, line->pos, end);
+	hgvs_fill_memory(pool, fp, tbx, id, line->pos, end, type);
 	if (pool->l == 0) return;
     }
     int n_names2 = 0;
@@ -1093,9 +1151,10 @@ void anno_hgvs_core(struct genepred_memory_pool *pool, htsFile *fp, tbx_t *tbx, 
 	return;
     char *trans_string = generate_transcript_string(&pool->cache, n_ale);
     char *hgvs_string = generate_hgvsvarnomen_string(&pool->cache, n_ale);
-    //debug_print("trans : %s", trans_string);
-    //debug_print("hgvs : %s", hgvs_string);
-
+#ifdef DEBUG_MODE
+    debug_print("trans : %s", trans_string);
+    debug_print("hgvs : %s", hgvs_string);
+#endif
     if ( hgvs_string )
     	setter_hgvs_string(hdr, line, "Transcript", trans_string);
     if ( trans_string )
@@ -1148,7 +1207,7 @@ void clear_args(struct args *args)
     tbx_destroy(args->gpidx);
     if (args->faidx) fai_destroy(args->faidx);
     if (args->gname) kh_destroy(name, args->gname);
-    memory_pool_clear(&args->pool);
+    hgvs_memory_clear(&args->pool);
     hts_close(args->fout);
     hts_close(args->fp);
 }
@@ -1257,34 +1316,16 @@ int main(int argc, char **argv)
     // assuming output is stdout in Vcf format in default. 
     args.fout = args.out_file == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.out_file, hts_bcf_wmode(out_type));
     bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);	
-    int id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, "Gene");
-    if (id == -1) {
-	bcf_hdr_append(hdr_out, "##INFO=<ID=Gene,Number=1,Type=String,Description=\"Gene names\">");
-	bcf_hdr_sync(hdr_out);
-	id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, "Gene");
-	assert(bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, id));
-    }
-    id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, "Transcript");
-    if (id == -1) {
-	bcf_hdr_append(hdr_out, "##INFO=<ID=Transcript,Number=G,Type=String,Description=\"Transcript names\">");
-	bcf_hdr_sync(hdr_out);
-	id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, "Transcript");
-	assert(bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, id));
-    }
-    id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, "HGVSDNA");
-    if (id == -1) {
-	bcf_hdr_append(hdr_out, "##INFO=<ID=HGVSDNA,Number=G,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
-	bcf_hdr_sync(hdr_out);
-	id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, "HGVSDNA");
-	assert(bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, id));
-    } 
+    hgvs_bcf_header_add_gene(hdr);
+    hgvs_bcf_header_add_trans(hdr);
+    hgvs_bcf_header_add_dna(hdr);
 #ifndef DEBUG_MODE   
     bcf_hdr_write(args.fout, hdr_out);
 #endif
     // init gene_pred or refgene database, hold tabix index cache and faidx cache in memory 
     bcf1_t *line = bcf_init();
     while ( bcf_read(args.fp, hdr, line) == 0 ) {     
-	anno_hgvs_core(pool, fgp, args.gpidx, hdr_out, line);
+	hgvs_anno(pool, fgp, args.gpidx, hdr_out, line, &genepred_formats);
 #ifndef DEBUG_MODE   
 	bcf_write1(args.fout, hdr_out, line);
 #endif

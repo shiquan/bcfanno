@@ -97,62 +97,6 @@ struct hgvs_cache {
     int l, m, i; // l == n_allele -1
     struct hgvs *a;
 };
-struct name_list {
-    int l, m;
-    char **a;
-};
-
-struct genepred_memory_pool {
-    int rid;
-    uint32_t start;
-    uint32_t end;
-    // l for used length, m for max length, i for inited length
-    int l, m, i;
-    struct genepred_line *a;
-    struct hgvs_cache cache;
-};
-
-// See UCSC website for more details about refgene format, there is no 
-// version information in refgene file in default, however, we can retrieve
-// this version number from other file in the same directrary. But remeber 
-// to check the names accordly in the refrna file.
-struct refgene_options {
-    // gene prediction file, include exons and cds regions, get it from UCSC, see our manual for details
-    const char *genepred_fname;
-    // transcripts sequences in fasta format, notice the name of transcripts should be exists in gene pred file
-    const char *refseq_fname;
-    // file handler of genepred
-    htsFile *fp;
-    // refgene should be sorted and indexed by tabix
-    tbx_t *genepred_idx;
-    // faidx of refseq
-    faidx_t *refseq_fai;
-    // transcripts list for screening datasets    
-    const char *trans_list_fname;
-    // gene list for screening datasets
-    const char *genes_list_fname;
-    int screen_by_genes;
-    int screen_by_transcripts;
-    // memory pool
-    struct genepred_memory_pool pool;
-};
-
-// map each column right for each format.
-// in default refgene have one more `bin` column in the first column than genepred format
-struct genepred_format {
-    int chrom;
-    int name1;
-    int name2; 
-    int strand;
-    int txstart;
-    int txend;
-    int cdsstart;
-    int cdsend;
-    int exoncount;
-    int exonstarts;
-    int exonends;
-};
-
 
 // HGVS nomenclature : 
 // DNA recommandations *
@@ -209,7 +153,65 @@ struct hgvs_des {
     int copy_number_ori;
 };
 
-extern void genepred_line_clear(struct genepred_line *line);
-extern void genepred_line_praser(kstring_t *string, struct genepred_line *line, struct format_type *type);
+// Refgene gene names, transcript names, HGVS names generate
+struct genepred_memory_pool {
+    int rid;
+    uint32_t start;
+    uint32_t end;
+    // l for used length, m for max length, i for inited length
+    int l, m, i;
+    struct genepred_line *a;
+    struct hgvs_cache cache;
+};
+
+
+// map each column right for each format.
+// in default refgene have one more `bin` column in the first column than genepred format
+struct genepred_format {
+    int chrom;
+    int name1;
+    int name2; 
+    int strand;
+    int txstart;
+    int txend;
+    int cdsstart;
+    int cdsend;
+    int exoncount;
+    int exonstarts;
+    int exonends;
+};
+
+// See UCSC website for more details about refgene format, there is no 
+// version information in refgene file in default, however, we can retrieve
+// this version number from other file in the same directrary. But remeber 
+// to check the names accordly in the refrna file.
+struct refgene_options {
+    // gene prediction file, include exons and cds regions, get it from UCSC, see our manual for details
+    const char *genepred_fname;
+    // transcripts sequences in fasta format, notice the name of transcripts should be exists in gene pred file
+    const char *refseq_fname;
+    // file handler of genepred
+    htsFile *fp;
+    // refgene should be sorted and indexed by tabix
+    tbx_t *genepred_idx;
+    // if refseq_fname is provided, check_refseq == 1, else check_refseq == 0
+    int check_refseq;
+    // faidx of refseq
+    faidx_t *refseq_fai;
+    // transcripts list for screening datasets    
+    const char *trans_list_fname;
+    // gene list for screening datasets
+    const char *genes_list_fname;
+    int screen_by_genes;
+    int screen_by_transcripts;
+    void *genehash;
+    void *transhash;
+    // memory pool
+    struct genepred_memory buffer;
+};
+
+// generate hgvs name
+// for col keys, must be one of HGVSDNA, Gene, Transcript
+extern int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_col *col);
 
 #endif
