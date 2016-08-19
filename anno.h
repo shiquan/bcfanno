@@ -26,8 +26,11 @@
 // for function region databases, bed format is required and should be packed by bgzip and indexed by tabix,
 // for hgvs databases, only used for generating HGVS names, here require genepred format, see our manual for more details.
 
+// handler of function regions data in bed format, goto anno_bed.h for details
 struct beds_options;
+// handler of variantions data in vcf/bcf format, goto anno_vcf.h for details
 struct vcfs_options;
+// handler of refgene data in genepred format, goto anno_hgvs.h for details
 struct refgene_options;
 
 // anno_line also defined in plugin.h for compile dynamic library
