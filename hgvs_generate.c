@@ -125,7 +125,7 @@ int hgvs_bcf_header_add_trans(bcf_hdr_t *hdr)
     }
     return id;
 }
-int hgvs_bcf_header_add_dna(bcf_hdr_t *hdr)
+int hgvs_bcf_header_add_hgvsdna(bcf_hdr_t *hdr)
 {
     int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
     if (id == -1) {
@@ -428,6 +428,18 @@ static void update_mempool(struct genepred_memory *pool)
 	    pool->end = pool->a[i].txend;
     }
 }
+static void hgvs_memory_clear(struct genepred_memory *pool)
+{
+    int i;
+    for ( i = 0; i < pool->i; ++i)
+	genepred_line_clear(&pool->a[i]);
+    
+    pool->l = 0;
+    // i and m should be kept for future use
+    pool->start = 0;
+    pool->end = 0;
+    pool->rid = -1;
+}
 static int hgvs_fill_memory(struct refgene_options *opts, bcf1_t *line)
 {
     // get the chromosome id in tabix indexed genepred database
@@ -435,10 +447,13 @@ static int hgvs_fill_memory(struct refgene_options *opts, bcf1_t *line)
     // no chromosome found, return 1
     if (id == -1)
 	return 1;    
-
-    int32_t end = bcf_calend(line);    
-    hts_itr_t *itr = tbx_itr_queryi(opts->genepred_idx, id, line->pos+1, end);
     struct genepred_memory *pool = &opts->buffer;
+    int32_t end = bcf_calend(line);
+    if (pool->rid == id && line->pos+1 >= pool->start && end <= pool->end)
+    	return 0;
+    hgvs_memory_clear(pool);
+    hts_itr_t *itr = tbx_itr_queryi(opts->genepred_idx, id, line->pos+1, end);
+
     kstring_t string = KSTRING_INIT;
     
     while ( tbx_itr_next(opts->fp, opts->genepred_idx, itr, &string) >= 0) {
@@ -451,18 +466,6 @@ static int hgvs_fill_memory(struct refgene_options *opts, bcf1_t *line)
     tbx_itr_destroy(itr);
     update_mempool(pool);
     return 0;
-}
-static void hgvs_memory_clear(struct genepred_memory *pool)
-{
-    int i;
-    for ( i = 0; i < pool->i; ++i)
-	genepred_line_clear(&pool->a[i]);
-    
-    pool->l = 0;
-    // i and m should be kept for future use
-    pool->start = 0;
-    pool->end = 0;
-    pool->rid = -1;
 }
 static void namehash_destroy(void *_hash)
 {
@@ -867,8 +870,8 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
 static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct hgvs_core *c)
 {
     if (des->start > line->txend || des->end < line->txstart)
-	error("Variants is not in this transcript. des->start: %u, des->end: %d, genepred_line: %s\t%s\t%u\t%u",
-	      des->start, des->end, line->chrom, line->txstart, line->txend);
+	return 1;
+    // error("Variants is not in this transcript. des->start: %u, des->end: %d, genepred_line: %s\t%u\t%u", des->start, des->end, line->chrom, line->txstart, line->txend);
     // clear hgvs_core memory before init
     hgvs_core_clear(c);
     
@@ -985,7 +988,7 @@ static void name_list_push(struct name_list *names, char *name)
 // genepred_memory        cached memory pool for gene predictions records
 // line        input variant record in bcf1_t format
 // hgvs_cache will init or update in this function
-static void generate_hgvs(struct refgene_options *opts, const bcf1_t *line)
+static void generate_hgvs(struct refgene_options *opts, bcf1_t *line)
 {
     struct genepred_memory *buffer = &opts->buffer;
     struct hgvs_cache *cache = &opts->cache;
@@ -1135,13 +1138,11 @@ int hgvs_names_init(struct refgene_options *opts, bcf1_t *line)
     struct hgvs_cache *cache = &opts->cache;
     // check the hgvs names inited already ?
     hgvs_cache_clear(cache);
-    // check the buffer is filled or not
-
     // fill memory pool, only if no transcriptc cover this variant return 1, else return 0
     if ( hgvs_fill_memory(opts, line) != 0 )
-	return 1;
-    //
-    generate_hgvs(line, opts);
+	return 1;    
+
+    generate_hgvs(opts, line);
     
     return 0;
 }
@@ -1162,7 +1163,7 @@ int anno_refgene_core(bcf1_t *line, struct refgene_options *opts)
     int i;
     for ( i = 0; i < opts->n_cols; ++i ) {
 	struct anno_col *col = &opts->cols[i];
-	col->setter->hgvs(opts, line, col);
+	col->setter.hgvs(opts, line, col);
     }
     // if success, return 0
     return 0;
@@ -1184,6 +1185,7 @@ int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_co
     uint32_t end = bcf_calend(line);
     // hgvs_names_init(opts, line);
     char *string = hgvs_get_names_string(&opts->cache, col->hdr_key);
+    debug_print("%s", string);
     setter_hgvs_string(opts->hdr_out, line, col->hdr_key, string);
     return 0;
 }
@@ -1191,11 +1193,14 @@ int hgvs_cols_prase(struct refgene_options *opts, const char *column)
 {
     kstring_t string = KSTRING_INIT;
     kputs(column, &string);
+    if (opts->hdr_out == NULL)
+	error("Usage error. opts->hdr_out header structure is not inited yet.");
     int nfields = 0;
     int *splits = ksplit(&string, ',', &nfields);
     opts->n_cols = nfields;
     opts->cols = (struct anno_col*)calloc(opts->n_cols, sizeof(struct anno_col));
     int i;
+
     for (i = 0; i < opts->n_cols; ++i ) {
 	struct anno_col *col = &opts->cols[i];
 	char *ss = string.s + splits[i];
@@ -1208,17 +1213,20 @@ int hgvs_cols_prase(struct refgene_options *opts, const char *column)
 	} else {
 	    col->replace = REPLACE_ALL;
 	}
-	col->hdr_key = strdup(ss);	
+	col->hdr_key = strdup(ss);
 	if ( strcmp(col->hdr_key, "Gene") == 0 ) {
-	    col->icol = hgvs_bcf_header_add_gene(opts->hdr_out);	    
+	    col->icol = hgvs_bcf_header_add_gene(opts->hdr_out);
 	} else if ( strcmp(col->hdr_key, "Transcript") == 0 ) {
 	    col->icol = hgvs_bcf_header_add_trans(opts->hdr_out);	    
 	} else if ( strcmp(col->hdr_key, "HGVSDNA") == 0 ) {
-	    col->icol = hgvs_bcf_header_add_hgvs(opts->hdr_out);
+	    col->icol = hgvs_bcf_header_add_hgvsdna(opts->hdr_out);
 	} else {
 	    error("Failed to prase column tag %s", col->hdr_key);
 	}
 	col->number =  bcf_hdr_id2length(opts->hdr_out, BCF_HL_INFO, col->icol);
+
+	col->setter.hgvs = setter_hgvs_names;
+
     }
     return 0;
 }
@@ -1255,31 +1263,34 @@ int usage(int argc, char **argv)
 }
 const char *hts_bcf_wmode(int file_type)
 {
-    if ( file_type == FT_BCF ) return "wbu";    // uncompressed BCF
-    if ( file_type & FT_BCF ) return "wb";      // compressed BCF
-    if ( file_type & FT_GZ ) return "wz";       // compressed VCF
+    if ( file_type == FT_BCF )
+	return "wbu";    // uncompressed BCF
+    if ( file_type & FT_BCF )
+	return "wb";      // compressed BCF
+    if ( file_type & FT_GZ )
+	return "wz";       // compressed VCF
     return "w";                                 // uncompressed VCF
 }
 
 int main(int argc, char **argv)
 {
     int i;
-    const char *out_type = 0;
+    const char *out_type_string = 0;
     const char *out_fname = 0;
+    const char *input_fname = 0;
     const char *columns = "Gene,Transcript,HGVSDNA";
-    for (i = 1; i< argc;) {
+    for ( i = 1; i< argc; ) {
 	const char *a = argv[i++];
 	if (strcmp(a, "-h") == 0) 
 	    return usage(argc, argv);
-
 	const char **arg_var = 0;
-	if (strcmp(a, "-o") == 0 && optsout_file == 0)
+	if (strcmp(a, "-o") == 0 && out_fname == 0)
 	    arg_var = &out_fname;
-	else if (strcmp(a, "-O") == 0 && args.out_type == 0)
-	    arg_var = &out_type;
-	else if (strcmp(a, "-data") == 0 && args.genepred_file == 0)
+	else if (strcmp(a, "-O") == 0 && out_type_string == 0)
+	    arg_var = &out_type_string;
+	else if (strcmp(a, "-data") == 0 && opts.genepred_fname == 0)
 	    arg_var = &opts.genepred_fname;
-	else if (strcmp(a, "-refseq") == 0 && args.refseq_file == 0)
+	else if (strcmp(a, "-refseq") == 0 && opts.refseq_fname == 0)
 	    arg_var = &opts.refseq_fname;
 
 	if (arg_var != 0) {
@@ -1302,12 +1313,9 @@ int main(int argc, char **argv)
     if (input_fname == 0)
 	error("No input file ! Use -h for more informations.");
  
-    if (opts.genepred_file == 0)
-	error("Reasons :\n"
-	      "-data gene preditions database is needed.\n"
-	      "You could download refGene.txt.gz or ensGene.txt.gz from UCSC websites and sort and indexed by tabix.");
+    if (opts.genepred_fname == 0)
+	error("Gene preditions database is needed. Download refGene.txt.gz or ensGene.txt.gz from UCSC websites and sort and indexed by tabix.");
 
-    hgvs_cols_prase(&opts, columns);
     opts.fp = hts_open(opts.genepred_fname, "r");
     if (opts.fp == NULL)
 	error("Failed to open %s", opts.genepred_fname);
@@ -1318,12 +1326,15 @@ int main(int argc, char **argv)
     htsFile *fp = hts_open(input_fname, "r");
     if (fp == NULL)
 	error("Failed to open %s.", input_fname);
+
+    // check input type is VCF/BCF or not
     htsFormat type = *hts_get_format(fp);
     if (type.format  != vcf && type.format != bcf)
 	error("Unsupported input format! %s", input_fname);
+
     int out_type = FT_VCF;
-    if (out_type != 0) {
-	switch (args.out_type[0]) {
+    if (out_type_string != 0) {
+	switch (out_type_string[0]) {
 	    case 'b':
 		out_type = FT_BCF_GZ; break;
 	    case 'u':
@@ -1344,28 +1355,25 @@ int main(int argc, char **argv)
     // duplicate header file and sync new tag in the output header .
     // assuming output is stdout in Vcf format in default. 
     htsFile *fout = out_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(out_fname, hts_bcf_wmode(out_type));
-    opts.hdr_out = bcf_hdr_dup(hdr); 
-
-    hgvs_bcf_header_add_trans(hdr);
-    hgvs_bcf_header_add_dna(hdr);
-#ifndef DEBUG_MODE   
-    bcf_hdr_write(args.fout, hdr_out);
-#endif
-    set_format_genepred();
+    opts.hdr_out = bcf_hdr_dup(hdr);
+    set_format_refgene();
+    // prase configure columns
+    hgvs_cols_prase(&opts, columns);   
+    bcf_hdr_write(fout, opts.hdr_out);    
     // init gene_pred or refgene database, hold tabix index cache and faidx cache in memory 
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {     
 	anno_refgene_core(line, &opts);
 #ifndef DEBUG_MODE   
-	bcf_write1(fout, hdr_out, line);
+	bcf_write1(fout, opts.hdr_out, line);
 #endif
     }
     LOG_print("Clear ...");
-    hts_close(opts.genepred_idx);
     bcf_destroy(line);
     bcf_hdr_destroy(hdr);
-    bcf_hdr_destroy(hdr_out);
+    bcf_hdr_destroy(opts.hdr_out);
     refgene_opts_destroy(&opts);
+
     double c1 = get_time();
     fprintf(stderr, "Run time: %.2fs\n", c1 -c0);
     return 0;

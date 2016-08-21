@@ -222,7 +222,7 @@ struct refgene_options {
 extern int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_col *col);
 extern int anno_refgene_core(bcf1_t *line, struct refgene_options *opts);
 extern int hgvs_bcf_header_add_gene(bcf_hdr_t *hdr);
-extern int hgvs_bcf_header_add_dna(bcf_hdr_t *hdr);
+extern int hgvs_bcf_header_add_hgvsdna(bcf_hdr_t *hdr);
 extern int hgvs_bcf_header_add_trans(bcf_hdr_t *hdr);
 extern void set_format_refgene();
 extern void set_format_genepred();

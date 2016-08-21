@@ -44,6 +44,8 @@ struct anno_line {
     int rid, start, end;
 };
 
+struct anno_col;
+
 typedef int (*setter_vcf)(struct vcfs_options *, bcf1_t *, struct anno_col *, void *);
 typedef int (*setter_hgvs)(struct refgene_options *, bcf1_t *, struct anno_col *);
 typedef int (*setter_bed)(struct beds_options *, bcf1_t *);
@@ -57,7 +59,7 @@ typedef union {
 struct anno_col {
     int icol, replace, number;  // number: one of BCF_VL_* types
     char *hdr_key;
-    setter_func *setter;
+    setter_func setter;
     //int (*setter)(struct vcfs_options *, bcf1_t *, struct anno_col *, void*);
 };
 
