@@ -204,7 +204,6 @@ static void genepred_prase_core(kstring_t *string, struct genepred_line *line)
     // and exon_offset_pair[] by exoncount 
     char *ss = string->s + splits[type->exonstarts];
     char *se = string->s + splits[type->exonends];
-    
     line->exons = (struct exon_pair*)calloc(line->exoncount, sizeof(struct exon_pair));
     line->dna_ref_offsets = (struct exon_offset_pair*)calloc(line->exoncount, sizeof(struct exon_offset_pair));
     free(splits);
@@ -224,6 +223,7 @@ static void genepred_prase_core(kstring_t *string, struct genepred_line *line)
 	line->exons[i].end = atoi(se);	
 	se = ++se1; // skip ','
     }
+    // make sure the genepred_line is filled
     line->clear = 0;
 }
 void genepred_line_praser(kstring_t *string, struct genepred_line *line)
@@ -407,7 +407,8 @@ static void push_mempool(struct genepred_memory *pool, kstring_t *str)
     }
     // i should always greater than l. if i == l increase i to init a new line for future use. go abort if i < l
     if (pool->i == pool->l) {
-	pool->a[pool->i++].clear = -1;
+      memset(&pool->a[pool->i], 0, sizeof(struct genepred_line));
+      pool->a[pool->i++].clear = 1;
     }
     // the prase func must return a point or go abort
     genepred_line_praser(str, &pool->a[pool->l]);
@@ -488,6 +489,8 @@ void refgene_opts_destroy(struct refgene_options *opt)
 	namehash_destroy(opt->genehash);
     if ( opt->screen_by_transcripts == 1 )
 	namehash_destroy(opt->transhash);
+    hgvs_memory_clear(&opt->buffer);
+    hgvs_cache_clear(&opt->cache);
 }
 static void hgvs_des_destory(struct hgvs_des *des)
 {
@@ -1185,8 +1188,9 @@ int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_co
     uint32_t end = bcf_calend(line);
     // hgvs_names_init(opts, line);
     char *string = hgvs_get_names_string(&opts->cache, col->hdr_key);
-    debug_print("%s", string);
+    // debug_print("%s", string);
     setter_hgvs_string(opts->hdr_out, line, col->hdr_key, string);
+    if (string ) free(string);
     return 0;
 }
 int hgvs_cols_prase(struct refgene_options *opts, const char *column)
@@ -1197,6 +1201,7 @@ int hgvs_cols_prase(struct refgene_options *opts, const char *column)
 	error("Usage error. opts->hdr_out header structure is not inited yet.");
     int nfields = 0;
     int *splits = ksplit(&string, ',', &nfields);
+    if (nfields == 0) return 1;
     opts->n_cols = nfields;
     opts->cols = (struct anno_col*)calloc(opts->n_cols, sizeof(struct anno_col));
     int i;
@@ -1228,6 +1233,8 @@ int hgvs_cols_prase(struct refgene_options *opts, const char *column)
 	col->setter.hgvs = setter_hgvs_names;
 
     }
+    free(string.s);
+    free(splits);
     return 0;
 }
 
@@ -1356,7 +1363,7 @@ int main(int argc, char **argv)
     // assuming output is stdout in Vcf format in default. 
     htsFile *fout = out_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(out_fname, hts_bcf_wmode(out_type));
     opts.hdr_out = bcf_hdr_dup(hdr);
-    set_format_refgene();
+    set_format_genepred();
     // prase configure columns
     hgvs_cols_prase(&opts, columns);   
     bcf_hdr_write(fout, opts.hdr_out);    
@@ -1373,7 +1380,8 @@ int main(int argc, char **argv)
     bcf_hdr_destroy(hdr);
     bcf_hdr_destroy(opts.hdr_out);
     refgene_opts_destroy(&opts);
-
+    hts_close(fp);
+    hts_close(fout);
     double c1 = get_time();
     fprintf(stderr, "Run time: %.2fs\n", c1 -c0);
     return 0;
