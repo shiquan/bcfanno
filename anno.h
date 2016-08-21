@@ -19,6 +19,7 @@
 #include "plugin.h"
 #include "config.h"
 
+#define KSTRING_INIT {0, 0, 0}
 
 // vcfanno is designed to annotate vcf files by retrieving tags from different databases. For now, vcfanno only
 // accept three different format of databases.
@@ -62,7 +63,7 @@ struct anno_col {
 
 typedef void (* rel_func)(void*);
 
-extern void safe_release(void * p, rel_func func);
+extern void safe_release(void *p, rel_func func);
 
 // regions struct for update pre-index cache
 struct region1 {
@@ -95,7 +96,6 @@ struct sql_connect {
     int start, end;
     int prev_seq, prev_start;
 };
-
 
 #define REPLACE_MISSING  0 // replace only missing values
 #define REPLACE_ALL      1 // replace both missing and existing values

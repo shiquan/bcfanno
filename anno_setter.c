@@ -1,7 +1,6 @@
 #include "anno.h"
 #include "vcmp.h"
 #include "plugin.h"
-//#include "hgvs.h"
 
 // only if annotation database is VCF/BCF file, header_in has values or else header_in == NULL
 anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)

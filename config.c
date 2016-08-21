@@ -12,14 +12,6 @@ struct configs anno_config_file = ANNOCONFIG_INIT;
 /* annotate with HGVS* tags */
 int has_hgvs = 0;
 
-/* #define ignore_free(x) do                       \ */
-/*     {                                           \ */
-/*         if (x!= NULL) { \ */
-/* 	    free((void*)x);			\ */
-/* 	}\ */
-/* 	x = NULL;				\ */
-/*     } while(0) */
-
 void safe_release(void *p, rel_func func)
 {
     check_double_free(p);

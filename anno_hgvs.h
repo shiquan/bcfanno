@@ -71,15 +71,16 @@ enum func_region_type {
     func_region_intergenic,
 };
 //  hgvs_core keeps transcript/protein name, the format of hgvs name is construct by
-//                                    l_name   l_type
-//                                    |        |
-//  [transcript|protein|gene|ensemble]:"prefix".postion...
+//                                    l_name   l_name2  l_type
+//                                    |        |        |
+//  [transcript|protein|gene|ensemble](gene_id):"prefix".postion...
 //
 //  l_name          l_type
 //  |               |
 //  [chrom]:"prefix".postion...
 struct hgvs_core {    
-    uint16_t l_name; // name offset in the data cahce, for chrom l_name == 0;
+    uint16_t l_name; // name offset in the data cache, for chrom l_name == 0;
+    uint16_t l_name2; // name2 offset in data cache, if no name2, l_name2 should be 0
     uint16_t l_type; // the byte after type offset, usually offset of '.'
     kstring_t str;
     enum func_region_type type;
@@ -97,9 +98,9 @@ struct hgvs_cache {
     int l, m, i; // l == n_allele -1
     struct hgvs *a;
 };
-
+#define HGVS_CACHE_INIT { 0, 0, 0, 0 }
 // HGVS nomenclature : 
-// DNA recommandations *
+// DNA recommandations 
 // - substitution variant, 
 // Format: “prefix”“position_substituted”“reference_nucleoride””>”new_nucleoride”, e.g. g.123A>G
 // - deletion variant, 
@@ -154,16 +155,16 @@ struct hgvs_des {
 };
 
 // Refgene gene names, transcript names, HGVS names generate
-struct genepred_memory_pool {
+struct genepred_memory {
     int rid;
     uint32_t start;
     uint32_t end;
     // l for used length, m for max length, i for inited length
     int l, m, i;
     struct genepred_line *a;
-    struct hgvs_cache cache;
 };
 
+#define GENEPRED_MEMORY_INIT {.rid = -1, .start = 0, .end = 0, .l = 0, .m = 0, .i = 0, .a = 0 }
 
 // map each column right for each format.
 // in default refgene have one more `bin` column in the first column than genepred format
@@ -198,6 +199,8 @@ struct refgene_options {
     int check_refseq;
     // faidx of refseq
     faidx_t *refseq_fai;
+    // alias to hdr point
+    bcf_hdr_t *hdr_out;
     // transcripts list for screening datasets    
     const char *trans_list_fname;
     // gene list for screening datasets
@@ -206,12 +209,22 @@ struct refgene_options {
     int screen_by_transcripts;
     void *genehash;
     void *transhash;
+    char *columns;
+    int n_cols;
+    struct anno_col *cols;
     // memory pool
     struct genepred_memory buffer;
+    struct hgvs_cache cache;
 };
 
 // generate hgvs name
 // for col keys, must be one of HGVSDNA, Gene, Transcript
 extern int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_col *col);
-
+extern int anno_refgene_core(bcf1_t *line, struct refgene_options *opts);
+extern int hgvs_bcf_header_add_gene(bcf_hdr_t *hdr);
+extern int hgvs_bcf_header_add_dna(bcf_hdr_t *hdr);
+extern int hgvs_bcf_header_add_trans(bcf_hdr_t *hdr);
+extern void set_format_refgene();
+extern void set_format_genepred();
+extern void refgene_opts_destroy(struct refgene_options *opts);
 #endif

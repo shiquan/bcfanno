@@ -146,21 +146,6 @@ bcf1_t *anno_core(bcf1_t *line)
     // annotate bed format datasets
     anno_beddata_core(line, &args.bed_opts);
     return line;
-    
-    /* int i, j; */
-    /* for (i=0; i < hand.vcf_cols->n; ++i) { */
-    /* 	hand.ti = i; */
-    /* 	if ( bcf_sr_has_line(hand.files, hand.ti) ) { */
-    /* 	    bcf1_t *aline = bcf_sr_get_line(hand.files, hand.ti); */
-    /* 	    struct annot_cols *cols = &hand.vcf_cols->vcols[i]; */
-    /* 	    for (j=0; j<cols->ncols; ++j) { */
-    /* 		annot_col_t *col = &cols->cols[j]; */
-    /* 		if ( col->setter(&hand, line, col, aline) )  */
-    /* 		    warnings("failed to annotate %s at %s:%d",col->hdr_key, bcf_seqname(hand.hdr, line), line->pos+1); */
-    /* 	    } */
-    /* 	} */
-    /* } */
-    /* return line; */
 }
 
 #include <getopt.h>
