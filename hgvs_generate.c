@@ -212,13 +212,13 @@ static void genepred_prase_core(kstring_t *string, struct genepred_line *line)
     for ( i = 0; i < line->exoncount; ++i ) {
 	// start
 	ss1 = ss;
-	while(*ss1 && *ss1 != ',') ss1++;
+	while (*ss1 && *ss1 != ',') ss1++;
 	ss1[0] = '\0';
 	line->exons[i].start = atoi(ss);
 	ss = ++ss1; // skip ','
 	// end
 	se1 = se;
-	while(*se && *se1 != ',') se1++;
+	while (*se && *se1 != ',') se1++;
 	se1[0] = '\0';
 	line->exons[i].end = atoi(se);	
 	se = ++se1; // skip ','
@@ -894,6 +894,7 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
 	kputc('(', string);
 	kputs(name2, string);
 	kputc(')', string);
+	c->l_name2 = string->l;
     }
     if (c->l_name == 0) 
 	error ("Failed to prase genepred database. %s\t%u\t%u", line->chrom, line->txstart, line->txend);
@@ -914,9 +915,11 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
     
     // put offsets into string
     c->l_type = string->l -1;
-    copy_seqs_func func = line->strand == '+' ? strndup : rev_seqs;
-    char *ref = des->ref_length == 0 ? NULL : func(des->ref, des->ref_length);
-    char *alt = des->alt_length == 0 ? NULL : func(des->alt, des->alt_length);
+
+
+    char *ref = strndup(des->ref, des->ref_length);
+    char *alt = strndup(des->alt, des->alt_length);
+
     int is_coding1;
     if (des->type == var_type_snp) {
 	ksprintf(string, "%s>%s", ref, alt);
@@ -963,7 +966,7 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
     }
     
 #ifdef DEBUG_MODE
-    debug_print("%d : %s", des->start,string->s);
+    debug_print("%d : %s", des->start, string->s);
 #endif
     free(pos1);
     // it is valid
@@ -1042,7 +1045,9 @@ static void generate_hgvs(struct refgene_options *opts, bcf1_t *line)
 	    // check strand of transcript and reverse the description if it is minus strand
 	    hgvs_des_reverse(des, gl->strand);
 	    // generate hgvs name core
-	    generate_hgvs_core(gl, des, core);	    
+	    if ( generate_hgvs_core(gl, des, core) != 0)
+		continue;
+	    name->l++;
 	}
 	// destroy hgvs descriptions structure
 	hgvs_des_destory(des);
@@ -1089,8 +1094,8 @@ static char *generate_transcript_string(struct hgvs_cache *cache)
 	struct hgvs *name = &cache->a[i];
 	for ( j = 0; j < name->l; ++j ) {
 	    struct hgvs_core *core = &name->a[j];
-	    if (core->l_name)
-		kputsn(core->str.s, core->l_name-1, &str);
+	    if ( core->l_name )
+		kputsn(core->str.s, core->l_name, &str);
 	    else
 		kputc('.', &str);
 	    kputc('|', &str);
@@ -1101,7 +1106,7 @@ static char *generate_transcript_string(struct hgvs_cache *cache)
 static char *generate_hgvsvarnomen_string(struct hgvs_cache *cache)
 {
     kstring_t str = KSTRING_INIT;
-    int i, j;    
+    int i, j;
     for ( i = 0; i < cache->l; ++i ) {
 	if ( i )
 	    kputc(',', &str);
@@ -1129,7 +1134,7 @@ static char *get_gene_string(struct hgvs_cache *cache)
 	    if (core->l_name  && core->l_name2 > 0) {
 		kstring_t *string = &core->str;
 		assert(string->s[core->l_name]  == '(');
-		kputsn(string->s + core->l_name + 1, core->l_name2 - core->l_name -1, &str);
+		kputsn(string->s + core->l_name + 1, core->l_name2 - core->l_name -2, &str);
 		return str.s;
 	    }
 	}
@@ -1153,8 +1158,8 @@ int hgvs_names_init(struct refgene_options *opts, bcf1_t *line)
 int anno_refgene_core(struct refgene_options *opts, bcf1_t *line)
 {
     // if refgene options not inited, skip all the next steps
-    if (opts->refgene_is_inited == 0)
-	return 1;
+    // if (opts->refgene_is_inited == 0)
+    // return 1;
     // retrieve the regions this variants located first, check the memory pool and update the pool if the regions is out of
     // cached positions. just skip if the variant type of line is a ref.    
     if ( line->pos < 0 )
@@ -1188,15 +1193,16 @@ static char *hgvs_get_names_string(struct hgvs_cache *cache, const char *key)
 }
 int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_col *col)
 {
-    uint32_t end = bcf_calend(line);
+    // uint32_t end = bcf_calend(line);
     // hgvs_names_init(opts, line);
     char *string = hgvs_get_names_string(&opts->cache, col->hdr_key);
     // debug_print("%s", string);
     setter_hgvs_string(opts->hdr_out, line, col->hdr_key, string);
-    if (string ) free(string);
+    if ( string )
+	free(string);
     return 0;
 }
-int refgene_column_prase(struct refgene_options *opts, const char *column)
+int refgene_column_prase(struct refgene_options *opts, char *column)
 {
     kstring_t string = KSTRING_INIT;
     kputs(column, &string);
@@ -1238,6 +1244,30 @@ int refgene_column_prase(struct refgene_options *opts, const char *column)
     }
     free(string.s);
     free(splits);
+    return 0;
+}
+int refgene_set_refseq_fname(struct refgene_options *opts, char *fname)
+{
+    const char **var = &opts->refseq_fname;
+    *var = fname;
+    return 0;
+}
+int refgene_set_refgene_fname(struct refgene_options *opts, char *fname)
+{
+    const char **var = &opts->genepred_fname;
+    *var = fname;
+    return 0;
+}
+int refgene_set_trans_fname(struct refgene_options *opts, char *fname)
+{
+    const char **var = &opts->trans_list_fname;
+    *var = fname;
+    return 0;
+}
+int refgene_set_genes_fname(struct refgene_options *opts, char *fname)
+{
+    const char **var = &opts->genes_list_fname;
+    *var = fname;
     return 0;
 }
 
@@ -1368,7 +1398,7 @@ int main(int argc, char **argv)
     opts.hdr_out = bcf_hdr_dup(hdr);
     set_format_genepred();
     // prase configure columns
-    refgene_column_prase(&opts, columns);   
+    refgene_column_prase(&opts, (char*)columns);   
     bcf_hdr_write(fout, opts.hdr_out);    
     // init gene_pred or refgene database, hold tabix index cache and faidx cache in memory 
     bcf1_t *line = bcf_init();

@@ -1,319 +1,289 @@
-/*  load configure file and check the apis */
-//#include "cache.h"
-//#include "variant_names.h"
-#include "anno.h"
-#include "config.h"
+// prase configure file in JSON format
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <htslib/kstring.h>
 #include "kson.h"
-//#include "anno_setter.h"
-//#include <htslib/vcf.h>
+#include "config.h"
+#include "utils.h"
 
-struct configs anno_config_file = ANNOCONFIG_INIT;
+#ifndef KSTRING_INIT
+#define KSTRING_INIT { 0, 0, 0}
+#endif
 
-/* annotate with HGVS* tags */
-int has_hgvs = 0;
+struct vcfanno_config temp_config_init = {
+    .author = 0,
+    .config_id = 0,
+    .reference_version = 0,
+    .vcfs = { 0, 0 },
+    .beds = { 0, 0 },
+    .refgene = { 0, 0, 0, 0, 0, 0 },
+};
 
-void safe_release(void *p, rel_func func)
+struct vcfanno_config *vcfanno_config_init()
 {
-    check_double_free(p);
-    func(p);
-    ignore_free(p);
+    struct vcfanno_config *config = (struct vcfanno_config*)malloc(sizeof(struct vcfanno_config));
+    memset(config, 0, sizeof(struct vcfanno_config));
+    return config;
 }
-static void config_hgvs_release()
-{
-    if ( anno_config_file.anno == NULL ) return;
-    ignore_free( anno_config_file.anno->refgene_file_path);
-    ignore_free( anno_config_file.anno->transcripts_list);
-    ignore_free( anno_config_file.anno->genes_list);
-    ignore_free( anno_config_file.anno->columns);
-    ignore_free( anno_config_file.anno);
-}
-static void config_summary_release(void *_summary)
-{
-    struct summary * summary = (struct summary*)( _summary);
-    ignore_free(summary->name);
-    ignore_free(summary->version);
-    ignore_free(summary->author);
-    ignore_free(summary->ref_version);
-    ignore_free(summary->path);
-}
-static void config_api_release(void *_api)
-{
-    struct vcf_sql_api *api = (struct vcf_sql_api *)_api;
-    if ( api != NULL ) {
-        ignore_free(api->vfile);
-        ignore_free(api->dynlib);
-        ignore_free(api->columns);
-        if ( api->has_summary ) {
-	    safe_release(api->summary, config_summary_release);
-        }
-    }
-}
-void config_release()
-{
-    ignore_free( anno_config_file.path_string);
-    config_hgvs_release();
-    //config_summary_release(anno_config_file.summary);
-    safe_release((void*)anno_config_file.summary,config_summary_release);
 
+void vcfanno_config_destroy(struct vcfanno_config *config)
+{
+    if ( config->author )
+	free (config->author );
+    if ( config->config_id )
+	free (config->config_id );
+    if ( config->reference_version )
+	free (config->reference_version);
     int i;
-
-    for (i = 0; i< anno_config_file.n_apis; ++i) {
-        config_api_release(&anno_config_file.apis[i]);
+    for (i = 0; i < config->vcfs.n_vcfs; ++i ) {
+	free(config->vcfs.files[i].fname);
+	free(config->vcfs.files[i].columns);
     }
-    ignore_free(anno_config_file.apis);
+    if ( i )
+	free(config->vcfs.files);
+    for (i = 0; i < config->beds.n_beds; ++i ) {
+	free(config->beds.files[i].fname);
+	if (config->beds.files[i].columns)
+	    free(config->beds.files[i].columns);
+    }
+    if ( i )
+	free(config->beds.files);
+    free(config);    
 }
 
-static char *skip_comments(const char *json_file)
+static char *skip_comments(const char *json_fname)
 {
     FILE *fp;
-    fp = fopen(json_file, "rb");
-    if ( fp == NULL ) {
-	clear_errno();
-        return NULL;
-    }
-    char *json = NULL;
-    int temp, len=0, max=0;
-    int i, j;
-    char buf[LINE_CACHE];
-    while ((temp=fread(buf, 1, LINE_CACHE, fp)) != 0 )
-    {
-        if ( len + temp + 1 > max ) {
-            max = len + temp + 1;
-            kroundup32(max);
-            json = (char*)realloc(json, max);
-        }
-        memcpy(json+len, buf, temp);
-        len += temp;
-    }
-    fclose(fp);
-    check_mem(json);
-    json[len]='\0';
-    for ( i=0; i<len-1; ++i )
-    {
-        if ( json[i]=='/' && json[i+1]=='/' ) {
-	    for (j=i+2; j<len && json[j]!='\n'; ++j);
-	    for (;i<j; ++i) json[i] = '\0';
-        }
-    }
+    fp = fopen(json_fname, "rb");
+    if ( fp == NULL ) 
+	error("Failed to open %s.", json_fname);
 
-    for ( i=j=0; i<len; ++i,++j )
-    {
-	for (;json[i] == '\0' || json[i] == '\t'|| json[i] == ' '; i++);
-	json[j] = json[i];
+    int temp;
+    kstring_t string = KSTRING_INIT;
+    char buf[1024];
+    while ( (temp = fread(buf, 1, 1024, fp) ) != 0 ) 
+	kputsn(buf, temp, &string);
+    fclose(fp);
+
+    int i, j;
+    char *json = string.s;
+    for ( i = 0, j = 0; i < string.l && j < string.l; ++i, ++j ) {
+        if ( json[i] == '/' && i < string.l -1 && json[i+1]=='/' ) {
+	    for ( j = i + 2; j < string.l && json[j] != '\n'; ++j);
+        }
+	json[i] = json[j];
     }
-    for (; j<len; ++j)
-	json[j] = '\0';
-    for ( i=j=0; i<len; ++i,++j )
-    {
-    	for (;json[i] == '\n' && i+1<len && json[i+1] == '\n'; i++);
-	json[j] = json[i];
-    }
-    len = j+1;
-    memset(json+len, 0, max-len);
+    json[i] = '\0';
+    string.l = i;
     return json;
 }
 
-static enum anno_type check_anno_type (char const *str)
+static int load_config_core(struct vcfanno_config *config, kson_t *json)
 {
-    if (!strcmp(str, "vcf")) {
-        return anno_is_vcf;
-    } else if (!strcmp(str, "sql")) {
-        return anno_is_sql;
-    } else {
-        return anno_is_unknown;
-    }
-}
-
-static int load_readers(const kson_t *s)
-{
-    assert(anno_config_file.summary == NULL);
-    anno_config_file.summary = (struct summary*)malloc(sizeof(struct summary));
-    anno_config_file.summary->author = NULL;
-    anno_config_file.summary->name = NULL;
-    anno_config_file.summary->version = NULL;
-    anno_config_file.summary->ref_version = NULL;
-    anno_config_file.summary->path = NULL;
-    check_mem(s);
-    const kson_node_t *root = s->root;
-    check_mem(root);
+    const kson_node_t *root = json->root;
+    if (root == NULL)
+	error("Format error. Root node is empty, check configure file.");
+#define BRANCH_INIT(_node) ( (_node)->v.str == NULL ? NULL : strdup((_node)->v.str) )
     int i;
-
-#define BRANCH(__node, __key, __hand, __func)	\
-	if ( __node ) {					\
-	    if (!strcmp((__node)->key, __key)) {	\
-		if ((__node)->v.str == NULL) {		\
-		    __hand = 0;				\
-		} else {				\
-		    __hand = __func((__node)->v.str);	\
-		}					\
-		continue;				\
-	    }						\
-	}
-
-    for (i = 0; i<root->n; ++i) {
-
+    for (i = 0; i < root->n; ++i ) {
 	const kson_node_t *node = kson_by_index(root, i);
-        if ( node == NULL) continue;
-	check_mem(node->key);
-        struct summary * const summary = anno_config_file.summary;
+	if ( node == NULL )
+	    continue;
+	if ( node->key == NULL) {
+	    warnings("Foramt error. Node key is empty. skip..");
+	    continue;
+	}
+	// the summary informations should in the top level
+	if ( strcmp(node->key, "Author") == 0 || strcmp(node->key, "author") == 0) {
+	    config->author = BRANCH_INIT(node);
+	} else if ( strcmp(node->key, "ID") == 0 || strcmp(node->key, "id") == 0) {
+	    config->config_id = BRANCH_INIT(node);
+	} else if ( strcmp(node->key, "ref") == 0 || strcmp(node->key, "reference") == 0) {
+	    config->reference_version = BRANCH_INIT(node);
+	} else if ( strcmp(node->key, "HGVS") == 0 || strcmp(node->key, "hgvs") == 0) {
+	    if ( node->type != KSON_TYPE_BRACE)
+		error("Format error. Configure for HGVS format should looks like :\n"
+		      "\"hgvs\":{\n \"gene_data\":\"genepred.txt.gz\",\n}"
+		    );
+	    struct refgene_config *refgene_config = &config->refgene;
+	    int j;
+	    for (j = 0; j < node->n; ++j) {
+		const kson_node_t *node1 = kson_by_index(node, j);
+		if (node1 == NULL)
+		    error("Format error. HGVS node is empty, check configure file.");
 
-        BRANCH(node, "threads", anno_config_file.n_theads, atoi);
-        BRANCH(node, "author", summary->author, strdup);
-        BRANCH(node, "id", summary->name, strdup);
-        BRANCH(node, "ref", summary->ref_version, strdup);		
-	BRANCH(node, "version", summary->version, strdup);
-	
-        if (!strcmp(node->key, "hgvs")) {
-	    if (node->type != KSON_TYPE_BRACE) {
-		error("Wrong format! hgvs configure should looks like this: hgvs:{}\n");
+		if ( strcmp(node1->key, "gene_data") == 0 || strcmp(node1->key, "refgene") == 0)
+		    refgene_config->genepred_fname = BRANCH_INIT(node1);
+		else if ( strcmp(node1->key, "refseq") == 0 )
+		    refgene_config->refseq_fname = BRANCH_INIT(node1);
+		else if ( strcmp(node1->key, "transcripts_list") == 0 || strcmp(node1->key, "trans_list") == 0 )
+		    refgene_config->trans_list_fname = BRANCH_INIT(node1);
+		else if ( strcmp(node1->key, "genes_list") == 0 )
+		    refgene_config->gene_list_fname = BRANCH_INIT(node1);
+		else if ( strcmp(node1->key, "columns") == 0 || strcmp(node1->key, "column") == 0)
+		    refgene_config->columns = BRANCH_INIT(node1);
+		else
+		    warnings("Unknown key : %s. skip ..", node1->key);		
 	    }
-	    if (has_hgvs != 0) {
-		warnings("More than 1 hgvs configure! skip it ...");
+	    if ( refgene_config->columns == NULL || refgene_config->columns[0] == '\0' )
+		error("No columns specified in HGVS configure.");
+	    if ( refgene_config->genepred_fname == NULL || refgene_config->genepred_fname[0] == '\0' )
+		error("No gene_data specified in HGVS configure.");
+	    refgene_config->refgene_is_set = 1;
+	} else if ( strcmp(node->key, "vcfs") == 0) {
+	    if ( node->type != KSON_TYPE_BRACKET )
+		error("Format error, configure for vcf databases should looks like :\n"
+		      "\"vcfs\":[\n{\n\"file\":\"file.vcf.gz\",\"columns\":\"TAGS,TAGS\",\n},\n{},\n]"
+		    );
+	    if ( node->n == 0) {
+		warnings("Empty vcfs configure. Skip");
 		continue;
 	    }
-            has_hgvs = 1;
-            anno_config_file.anno = (struct anno_data_file*)malloc(sizeof(struct anno_data_file));
-            struct anno_data_file * const anno =  anno_config_file.anno;
-            anno->refgene_file_path = NULL;
-            anno->transcripts_list = NULL;
-            anno->genes_list = NULL;
-            //anno->intron_edge = DEFAULT_INTRON_EDGE;
-            anno->columns = NULL;
-
-            int i;
-            for (i = 0; i < node->n; ++i) {
-                const kson_node_t *node1 = kson_by_index(node, i);
-		if ( node1==NULL)
-		    error("empty HGVS configure !!");
-	
-                BRANCH(node1, "refgene", anno->refgene_file_path, strdup);
-                BRANCH(node1, "trans_list", anno->transcripts_list, strdup);
-                BRANCH(node1, "genes_list", anno->genes_list, strdup);
-                //BRANCH(node1, "intron_edge", anno->intron_edge, atoi);
-                BRANCH(node1, "columns", anno->columns, strdup);
-                warnings("%s is not a pre-defined element. skip it ..", node1->key);
-            }
-            if (anno->refgene_file_path == NULL) {
-                config_release();
-                error("Cannot find refgene file in the HGVS configure!");
-            }
-            if (anno->columns == NULL) {
-                warnings("Do you use a right configure file ?? No tags columns in HGVS configure, HGVS variants name will not be annotated.");
-                config_hgvs_release();
-            }
-            //continue; // only accept one node
-        } else if (!strcmp(node->key, "api")) {
-	    if (node->type != KSON_TYPE_BRACKET) {
-		error("Wrong format! api configure should looks like this: api:[{},{}]");
-	    }
-	    if (node->n == 0) {
-		warnings("empty apis");
-		continue;
-	    }
-            
-            anno_config_file.apis = (struct vcf_sql_api*)calloc(node->n, sizeof(struct vcf_sql_api));
-	    anno_config_file.n_apis = 0;
-
-	    long i, j;
-            for (i = 0; i < (long)node->n; ++i) {
-		const kson_node_t *node1 = node->v.child[i];
-                if ( node1==NULL) continue;
-		struct vcf_sql_api * const api = &anno_config_file.apis[anno_config_file.n_apis++];
-		for (j = 0; j < (long)node1->n; ++j) {
-		    //debug_print("n: %llu\ti:%ld\n", node1->n, j);
-		    const kson_node_t *node2 = kson_by_index(node1, j);
-		    BRANCH(node2, "type", api->type, check_anno_type);
-		    BRANCH(node2, "file", api->vfile, strdup);
-		    BRANCH(node2, "dynlib", api->dynlib, strdup);
-		    BRANCH(node2, "columns", api->columns, strdup);
-		    // summarys
-		    api->has_summary = 0;
-		    //warnings("[%s] %s is not a pre-defined element. skip it ..\n", __FUNCTION__, node2->key);
+	    struct vcfs_config *vcfs_config = &config->vcfs;
+	    vcfs_config->n_vcfs = (int)node->n;
+	    vcfs_config->files = (struct file_config*)malloc(vcfs_config->n_vcfs*sizeof(struct file_config));
+	    int n_files = 0;
+	    int j;
+	    for ( j = 0; j < (long)node->n; ++j ) {
+		const kson_node_t *node1 = node->v.child[j];
+		if ( node1 == NULL )
+		    continue;
+		int k;
+		struct file_config *file_config = &vcfs_config->files[n_files];
+		for ( k = 0; k < node1->n; ++k ) {
+		    const kson_node_t *node2 = kson_by_index(node1, k);
+		    if ( strcmp(node2->key, "file") == 0 )
+			file_config->fname = BRANCH_INIT(node2);
+		    else if ( strcmp(node2->key, "columns") == 0 )
+			file_config->columns = BRANCH_INIT(node2);
+		    else
+			warnings("Unknown key : %s. skip ..", node2->key);
 		}
-            }
-            //continue;
-        }
-        // filter fields
+		// if only set vcf file, go abort
+		if ( file_config->columns == NULL || file_config->columns[0] == '\0')
+		    error("No columns specified for vcf. %s", file_config->fname);
+		// if only set columns, skip it
+		if ( file_config->fname == NULL || file_config->fname[0] == '\0' ) {
+		    free(file_config->columns);
+		    file_config->columns = NULL;
+		    continue;
+		}		
+		n_files++;		
+	    }
+	    if (n_files == 0 && vcfs_config->n_vcfs)
+		free(vcfs_config->files);
+	    vcfs_config->n_vcfs = n_files;
+	} else if ( strcmp(node->key, "beds") == 0 ) {
+	    if ( node->type != KSON_TYPE_BRACKET )
+		error("Format error, configure for vcf databases should looks like :\n"
+		      "\"beds\":[\n{\n\"file\":\"file.bed.gz\",\"header\":\"TAGS,TAGS\",\n},\n{},\n]"
+		    );
+	    if ( node->n == 0) {
+		warnings("Empty beds configure. Skip ..");
+		continue;
+	    }
+	    struct beds_config *beds_config = &config->beds;
+	    beds_config->n_beds = (int)node->n;
+	    beds_config->files = (struct file_config*)malloc(beds_config->n_beds*sizeof(struct file_config));
+	    int n_files = 0;
+	    int j;
+	    for ( j = 0; j < (long)node->n; ++j ) {
+		const kson_node_t *node1 = node->v.child[j];
+		if ( node1 == NULL )
+		    continue;
+		int k;
+		struct file_config *file_config = &beds_config->files[n_files];
+		for ( k = 0; k < node1->n; ++k ) {
+		    const kson_node_t *node2 = kson_by_index(node1, k);
+		    if ( strcmp(node2->key, "file") == 0 )
+			file_config->fname = BRANCH_INIT(node2);
+		    else if ( strcmp(node2->key, "header") == 0 )
+			file_config->columns = BRANCH_INIT(node2);
+		    else
+			warnings("Unknown key : %s. skip ..", node1->key);
+		}
+		// if only set vcf file, check the header of bed file, description information keep in the header in default
+			    
+		// if only set columns, skip it
+		if ( file_config->columns && file_config->fname == NULL ) {
+		    free(file_config->columns);
+		    file_config->columns = NULL;
+		    continue;
+		}
+		n_files++;		
+	    }
+	    if ( n_files == 0 && beds_config->n_beds )
+		free(beds_config->files);
+	    beds_config->n_beds = n_files;	    
+	} else {
+	    warnings("Unknown key : %s. skip ..", node->key);
+	}
     }
-#undef BRANCH
-    // check all the api or file reachable
-    return 0;    
-}
-
-static void debug_configure_summary(struct summary *summary)
-{
-    check_mem(summary);
-    if ( summary->name != NULL )
-        printf ("[summary] name : %s\n", summary->name);
-    if ( summary->version != NULL)
-        printf ("[summary] version: %s\n", summary->version);
-    if ( summary->author != NULL)
-        printf ("[summary] author: %s\n", summary->author);
-    if ( summary->ref_version != NULL)
-        printf ("[summary] ref version: %s\n", summary->ref_version);
-}
-void debug_configure_file()
-{
-    int i;    
-    if ( anno_config_file.path_string )
-        printf("path string : %s\n", anno_config_file.path_string);
-    if ( anno_config_file.summary )
-	debug_configure_summary(anno_config_file.summary);
-    if ( anno_config_file.anno ) {
-	struct anno_data_file *anno = anno_config_file.anno;
-	//printf("[hgvs] intron edge: %u\n", anno->intron_edge);
-	if ( anno->refgene_file_path )
-	    printf("[hgvs] file path: %s\n", anno->refgene_file_path);
-	if ( anno->transcripts_list )
-	    printf("[hgvs] transcript list: %s\n", anno->transcripts_list);
-	if ( anno->genes_list )
-	    printf("[hgvs] genes list: %s\n", anno->genes_list);
-	if ( anno->columns )
-	    printf("[hgvs] columns: %s\n", anno->columns);
-    }
-    for (i=0; i<anno_config_file.n_apis; i++) {
-	struct vcf_sql_api *api = &anno_config_file.apis[i];
-	if (api->type == anno_is_vcf && api->vfile) {
-	    printf( "[api] api is VCF\n");
-	    printf( "[api] %s\n", api->vfile);
-	    printf( "[api] columns: %s\n", api->columns);
-	} else if ( api->type == anno_is_sql && api->dynlib) {
-	    printf( "[api] api is dynlib\n");
-	    printf( "[api] %s\n", api->dynlib);
-	    printf( "[api] columns: %s\n", api->columns);
-	} 
-    }
-}
-
-int load_config(const char *json_file)
-{
-    kson_t *kson = 0;
-    const char *json = skip_comments(json_file);
-    if (json==NULL) return 1;
-    anno_config_file.path_string = strdup(json_file);
-    kson = kson_parse(json);
-    safe_free(json);
-    if ( !kson )
-        error("Can not parse %s\n", json_file);
-    int n;
-    n= load_readers(kson);
-    if (n < 0) {
-	debug_print("Failed to load file from %s\n", json_file);
-    }
-    //debug_configure_file();
-    //config_release();
-    kson_destroy(kson);
+#undef BRANCH_INIT
     return 0;
 }
+
+int vcfanno_load_config(struct vcfanno_config *config, const char * config_fname)
+{
+    char *string = skip_comments(config_fname);
+    if (string == NULL)
+	error("Configure file is empty! %s", config_fname);
+
+    kson_t *json = NULL;
+    json = kson_parse(string);
+    free(string);
+    if ( load_config_core(config, json) == 1 )
+	return 1;
+    kson_destroy(json);
+    return 0;
+}
+
+int vcfanno_config_debug(struct vcfanno_config *config)
+{
+    int i;
+    LOG_print("author : %s", config->author == NULL ? "Unknown" : config->author);
+    LOG_print("config file ID : %s", config->config_id == NULL ? "not set" : config->config_id);
+    LOG_print("reference sequence : %s", config->reference_version == NULL ? "Unknown" : config->reference_version);    
+
+    if ( config->refgene.refgene_is_set == 1) {
+	struct refgene_config *refgene = &config->refgene;	
+	LOG_print("[refgene] gene_data : %s", refgene->genepred_fname);	
+	LOG_print("[refgene] columns : %s", refgene->columns);
+	if ( refgene->refseq_fname )
+	    LOG_print("[refgene] refseq : %s", refgene->refseq_fname);
+	if ( refgene->trans_list_fname )
+	    LOG_print("[refgene] trans_list : %s", refgene->trans_list_fname);
+	if ( refgene->gene_list_fname )
+	    LOG_print("[refgene] gene_list : %s", refgene->gene_list_fname);	
+    }
+    
+    for ( i = 0; i < config->vcfs.n_vcfs; ++i ) {
+	LOG_print("[vcfs] %d\n", i);
+	LOG_print("[vcfs] file : %s\n", config->vcfs.files[i].fname);
+	LOG_print("[vcfs] columns : %s\n", config->vcfs.files[i].columns);	    
+    }
+    
+    for ( i = 0; i < config->beds.n_beds; ++i ) {	
+	LOG_print("[beds] %d\n", i);
+	LOG_print("[beds] file : %s\n", config->beds.files[i].fname);
+	LOG_print("[beds] header : %s\n", config->beds.files[i].columns);	    
+    }
+    return 0;
+}
+
 
 #ifdef _MAIN_CONFIG
 int main(int argc, char **argv)
 {
-    if (argc == 1) {
+    if (argc != 2) {
         fprintf(stderr, "%s input.json\n", argv[0]);
-        exit(-1);
+	return 1;
     }
-    load_config(argv[1]);
+    struct vcfanno_config *con = vcfanno_config_init();
+    vcfanno_load_config(con, argv[1]);
+    vcfanno_config_debug(con);
+    vcfanno_config_destroy(con);
     return 0;
 }
 #endif

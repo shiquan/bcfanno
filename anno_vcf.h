@@ -12,9 +12,16 @@
 
 struct anno_vcf_file {
     htsFile *fp;
+    // header of vcf
+    bcf_hdr_t *hdr;
+    // index for bcf file, pre-indexed by bcftools
     hts_idx_t *bcf_idx;
-    hts_itr_t *itr;
-    char *fname;
+    // index for vcf file, pre-indexed by tabix
+    tbx_t *tbx_idx;
+    // iterator
+    hts_itr_t *itr;    
+    // char *fname;
+    // cached for
     int cached, max;
     bcf1_t **buffer;
     char *columns;
@@ -23,13 +30,16 @@ struct anno_vcf_file {
 };
 
 struct vcfs_options {
+    // this flag should be set 1 if vcf databases are inited, else set 0
+    int vcfs_is_inited;
     // hdr is header struct of input vcf file, all the annotated tags should be inited in the hdr_out before export bcf lines
-    bcf_hdr_t *hdr, *hdr_out;
+    bcf_hdr_t *hdr_out;
     // pre-indexed vcf/bcf databases
     // columns structure of vcf databases
     // struct anno_cols *cols;    
     // int i_data;
     int n_files;
+    int m_files;
     struct anno_vcf_file *files;
     // for matching annotation and VCF lines by allele
     vcmp_t *vcmp;  

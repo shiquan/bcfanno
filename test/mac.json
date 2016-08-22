@@ -1,19 +1,24 @@
 {
-    "id":"mac-test v1",
+    "id":"mac-test(v1)",
     "author":"shiquan@genomics.cn",
-    "threads":1,
     "ref":"hg19", // hg19, hg38
     "hgvs": {
-	"refgene":"",
-	"trans_list":"",
-	"genes_list":"",
-	"columns":"",
+	"gene_data":"/Users/shiquan/Documents/Workdir/03.codes/database/refgene/hg19_refgene.version.tsv.gz",
+	"columns":"Gene,Transcript,HGVSDNA",
     },
-    "api": [
+    "vcfs": [
 	{
-	    "type":"vcf",
 	    "columns":"INFO/RS,INFO/CLNHGVS,INFO/VC",
 	    "file":"/Users/shiquan/Documents/02.codes/vcfanno/test/clinvar_20151201_CRCH37p13.vcf.gz",
+	},
+	{
+	    "file":"/Users/shiquan/Documents/Workdir/03.codes/database/allele_frequence/ExAC.r0.3.sites.vep.hg19.vcf.gz",
+	    "columns":"INFO/AC_EAS,INFO/AN_EAS",
+	},
+    ],
+    "beds": [
+	{
+	    "file" : "/Users/shiquan/Documents/Workdir/03.codes/database/regions/hg19_cytoBand.bed.gz",
 	},
     ],
 }

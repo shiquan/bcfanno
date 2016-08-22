@@ -819,6 +819,7 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
 }
 int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column)
 {
+    
 }
 // find the bcf line from database of same positions and allele
 static bcf1_t *vcf_get_from_databases(struct anno_vcf_file *file, bcf1_t *line, int *ret)

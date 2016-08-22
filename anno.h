@@ -80,7 +80,7 @@ struct region {
     struct region1 *regs;
 };
 
-extern struct anno_col *init_columns(const char *rules, bcf_hdr_t *in, bcf_hdr_t *out, int *n, enum anno_type type);
+// extern struct anno_col *init_columns(const char *rules, bcf_hdr_t *in, bcf_hdr_t *out, int *n, enum anno_type type);
 
 struct sql_connect {
     void *connect;
