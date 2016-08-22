@@ -187,6 +187,7 @@ struct genepred_format {
 // this version number from other file in the same directrary. But remeber 
 // to check the names accordly in the refrna file.
 struct refgene_options {
+    int refgene_is_inited;
     // gene prediction file, include exons and cds regions, get it from UCSC, see our manual for details
     const char *genepred_fname;
     // transcripts sequences in fasta format, notice the name of transcripts should be exists in gene pred file

@@ -1150,10 +1150,13 @@ int hgvs_names_init(struct refgene_options *opts, bcf1_t *line)
     return 0;
 }
 
-int anno_refgene_core(bcf1_t *line, struct refgene_options *opts)
+int anno_refgene_core(struct refgene_options *opts, bcf1_t *line)
 {
+    // if refgene options not inited, skip all the next steps
+    if (opts->refgene_is_inited == 0)
+	return 1;
     // retrieve the regions this variants located first, check the memory pool and update the pool if the regions is out of
-    // cached positions. just skip if the variant type of line is a ref.     
+    // cached positions. just skip if the variant type of line is a ref.    
     if ( line->pos < 0 )
 	return 1;
     // skip reference positions, usually vcfanno will check the type of position in the first step, get error if see ref here
@@ -1193,7 +1196,7 @@ int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_co
     if (string ) free(string);
     return 0;
 }
-int hgvs_cols_prase(struct refgene_options *opts, const char *column)
+int refgene_column_prase(struct refgene_options *opts, const char *column)
 {
     kstring_t string = KSTRING_INIT;
     kputs(column, &string);
@@ -1268,7 +1271,7 @@ int usage(int argc, char **argv)
     fprintf(stderr, "Usage: %s [-h] -refseq refseq.fa.gz -data gene_pred.txt.gz|refgene.txt.gz -O [u|v|z|b] -o output_file input_fname.vcf.gz \n", argv[0]);
     return 0;
 }
-const char *hts_bcf_wmode(int file_type)
+static const char *hts_bcf_wmode(int file_type)
 {
     if ( file_type == FT_BCF )
 	return "wbu";    // uncompressed BCF
@@ -1365,12 +1368,12 @@ int main(int argc, char **argv)
     opts.hdr_out = bcf_hdr_dup(hdr);
     set_format_genepred();
     // prase configure columns
-    hgvs_cols_prase(&opts, columns);   
+    refgene_column_prase(&opts, columns);   
     bcf_hdr_write(fout, opts.hdr_out);    
     // init gene_pred or refgene database, hold tabix index cache and faidx cache in memory 
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {     
-	anno_refgene_core(line, &opts);
+	anno_refgene_core(&opts, line);
 #ifndef DEBUG_MODE   
 	bcf_write1(fout, opts.hdr_out, line);
 #endif

@@ -3,9 +3,48 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-//#include "anno_setter.h"
 
-//#define DEFAULT_INTRON_EDGE 30
+struct refgene_config {
+    // if refgene_is_set == 1, genepred_fname and columns are mandatory.
+    int refgene_is_set;
+    const char *genepred_fname;
+    const char *refseq_fname;
+    const char *trans_list_fname;
+    const char *gene_list_fname;
+    const char *columns;
+};
+
+struct file_config {
+    // file path
+    const char *fname;
+    // columns string
+    const char *columns;
+};
+struct vcfs_config {
+    // vcf files number
+    int n_vcfs;
+    struct file_config *files;
+};
+struct beds_config {
+    // bed files number
+    int n_beds;
+    struct file_config *files;
+};
+
+// skip other keys except author, config_id and reference_version
+struct vcfanno_config {
+    const char *author;
+    const char *config_id;
+    const char *reference_version;
+    struct vcfs_config vcfs;
+    struct beds_config beds;
+    struct refgene_config refgene;
+};
+
+extern struct vcfanno_config *vcfanno_config_init(void);
+extern struct vcfanno_config_destroy(struct vcfanno_config *);
+extern int vcfanno_load_config(struct vcfanno_config *, const char *);
+
 
 #define ANNOCONFIG_INIT { NULL, NULL, NULL, 0, 0, NULL }
 

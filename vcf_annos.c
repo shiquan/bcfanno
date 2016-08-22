@@ -817,3 +817,36 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
     }
     return bcf_update_format_string(opts->hdr_out,line,col->hdr_key,(const char**)opts->tmpp2,bcf_hdr_nsamples(opts->hdr_out));
 }
+int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column)
+{
+}
+// find the bcf line from database of same positions and allele
+static bcf1_t *vcf_get_from_databases(struct anno_vcf_file *file, bcf1_t *line, int *ret)
+{
+    *ret = 0;
+    
+    *ret = 1;
+}
+    
+bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
+{
+    // just skip the next steps if vcfs databases not inited
+    if ( opts->vcfs_is_inited == 0 )
+	return line;
+
+    assert(opts->hdr_out);
+    
+    int i, j;
+    int ret = 0;
+    for ( i = 0; i < opts->n_files; ++i ) {
+	struct anno_vcf_file *file = &opts->files[i];
+	bcf1_t *dat = vcf_get_from_databases(file, line, &ret);
+	if (ret == 0)
+	    continue;
+	for ( j = 0; j < file->ncols; ++j ) {
+	    struct anno_col *col = &file->cols[j];
+	    col->setter.vcf(opts, line, col, dat);
+	}
+    }
+    return line;
+}
