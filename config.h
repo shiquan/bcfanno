@@ -44,5 +44,5 @@ struct vcfanno_config {
 extern struct vcfanno_config *vcfanno_config_init(void);
 extern void vcfanno_config_destroy(struct vcfanno_config *);
 extern int vcfanno_load_config(struct vcfanno_config *, const char *);
-
+extern int vcfanno_config_debug(struct vcfanno_config *config);
 #endif

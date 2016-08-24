@@ -151,6 +151,8 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 		    continue;
 		int k;
 		struct file_config *file_config = &vcfs_config->files[n_files];
+		file_config->fname = NULL;
+		file_config->columns = NULL;
 		for ( k = 0; k < node1->n; ++k ) {
 		    const kson_node_t *node2 = kson_by_index(node1, k);
 		    if ( strcmp(node2->key, "file") == 0 )
@@ -194,6 +196,8 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 		    continue;
 		int k;
 		struct file_config *file_config = &beds_config->files[n_files];
+		file_config->fname = NULL;
+		file_config->columns = NULL;
 		for ( k = 0; k < node1->n; ++k ) {
 		    const kson_node_t *node2 = kson_by_index(node1, k);
 		    if ( strcmp(node2->key, "file") == 0 )
@@ -259,15 +263,16 @@ int vcfanno_config_debug(struct vcfanno_config *config)
     }
     
     for ( i = 0; i < config->vcfs.n_vcfs; ++i ) {
-	LOG_print("[vcfs] %d\n", i);
-	LOG_print("[vcfs] file : %s\n", config->vcfs.files[i].fname);
-	LOG_print("[vcfs] columns : %s\n", config->vcfs.files[i].columns);	    
+	LOG_print("[vcfs] %d", i);
+	LOG_print("[vcfs] file : %s", config->vcfs.files[i].fname);
+	LOG_print("[vcfs] columns : %s", config->vcfs.files[i].columns);	    
     }
     
     for ( i = 0; i < config->beds.n_beds; ++i ) {	
-	LOG_print("[beds] %d\n", i);
-	LOG_print("[beds] file : %s\n", config->beds.files[i].fname);
-	LOG_print("[beds] header : %s\n", config->beds.files[i].columns);	    
+	LOG_print("[beds] %d", i);
+	LOG_print("[beds] file : %s", config->beds.files[i].fname);
+	if (config->beds.files[i].columns != NULL)
+	    LOG_print("[beds] header : %s", config->beds.files[i].columns);	    
     }
     return 0;
 }

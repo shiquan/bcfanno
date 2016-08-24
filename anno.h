@@ -57,6 +57,7 @@ typedef union {
 } setter_func;
 
 struct anno_col {
+    int ifile; // file idx
     int icol, replace, number;  // number: one of BCF_VL_* types
     char *hdr_key;
     setter_func setter;

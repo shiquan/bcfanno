@@ -2,8 +2,12 @@
 //
 #include "utils.h"
 #include "anno.h"
-#include "plugin.h"
+#include "anno_vcf.h"
 #include "vcmp.h"
+#include <htslib/hts.h>
+#include <htslib/vcf.h>
+#include <htslib/kstring.h>
+#include <htslib/bgzf.h>
 
 // Logic of the filters: include or exclude sites which match the filters?
 #define FLT_INCLUDE 1
@@ -39,7 +43,7 @@ int vcf_setter_filter(struct vcfs_options *opts, bcf1_t *line, struct anno_col *
 {
     int i;
     bcf1_t *rec = (bcf1_t*) data;
-    bcf_hdr_t *hdr = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
     if ( !(rec->unpacked & BCF_UN_FLT) ) bcf_unpack(rec, BCF_UN_FLT);
     if ( !(line->unpacked & BCF_UN_FLT) ) bcf_unpack(line, BCF_UN_FLT);
     if ( !rec->d.n_flt ) return 0;  // don't overwrite with a missing value
@@ -91,7 +95,7 @@ int vcf_setter_id(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col,
     if ( col->replace==SET_OR_APPEND ) return bcf_add_id(opts->hdr_out,line,rec->d.id);
     if ( col->replace!=REPLACE_MISSING ) return bcf_update_id(opts->hdr_out,line,rec->d.id);
 
-    // running with +ID, only update missing ids
+   // running with +ID, only update missing ids
     if ( !line->d.id || (line->d.id[0]=='.' && !line->d.id[1]) )
         return bcf_update_id(opts->hdr_out,line,rec->d.id);
     return 0;
@@ -106,7 +110,7 @@ int setter_qual(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, v
 
     line->qual = strtod(str, &str);
     if ( str == tab->cols[col->icol] )
-        error("Could not parse %s at %s:%d [%s]\n", col->hdr_key, bcf_seqname(opts->hdr,line),line->pos+1,tab->cols[col->icol]);
+        error("Could not parse %s at %s:%d [%s]\n", col->hdr_key, bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
     return 0;
 }
 int vcf_setter_qual(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
@@ -125,13 +129,13 @@ int setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_col *c
 
     if ( str[0]=='1' && str[1]==0 ) return bcf_update_info_flag(opts->hdr_out,line,col->hdr_key,NULL,1);
     if ( str[0]=='0' && str[1]==0 ) return bcf_update_info_flag(opts->hdr_out,line,col->hdr_key,NULL,0);
-    error("Could not parse %s at %s:%d .. [%s]",col->hdr_key, bcf_seqname(opts->hdr,line), line->pos+1, tab->cols[col->icol]);
+    error("Could not parse %s at %s:%d .. [%s]",col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1, tab->cols[col->icol]);
     return -1;
 }
 int vcf_setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    bcf_hdr_t *hdr = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
     int flag = bcf_get_info_flag(hdr,rec,col->hdr_key,NULL,NULL);
     bcf_update_info_flag(opts->hdr_out,line,col->hdr_key,NULL,flag);
     return 0;
@@ -139,16 +143,16 @@ int vcf_setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_co
 int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpi)
 {
     if ( col->number==BCF_VL_A && ntmpi!=nals-1 && (ntmpi!=1 || opts->tmpi[0]!=bcf_int32_missing || opts->tmpi[1]!=bcf_int32_vector_end) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(opts->hdr,line), line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1);
     else if ( col->number==BCF_VL_R && ntmpi!=nals && (ntmpi!=1 || opts->tmpi[0]!=bcf_int32_missing || opts->tmpi[1]!=bcf_int32_vector_end) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(opts->hdr,line), line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1);
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(opts->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr, line), line->pos +1);
+    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos +1);
 
     // fill in any missing values in the target VCF (or all, if not present)
-    int ntmpi2 = bcf_get_info_float(opts->hdr, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
+    int ntmpi2 = bcf_get_info_float(opts->hdr_out, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
     if ( ntmpi2 < ndst ) hts_expand(int32_t,ndst,opts->mtmpi2,opts->tmpi2);
 
     int i;
@@ -179,7 +183,7 @@ int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
     {
         int val = strtol(str, &end, 10); 
         if ( end==str )
-            error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key, bcf_seqname(opts->hdr,line),line->pos+1,tab->cols[col->icol]);
+            error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key, bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
         ntmpi++;
         hts_expand(int32_t,ntmpi,opts->mtmpi,opts->tmpi);
         opts->tmpi[ntmpi-1] = val;
@@ -191,7 +195,7 @@ int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
 
     if ( col->replace==REPLACE_MISSING )
     {
-        int ret = bcf_get_info_int32(opts->hdr, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
+        int ret = bcf_get_info_int32(opts->hdr_out, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
         if ( ret>0 && opts->tmpi2[0]!=bcf_int32_missing ) return 0;
     }
 
@@ -201,8 +205,9 @@ int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
 int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    bcf_hdr_t *hdr = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
     int ntmpi = bcf_get_info_int32(hdr, rec, col->hdr_key, &opts->tmpi, &opts->mtmpi);
+    // debug_print("ntmpi : %d", ntmpi);
     if ( ntmpi < 0 ) return 0;    // nothing to add
 
     if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
@@ -210,7 +215,7 @@ int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 
     if ( col->replace==REPLACE_MISSING )
     {
-        int ret = bcf_get_info_int32(opts->hdr, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
+        int ret = bcf_get_info_int32(opts->hdr_out, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
         if ( ret>0 && opts->tmpi2[0]!=bcf_int32_missing ) return 0;
     }
 
@@ -220,16 +225,17 @@ int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 int setter_ARinfo_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpf)
 {
     if ( col->number==BCF_VL_A && ntmpf!=nals-1 && (ntmpf!=1 || !bcf_float_is_missing(opts->tmpf[0]) || !bcf_float_is_vector_end(opts->tmpf[0])) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpf,col->hdr_key,bcf_seqname(opts->hdr,line),line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpf,col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1);
     else if ( col->number==BCF_VL_R && ntmpf!=nals && (ntmpf!=1 || !bcf_float_is_missing(opts->tmpf[0]) || !bcf_float_is_vector_end(opts->tmpf[0])) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpf,col->hdr_key,bcf_seqname(opts->hdr,line),line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpf,col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1);
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
+    // debug_print("ndst : %d, nals : %d", ndst, nals);
     int *map = vcmp_map_ARvalues(opts->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr, line), line->pos +1);
+    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos +1);
 
     // fill in any missing values in the target VCF (or all, if not present)
-    int ntmpf2 = bcf_get_info_float(opts->hdr, line, col->hdr_key, &opts->tmpf2, &opts->mtmpf2);
+    int ntmpf2 = bcf_get_info_float(opts->hdr_out, line, col->hdr_key, &opts->tmpf2, &opts->mtmpf2);
     if ( ntmpf2 < ndst ) hts_expand(float,ndst,opts->mtmpf2,opts->tmpf2);
 
     int i;
@@ -260,7 +266,7 @@ int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *c
     {
         double val = strtod(str, &end);
         if ( end==str )
-            error("Could not parse %s at %s:%d .. [%s]\n",col->hdr_key, bcf_seqname(opts->hdr,line),line->pos+1,tab->cols[col->icol]);
+            error("Could not parse %s at %s:%d .. [%s]\n",col->hdr_key, bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
         ntmpf++;
         hts_expand(float,ntmpf,opts->mtmpf,opts->tmpf);
         opts->tmpf[ntmpf-1] = val;
@@ -272,7 +278,7 @@ int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *c
 
     if ( col->replace==REPLACE_MISSING )
     {
-        int ret = bcf_get_info_float(opts->hdr, line, col->hdr_key, &opts->tmpf2, &opts->mtmpf2);
+        int ret = bcf_get_info_float(opts->hdr_out, line, col->hdr_key, &opts->tmpf2, &opts->mtmpf2);
         if ( ret>0 && !bcf_float_is_missing(opts->tmpf2[0]) ) return 0;
     }
 
@@ -282,7 +288,7 @@ int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *c
 int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    bcf_hdr_t *hdr = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
     int ntmpf = bcf_get_info_float(hdr,rec,col->hdr_key,&opts->tmpf,&opts->mtmpf);
     if ( ntmpf < 0 ) return 0;    // nothing to add
 
@@ -291,7 +297,7 @@ int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_co
 
     if ( col->replace==REPLACE_MISSING )
     {
-        int ret = bcf_get_info_float(opts->hdr, line, col->hdr_key, &opts->tmpf2, &opts->mtmpf2);
+        int ret = bcf_get_info_float(opts->hdr_out, line, col->hdr_key, &opts->tmpf2, &opts->mtmpf2);
         if ( ret>0 && !bcf_float_is_missing(opts->tmpf2[0]) ) return 0;
     }
 
@@ -350,17 +356,17 @@ int setter_ARinfo_string(struct vcfs_options *opts, bcf1_t *line, struct anno_co
         lsrc++;
     }
     if ( col->number==BCF_VL_A && nsrc!=nals-1 && (nsrc!=1 || opts->tmps[0]!='.' || opts->tmps[1]!=0 ) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", nsrc,col->hdr_key,bcf_seqname(opts->hdr,line),line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", nsrc,col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1);
     else if ( col->number==BCF_VL_R && nsrc!=nals && (nsrc!=1 || opts->tmps[0]!='.' || opts->tmps[1]!=0 ) )
-        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", nsrc,col->hdr_key,bcf_seqname(opts->hdr,line),line->pos+1);
+        error("Incorrect number of values (%d) for the %s tag at %s:%d\n", nsrc,col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1);
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(opts->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr, line), line->pos+1);
+    if ( !map ) error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos+1);
 
     // fill in any missing values in the target VCF (or all, if not present)
     int i, empty = 0, nstr, mstr = opts->tmpks.m;
-    nstr = bcf_get_info_string(opts->hdr, line, col->hdr_key, &opts->tmpks.s, &mstr); 
+    nstr = bcf_get_info_string(opts->hdr_out, line, col->hdr_key, &opts->tmpks.s, &mstr); 
     opts->tmpks.m = mstr;
     if ( nstr<0 || (nstr==1 && opts->tmpks.s[0]=='.' && opts->tmpks.s[1]==0) )
     {
@@ -410,7 +416,7 @@ int setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
 
     if ( col->replace==REPLACE_MISSING )
     {
-        int ret = bcf_get_info_string(opts->hdr, line, col->hdr_key, &opts->tmps2, &opts->mtmps2);
+        int ret = bcf_get_info_string(opts->hdr_out, line, col->hdr_key, &opts->tmps2, &opts->mtmps2);
         if ( ret>0 && (opts->tmps2[0]!='.' || opts->tmps2[1]!=0) ) return 0;
     }
 
@@ -420,7 +426,7 @@ int setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
 int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    bcf_hdr_t *hdr = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
     int ntmps = bcf_get_info_string(hdr,rec,col->hdr_key,&opts->tmps,&opts->mtmps);
     if ( ntmps < 0 ) return 0;    // nothing to add
 
@@ -429,7 +435,7 @@ int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 
     if ( col->replace==REPLACE_MISSING )
     {
-        int ret = bcf_get_info_string(opts->hdr, line, col->hdr_key, &opts->tmps2, &opts->mtmps2);
+        int ret = bcf_get_info_string(opts->hdr_out, line, col->hdr_key, &opts->tmps2, &opts->mtmps2);
         if ( ret>0 && (opts->tmps2[0]!='.' || opts->tmps2[1]!=0) ) return 0;
     }
 
@@ -439,8 +445,8 @@ int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    assert(opts->ti > 0);
-    bcf_hdr_t *header = opts->files->readers[opts->ti].header;
+
+    bcf_hdr_t *header = opts->hdr_out;
     int nsrc = bcf_get_genotypes(header, rec, &opts->tmpi, &opts->mtmpi);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
@@ -448,7 +454,7 @@ int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_co
     if ( !opts->sample_map )
         return bcf_update_genotypes(opts->hdr_out,line,opts->tmpi,nsrc);
 
-    int i, j, ndst = bcf_get_genotypes(opts->hdr,line,&opts->tmpi2,&opts->mtmpi2);
+    int i, j, ndst = bcf_get_genotypes(opts->hdr_out,line,&opts->tmpi2,&opts->mtmpi2);
     if ( ndst > 0 ) ndst /= bcf_hdr_nsamples(opts->hdr_out);
     nsrc /= bcf_hdr_nsamples(header);
     if ( ndst<=0 )  // field not present in dst file
@@ -560,7 +566,7 @@ int setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *
             char *end = str;
             ptr[ival] = strtol(str, &end, 10); 
             if ( end==str )
-                error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(opts->hdr,line),line->pos+1,tab->cols[col->icol]);
+                error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
 
             ival++;
             str = *end ? end+1 : end;
@@ -600,7 +606,7 @@ int setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col 
             char *end = str;
             ptr[ival] = strtod(str, &end); 
             if ( end==str )
-                error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(opts->hdr,line),line->pos+1,tab->cols[col->icol]);
+                error("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
 
             ival++;
             str = *end ? end+1 : end;
@@ -644,8 +650,8 @@ int setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *
 int vcf_setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    assert(opts->ti > 0);
-    bcf_hdr_t *header = opts->files->readers[opts->ti].header;
+
+    bcf_hdr_t *header = opts->hdr_out;
     int nsrc = bcf_get_format_int32(header, rec, col->hdr_key, &opts->tmpi, &opts->mtmpi);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
@@ -653,7 +659,7 @@ int vcf_setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_c
     if ( !opts->sample_map )
         return bcf_update_format_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,nsrc);
 
-    int i, j, ndst = bcf_get_format_int32(opts->hdr,line,col->hdr_key,&opts->tmpi2,&opts->mtmpi2);
+    int i, j, ndst = bcf_get_format_int32(opts->hdr_out,line,col->hdr_key,&opts->tmpi2,&opts->mtmpi2);
     if ( ndst > 0 ) ndst /= bcf_hdr_nsamples(opts->hdr_out);
     nsrc /= bcf_hdr_nsamples(header);
     if ( ndst<=0 ) {
@@ -710,7 +716,7 @@ int vcf_setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_c
 int vcf_setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-    bcf_hdr_t *header = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *header = opts->hdr_out;
     int nsrc = bcf_get_format_float(header, rec, col->hdr_key, &opts->tmpf, &opts->mtmpf);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
@@ -718,7 +724,7 @@ int vcf_setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_
     if ( !opts->sample_map )
         return bcf_update_format_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,nsrc);
 
-    int i, j, ndst = bcf_get_format_float(opts->hdr,line,col->hdr_key,&opts->tmpf2,&opts->mtmpf2);
+    int i, j, ndst = bcf_get_format_float(opts->hdr_out,line,col->hdr_key,&opts->tmpf2,&opts->mtmpf2);
     if ( ndst > 0 ) ndst /= bcf_hdr_nsamples(opts->hdr_out);
     nsrc /= bcf_hdr_nsamples(header);
     if ( ndst<=0 )
@@ -784,7 +790,7 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
 {
     bcf1_t *rec = (bcf1_t*) data;
     opts->tmpp[0] = opts->tmps;
-    bcf_hdr_t *header = opts->files->readers[opts->ti].header;
+    bcf_hdr_t *header = opts->hdr_out;
     int ret = bcf_get_format_string(header,rec,col->hdr_key,&opts->tmpp,&opts->mtmps);
     opts->tmps = opts->tmpp[0]; // tmps might be realloced
     if ( ret==-3 ) return 0;    // the tag is not present
@@ -795,7 +801,7 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
 
     int i;
     opts->tmpp2[0] = opts->tmps2;
-    ret = bcf_get_format_string(opts->hdr,line,col->hdr_key,&opts->tmpp2,&opts->mtmps2);
+    ret = bcf_get_format_string(opts->hdr_out,line,col->hdr_key,&opts->tmpp2,&opts->mtmps2);
     opts->tmps2 = opts->tmpp2[0];   // tmps2 might be realloced
 
     if ( ret<=0 )   // not present in dst
@@ -817,37 +823,430 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
     }
     return bcf_update_format_string(opts->hdr_out,line,col->hdr_key,(const char**)opts->tmpp2,bcf_hdr_nsamples(opts->hdr_out));
 }
-int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column)
+int vcfs_options_init(struct vcfs_options *opts)
 {
-    
+    memset(opts, 0, sizeof(struct vcfs_options));
+    opts->vcmp = vcmp_init();
+    opts->vcfs_is_inited = 1;
+    return 0;    
+}
+int vcf_file_destroy(struct anno_vcf_file *file)
+{
+    hts_close(file->fp);
+    bcf_hdr_destroy(file->hdr);
+    if ( file->bcf_idx )
+	hts_idx_destroy(file->bcf_idx);
+    if ( file->tbx_idx )
+	tbx_destroy(file->tbx_idx);
+    free(file->fname);
+    int i;
+    for ( i = 0; i < file->max; ++i ) 
+	bcf_destroy1(file->buffer[i]);
+    for ( i = 0; i < file->ncols; ++i )
+	free(file->cols[i].hdr_key);
+    if ( file->ncols )
+	free(file->cols);
+    return 0;
+}
+int vcfs_options_destroy(struct vcfs_options *opts)
+{
+    if ( opts->vcfs_is_inited == 0 )
+	return 1;
+    int i;
+    for ( i = 0; i < opts->n_files; ++i ) 
+	vcf_file_destroy(&opts->files[i]);
+    free(opts->files);
+    vcmp_destroy(opts->vcmp);
+    free(opts->tmpks.s);
+    free(opts->tmpi);
+    free(opts->tmpi2);
+    free(opts->tmpi3);
+    free(opts->tmpf);
+    free(opts->tmpf2);
+    free(opts->tmpf3);
+    free(opts->tmps);
+    free(opts->tmps2);
+    free(opts->sample_map);
+    return 0;
+}
+int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *columns)
+{
+    kstring_t string = KSTRING_INIT;
+    kputs(columns, &string);
+    int nfields = 0;
+    int *splits = ksplit(&string, ',', &nfields);
+    if (nfields == 0)
+	return 1;
+    file->cols = (struct anno_col*)malloc(nfields * sizeof(struct anno_col));
+    int i;
+    kstring_t temp = KSTRING_INIT;
+    file->ncols = 0;
+    for ( i = 0; i < nfields; ++i ) {
+	struct anno_col *col = &file->cols[file->ncols];
+	char *ss = string.s + splits[i];
+	col->replace = REPLACE_MISSING;
+	if ( *ss == '+') {
+	    col->replace = REPLACE_MISSING;
+	    ss++;
+	} else if ( *ss == '-' ) {
+	    col->replace = REPLACE_EXISTING;
+	    ss++;
+	}
+	if ( ss[0] == '\0' ) {
+	    warnings("Empty tag.");
+	    continue;
+	}
+	if ( strcasecmp("CHROM", ss) == 0 || strcasecmp("POS", ss) == 0 || strcasecmp("FEF", ss) == 0 ||
+	     strcasecmp("ALT", ss) == 0 || strcasecmp("FILTER", ss) == 0 || strcasecmp("QUAL", ss) == 0 ) {
+	    warnings("Skip %s", ss);
+	    continue;
+	}	
+	if ( strcasecmp("INFO", ss) == 0 || strcasecmp("FORMAT", ss) == 0 ) {
+	    warnings("Do not support annotate all INFO or FORMAT fields. todo INFO/TAGS instead.");
+	    continue;
+	}
+	if ( strcasecmp("ID", ss) == 0 ) {	    
+	    col->setter.vcf = vcf_setter_id;	    
+	} else if ( strncasecmp("FORMAT/", ss, 7) == 0 || strncasecmp("FMT/", ss, 4) == 0) {
+	    ss += (strncasecmp("FORMAT/", ss, 7) == 0 ? 7 : 4);
+	    if ( strcasecmp("GT", ss) == 0 ) {
+		warnings("It is not allowed to change GT tag.");
+		continue;
+	    }
+	    int hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
+	    if ( !bcf_hdr_idinfo_exists(hdr_out, BCF_HL_FMT, hdr_id) ) {
+		bcf_hrec_t *hrec = bcf_hdr_get_hrec(file->hdr, BCF_HL_FMT, "ID", ss, NULL);
+		if ( hrec == NULL )
+		    error("The tag \"%s\" is not defined in header.", ss);
+		temp.l = 0;
+		bcf_hrec_format(hrec, &temp);
+		bcf_hdr_append(hdr_out, temp.s);
+		bcf_hdr_sync(hdr_out);
+		hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
+		assert ( bcf_hdr_idinfo_exists(hdr_out, BCF_HL_FMT, hdr_id) );
+	    }
+	    switch ( bcf_hdr_id2type(hdr_out, BCF_HL_FMT, hdr_id) ) {		
+		case BCF_HT_INT :
+		    col->setter.vcf = vcf_setter_format_int;
+		    break;
+		case BCF_HT_REAL:
+		    col->setter.vcf = vcf_setter_format_real;
+		    break;
+		case BCF_HT_STR:
+		    col->setter.vcf = vcf_setter_format_str;
+		    break;
+		default:
+		    error("The type of %s not recongized (%d).", ss, bcf_hdr_id2type(hdr_out, BCF_HL_FMT, hdr_id));
+	    }
+	    col->number = bcf_hdr_id2length(hdr_out, BCF_HL_FMT, hdr_id);
+	    // col->icol = hdr_id;
+	} else {
+	    if ( strncasecmp("INFO/", ss, 5) == 0 )
+		ss += 5;
+	    int hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
+	    if ( !bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, hdr_id) ) {
+		bcf_hrec_t *hrec = bcf_hdr_get_hrec(file->hdr, BCF_HL_INFO, "ID", ss, NULL);
+		if ( hrec == NULL )
+		    error("The tag \"%s\" is not defined in header.", ss);
+		temp.l = 0;
+		bcf_hrec_format(hrec, &temp);
+		bcf_hdr_append(hdr_out, temp.s);
+		bcf_hdr_sync(hdr_out);
+		hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
+		assert( bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, hdr_id));
+	    }
+
+	    switch ( bcf_hdr_id2type(hdr_out, BCF_HL_INFO, hdr_id) ) {
+		case BCF_HT_FLAG:
+		    col->setter.vcf = vcf_setter_info_flag;
+		    break;
+		case BCF_HT_INT:
+		    col->setter.vcf = vcf_setter_info_int;
+		    break;
+
+		case BCF_HT_REAL:
+		    col->setter.vcf = vcf_setter_info_real;
+		    break;
+
+		case BCF_HT_STR:
+		    col->setter.vcf = vcf_setter_info_str;
+		    break;
+
+		default:
+		    error("The type of %s not recongized (%d).", ss, bcf_hdr_id2type(hdr_out, BCF_HL_INFO, hdr_id));
+	    }
+	    col->number = bcf_hdr_id2length(hdr_out, BCF_HL_INFO, hdr_id);
+	    // col->icol = hdr_id;
+	}
+	col->hdr_key = strdup(ss);
+	// set the file id to col ifile
+	col->ifile = file->id;
+	file->ncols++;	
+    }
+    free(splits);    
+    if ( string.m )
+	free(string.s);    
+    if ( file->ncols == 0 )
+	return 1;
+    return 0;    
+}
+int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *columns)
+{
+    if ( opts->n_files == opts->m_files ) {
+	opts->m_files = opts->m_files + 4;
+	opts->files = (struct anno_vcf_file *)realloc(opts->files, opts->m_files*sizeof(struct anno_vcf_file));
+    }
+    struct anno_vcf_file *file = &opts->files[opts->n_files];
+    file->fp = hts_open(fname, "r");
+    if ( file->fp == NULL ) {
+	warnings("Failed to open %s : %s.", fname, strerror(errno));
+	return 1;
+    }
+    htsFormat type = *hts_get_format(file->fp);
+    if ( type.format != vcf && type.format != bcf)
+	error("Unsupported input format; only accept pre-indexed BCF/VCF file. %s", fname);
+
+    if ( file->fp->format.compression != bgzf )
+	error("This file is not compressed by bgzip. %s", fname);
+    BGZF *bgzf = hts_get_bgzfp(file->fp);
+    if (bgzf && bgzf_check_EOF(bgzf) == 0) {
+	warnings("no BGZF EOF marker; file may be truncated. %s", fname);
+    }
+    file->bcf_idx = NULL;
+    file->tbx_idx = NULL;
+    if ( type.format == bcf ) {
+	file->bcf_idx = bcf_index_load(fname);
+	if (file->bcf_idx == NULL)
+	    error("Failed to load bcf index of %s", fname);
+    } else {
+	file->tbx_idx = tbx_index_load(fname);
+	if (file->tbx_idx == NULL)
+	    error("Failed to load tabix index of %s", fname);
+    }
+    file->id= opts->n_files;
+    file->fname = strdup(fname);
+    file->hdr = bcf_hdr_read(file->fp);
+    file->itr = NULL;
+    file->buffer = NULL;
+    file->cached = file->max = 0;
+    if ( vcfs_columns_init(file, opts->hdr_out, columns) == 1) {
+	bcf_hdr_destroy(file->hdr);
+	hts_close(file->fp);
+	if ( file->tbx_idx )
+	    tbx_destroy(file->tbx_idx);
+	if ( file->bcf_idx )
+	    hts_idx_destroy(file->bcf_idx);
+	return 1;
+    }
+
+    opts->n_files++;
+    if (opts->vcfs_is_inited == 0)
+	opts->vcfs_is_inited = 1;
+    return 0;
 }
 // find the bcf line from database of same positions and allele
-static bcf1_t *vcf_get_from_databases(struct anno_vcf_file *file, bcf1_t *line, int *ret)
+static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_t *line)
 {
-    *ret = 0;
+    if ( file->itr ) {
+	hts_itr_destroy(file->itr);
+	file->itr = NULL;
+    }
     
-    *ret = 1;
+    if ( file->tbx_idx ) {
+	int tid = tbx_name2id(file->tbx_idx, bcf_seqname(hdr_out, line));
+	if ( tid == -1) {
+	    warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+	    return 1;
+	}
+	file->itr = tbx_itr_queryi(file->tbx_idx, tid, line->pos, line->pos + line->rlen);
+    } else if ( file->bcf_idx ) {
+	int tid = bcf_hdr_name2id(file->hdr, bcf_seqname(hdr_out, line));
+	if ( tid == -1) {
+	    warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+	    return 1;
+	}
+	file->itr = bcf_itr_queryi(file->bcf_idx, tid, line->pos, line->pos + line->rlen);	
+    } else {
+	error("no index");
+    }
+    if ( file->itr == NULL )
+	return 1;
+    file->cached = 0;
+    // debug_print("tbx : %p, bcf : %p, cached : %d, max : %d", file->tbx_idx, file->bcf_idx, file->cached, file->max);
+    while (1) {
+	if ( file->cached == file->max ) {
+	    file->max += 8;
+	    file->buffer = (bcf1_t**)realloc(file->buffer, sizeof(bcf1_t)*file->max);
+	    int i;
+	    for (i = 8; i > 0; i--) {
+		file->buffer[file->max-i] = bcf_init();
+		//file->buffer[file->max-i]->max_unpack = file->max_unpack;
+		file->buffer[file->max-i]->pos = -1;
+	    } 
+	}
+	if ( file->tbx_idx ) {
+	    kstring_t tmps = KSTRING_INIT;		
+	    if ( tbx_itr_next(file->fp, file->tbx_idx, file->itr, &tmps) < 0) 
+		break;
+	    //debug_print("%s", tmps.s);
+	    vcf_parse1(&tmps, file->hdr, file->buffer[file->cached]);
+	    free(tmps.s);	    
+	} else if ( file->bcf_idx ) {
+	    if ( bcf_itr_next(file->fp, file->itr, file->buffer[file->cached]) < 0)
+		break;
+	} else {
+	    error("no index");
+	}
+	file->cached++;
+    } 
+    if (file->cached)
+	return 0;
+    return 1;       
 }
-    
+   
 bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 {
     // just skip the next steps if vcfs databases not inited
     if ( opts->vcfs_is_inited == 0 )
 	return line;
-
-    assert(opts->hdr_out);
-    
+    assert(opts->hdr_out);    
     int i, j;
+    int k;    
     int ret = 0;
+    // debug_print("n_files : %d", opts->n_files);
     for ( i = 0; i < opts->n_files; ++i ) {
 	struct anno_vcf_file *file = &opts->files[i];
-	bcf1_t *dat = vcf_get_from_databases(file, line, &ret);
-	if (ret == 0)
-	    continue;
-	for ( j = 0; j < file->ncols; ++j ) {
-	    struct anno_col *col = &file->cols[j];
-	    col->setter.vcf(opts, line, col, dat);
+	vcf_fill_buffer(file, opts->hdr_out, line);
+	// debug_print("%d, file: %d", file->cached, i);
+	for ( j = 0; j < file->cached; ++j ) {
+	    bcf1_t *dat = file->buffer[j];
+	    // todo : for deletion, rough search
+	    if ( dat->rlen != line->rlen)
+		continue;
+	    if (dat->pos != line->pos)
+		continue;
+	    if (dat->pos > line->pos)
+		break;
+	    // debug_print("dat->pos : %d, line->pos : %d", dat->pos,line->pos);
+	    for ( k = 0; k < file->ncols; ++k ) {
+		struct anno_col *col = &file->cols[k];
+		// col->replace = REPLACE_MISSING;
+		// debug_print("ifile : %d, hdr_key : %s", col->ifile, col->hdr_key);
+		col->setter.vcf(opts, line, col, dat);
+	    }
 	}
     }
     return line;
 }
+#ifdef _VCF_ANNOS_MAIN
+
+#include "config.h"
+static const char *hts_bcf_wmode(int file_type)
+{
+    if ( file_type == FT_BCF )
+	return "wbu";    // uncompressed BCF
+    if ( file_type & FT_BCF )
+	return "wb";      // compressed BCF
+    if ( file_type & FT_GZ )
+	return "wz";       // compressed VCF
+    return "w";                                 // uncompressed VCF
+}
+
+const char *json_fname = 0;
+const char *input_fname = 0;
+const char *output_fname_type = 0;
+const char *output_fname = 0;
+
+int main(int argc, char **argv)
+{
+    if (argc == 1)
+	error("Usage : vcf_annos -c config.json -O z -o output.vcf.gz input.vcf.gz");
+    int i;
+    for ( i = 1; i < argc; ) {
+	const char *a = argv[i++];
+	const char **var = 0;
+	if ( strcmp(a, "-c") == 0 )
+	    var = &json_fname;
+	else if ( strcmp(a, "-O") == 0 )
+	    var = &output_fname_type;
+	else if ( strcmp(a, "-o") == 0 )
+	    var = &output_fname;
+
+	if ( var != 0 ) {
+	    if ( i == argc )
+		error("Missing an argument after %s", a);
+	    *var = argv[i++];
+	    continue;
+	}
+
+	if ( input_fname == 0 ) {
+	    input_fname = a;
+	    continue;
+	}
+
+	error("Unknown argument : %s.", a);
+    }
+
+    struct vcfanno_config *con = vcfanno_config_init();
+    if ( vcfanno_load_config(con, json_fname) != 0 )
+	error("Failed to load configure file. %s : %s", json_fname, strerror(errno));
+    vcfanno_config_debug(con);
+    if ( con->vcfs.n_vcfs == 0)
+	error("No BCF/VCF database specified.");
+    if (input_fname == 0 && (!isatty(fileno(stdin))))
+	input_fname = "-";
+    if (input_fname == 0)
+	error("No input file.");
+
+    int out_type = FT_VCF;
+    if (output_fname_type != 0) {
+	switch (output_fname_type[0]) {
+	    case 'b':
+		out_type = FT_BCF_GZ; break;
+	    case 'u':
+		out_type = FT_BCF; break;
+	    case 'z':
+		out_type = FT_VCF_GZ; break;
+	    case 'v':
+		out_type = FT_VCF; break;
+	    default :
+		error("The output type \"%d\" not recognised\n", out_type);
+	};
+    }
+
+    htsFile *fp = hts_open(input_fname, "r");
+    if ( fp == NULL )
+	error("Failed to open %s : %s.", input_fname, strerror(errno));
+    htsFormat type = *hts_get_format(fp);
+    if ( type.format != vcf && type.format != bcf )
+	error("Unsupported input format. %s", input_fname);
+    
+    bcf_hdr_t *hdr = bcf_hdr_read(fp);
+    if ( hdr == NULL )
+	error("Failed to parse header.");	
+    bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);    
+    htsFile *fout = output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(output_fname, hts_bcf_wmode(out_type));
+    struct vcfs_options opts = { .vcfs_is_inited = 0,};
+    vcfs_options_init(&opts);
+    opts.hdr_out = hdr_out;
+    
+    for ( i = 0; i < con->vcfs.n_vcfs; ++i ) {
+	vcfs_database_add(&opts, con->vcfs.files[i].fname, con->vcfs.files[i].columns);
+    }
+
+    bcf_hdr_write(fout, hdr_out);
+    bcf1_t *line = bcf_init();
+    while ( bcf_read(fp, hdr, line) == 0 ) {
+	anno_vcfs_core(&opts, line);
+	bcf_write1(fout, hdr_out, line);
+    }
+    bcf_destroy(line);
+    bcf_hdr_destroy(hdr);
+    bcf_hdr_destroy(hdr_out);
+    vcfs_options_destroy(&opts);
+    hts_close(fp);
+    hts_close(fout);
+    return 0;
+}
+
+#endif

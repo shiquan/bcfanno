@@ -8,29 +8,33 @@
 #include <htslib/tbx.h>
 #include "anno.h"
 
+struct anno_bed_col {
+    int hdr_id;
+    int icol; // column number in bed file
+    char *a;
+};
+
 struct anno_bed_line {
     int rid;
     int start; // 0based start
     int end; // 1based end
-    char *a;
+    struct anno_bed_col *cols;
 };
 
 struct anno_bed_file {
     htsFile *fp;
     tbx_t *idx;
-    int rid;
-    uint32_t start;
-    uint32_t end;
-    struct anno_col *col;
+    int n_cols;
+    struct anno_col *cols;
     // memory pool
     int cached, max;
-    struct anno_bed_line *a;
+    struct anno_bed_line **buffer;
 };
 
 struct beds_options {
-    char **fnames;
+    
     int n_files;
-    struct anno_bed_files *files;
+    struct anno_bed_file *files;
     
 };
 // bed format function annotation

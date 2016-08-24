@@ -9,11 +9,11 @@
     "vcfs": [
 	{
 	    "columns":"INFO/RS,INFO/CLNHGVS,INFO/VC",
-	    "file":"/Users/shiquan/Documents/02.codes/vcfanno/test/clinvar_20151201_CRCH37p13.vcf.gz",
+	    "file":"/Users/shiquan/Documents/Workdir/03.codes/database/clinical/clinvar_20160802.rename.vcf.gz",
 	},
 	{
 	    "file":"/Users/shiquan/Documents/Workdir/03.codes/database/allele_frequence/ExAC.r0.3.sites.vep.hg19.vcf.gz",
-	    "columns":"INFO/AC_EAS,INFO/AN_EAS",
+	    "columns":"INFO/AF,INFO/AN_EAS",
 	},
     ],
     "beds": [

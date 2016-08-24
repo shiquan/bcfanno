@@ -133,6 +133,7 @@ int args_destroy(){
 }
 
 static int quiet_mode = 0;
+
 int test_databases_framework()
 {
     
@@ -141,7 +142,6 @@ int test_databases_framework()
 }
 int prase_args(int argc, char **argv)
 {
-    args_init();
     int i;
     for (i = 0; i < argc; ++i ) {
 	if ( i ) kputc(' ', &args.commands);
@@ -218,14 +218,14 @@ int prase_args(int argc, char **argv)
 	error("Failed to open %s.", args.fname_input);    
     // check input type is VCF/BCF or not
     htsFormat type = *hts_get_format(args.fp_input);
-    if (type.format  != vcf && type.format != bcf)
+    if ( type.format  != vcf && type.format != bcf )
 	error("Unsupported input format, only accept BCF/VCF format. %s", input_fname);
 
     // init output file handler
     args.fp_out = args.fname_output == 0 ? hts_open("-", hts_bcf_wmode(args.out_type)) : hts_open(args.fname_output, hts_bcf_wmode(args.out_type));
     // init output type
     int out_type = FT_VCF;
-    if (out_type_string != 0) {
+    if ( out_type_string != 0 ) {
 	switch (out_type_string[0]) {
 	    case 'b':
 		out_type = FT_BCF_GZ; break;
@@ -267,6 +267,7 @@ int prase_args(int argc, char **argv)
     }
 
     for ( i = 0; i < config->n_beds; ++i ) {
+
     }
 
 }
@@ -284,7 +285,9 @@ bcf1_t *anno_core(bcf1_t *line)
     
     return line;
 }
-
+void export_reports()
+{
+}
 int main(int argc, char **argv)
 {
     // prase arguments first, if failure or just do test will return 1, else return 0

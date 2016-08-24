@@ -11,6 +11,8 @@
 #include "vcmp.h"
 
 struct anno_vcf_file {
+    int id; // index
+    char *fname;
     htsFile *fp;
     // header of vcf
     bcf_hdr_t *hdr;
@@ -20,11 +22,10 @@ struct anno_vcf_file {
     tbx_t *tbx_idx;
     // iterator
     hts_itr_t *itr;    
-    // char *fname;
-    // cached for
+    // char *fname;   
     int cached, max;
     bcf1_t **buffer;
-    char *columns;
+    // char *columns;
     int ncols;
     struct anno_col *cols;
 };
@@ -52,32 +53,13 @@ struct vcfs_options {
     char *tmps, *tmps2, **tmpp, **tmpp2;
     kstring_t tmpks;
 };
-
-extern int setter_filter(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_filter(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_id(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_id(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_qual(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_qual(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpi);
-extern int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_ARinfo_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpf);
-extern int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int copy_string_field(char *src, int isrc, int src_len, kstring_t *dst, int idst);
-extern int setter_ARinfo_string(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als);
-extern int setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int count_vals(struct anno_line *tab, int icol_beg, int icol_end);
-extern int setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
-extern int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data);
+// vcfs_options_init will init options but will not allocate memory for vcfs_options 
+extern int vcfs_options_init(struct vcfs_options *opts);
+// clean all options in vcfs_options, but will not free the memory of vcfs_options
+extern int vcfs_options_destroy(struct vcfs_options *opts);
+// add new vcf/bcf database and init columns
+extern int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *columns);
+// core function to annotate
+extern bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line);
 
 #endif
