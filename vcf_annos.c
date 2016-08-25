@@ -1099,9 +1099,7 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 	}
 	file->cached++;
     } 
-    if (file->cached)
-	return 0;
-    return 1;       
+    return file->cached ? 0 : 1;      
 }
    
 bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)

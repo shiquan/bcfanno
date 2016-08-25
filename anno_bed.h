@@ -8,33 +8,46 @@
 #include <htslib/tbx.h>
 #include "anno.h"
 
-struct anno_bed_col {
-    int hdr_id;
-    int icol; // column number in bed file
-    char *a;
+/* struct bed_anno_file_col { */
+/*     int hdr_id; */
+/*     int icol; // column number in bed file */
+/*     char *a; */
+/* }; */
+
+/* struct bed_anno_line { */
+/*     int rid; */
+/*     int start; // 0based start */
+/*     int end; // 1based end */
+/*     struct bed_anno_col *cols; */
+/* }; */
+struct beds_anno_tsv {
+    int nfields;
+    int *fields;
+    kstring_t string;
 };
 
-struct anno_bed_line {
-    int rid;
-    int start; // 0based start
-    int end; // 1based end
-    struct anno_bed_col *cols;
-};
-
-struct anno_bed_file {
+struct beds_anno_file {
+    int id; // file idx
     htsFile *fp;
     tbx_t *idx;
+    char *fname;
+    int last_id;
+    int last_start;
+    int last_end;
     int n_cols;
     struct anno_col *cols;
-    // memory pool
+    // memory pool    
     int cached, max;
-    struct anno_bed_line **buffer;
+    struct beds_anno_tsv **buffer;
+    // struct bed_anno_line **buffer;
 };
 
 struct beds_options {
-    
+    int beds_is_inited;
+    bcf_hdr_t *hdr_out;
     int n_files;
-    struct anno_bed_file *files;
+    int m_files;    
+    struct beds_anno_file *files;
     
 };
 // bed format function annotation
