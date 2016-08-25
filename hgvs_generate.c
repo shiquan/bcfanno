@@ -20,11 +20,6 @@ typedef khash_t(name) namehash_type;
 
 typedef char *(*copy_seqs_func)(const char*, unsigned long n);
 
-struct name_list {
-    int l, m;
-    char **a;
-};
-
 static void genepred_line_clear(struct genepred_line *line)
 {
     if ( line->clear == 1 )
@@ -977,19 +972,6 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
     return 0;
 }
 
-static void name_list_push(struct name_list *names, char *name)
-{
-    int i;
-    for ( i = 0; i < names->l; ++i ) {
-	if ( strcmp(names->a[i], name) == 0 )
-	    return;
-    }
-    if ( names->m == names->l ) {
-	names->m = names->m == 0 ? 2 : names->m<<1;
-	names->a = (char**)realloc(names->a, sizeof(char*)*names->m);
-    }
-    names->a[names->l++] = (char*)strdup(name);
-}
 // -- assuming type of hgvs.name tag is string and number is R. this is mandontary for VCF file 
 // genepred_memory        cached memory pool for gene predictions records
 // line        input variant record in bcf1_t format
