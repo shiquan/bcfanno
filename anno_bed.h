@@ -51,6 +51,6 @@ struct beds_options {
     
 };
 // bed format function annotation
-extern int setter_func_region(struct beds_options *opts, bcf1_t *line);
+// extern int setter_func_region(struct beds_options *opts, bcf1_t *line);
 
 #endif

@@ -64,11 +64,7 @@
 
 #define warnings(line, ...) do						\
     {									\
-	if (errno == 0) {						\
-	    fprintf(stderr, "[warnings] " line "\n", ##__VA_ARGS__);	\
-	} else {							\
-	    fprintf(stderr, "[warnings] Errno: %s. " line "\n", str_errno(), ##__VA_ARGS__); \
-	}								\
+	fprintf(stderr, "[warnings] " line "\n", ##__VA_ARGS__);	\
     }while(0)
 
 #define debug_print(line, ...) do {\

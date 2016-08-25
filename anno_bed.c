@@ -41,6 +41,7 @@ void anno_stack_destroy(struct anno_stack *stack)
 }
 char * get_col_tsv(struct beds_anno_tsv *tsv, int icol)
 {
+    debug_print("icol : %d, nfields : %d", icol, tsv->nfields);
     if (icol > tsv->nfields) {
 	warnings("outof columns");
 	return NULL;
@@ -54,6 +55,7 @@ static char *generate_funcreg_string (struct beds_anno_file *file, struct anno_c
 
     struct anno_stack * stack = anno_stack_init();
     int i;
+    debug_print("cached : %d", file->cached);
     for ( i = 0; i < file->cached; ++i ) {
 	struct beds_anno_tsv *tsv = file->buffer[i];
 	anno_stack_push(stack, get_col_tsv(tsv, col->icol));
@@ -103,7 +105,8 @@ void kstring_destroy(kstring_t *str)
     free(str);
 }
 int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *line)
-{    
+{
+    debug_print("id : %d, idx : %p", file->id, file->idx);
     assert(file->idx);
     int tid = tbx_name2id(file->idx, bcf_seqname(hdr_out, line));
     if ( tid == -1 ) {
@@ -187,6 +190,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 	opts->files = (struct beds_anno_file*)realloc(opts->files, opts->m_files*sizeof(struct beds_anno_file));	
     }
     struct beds_anno_file *file = &opts->files[opts->n_files];
+    file->id = opts->n_files;
     file->fp = hts_open(fname, "r");
     if (file->fp == NULL)
 	error("Failed to open %s : %s", fname, strerror(errno));
@@ -200,7 +204,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
     file->cached = 0;
     file->max = 0;
     file->buffer = 0;
-    file->id = opts->n_files;
+
     file->last_id = -1;
     file->last_start = -1;
     file->last_end = -1;
@@ -231,7 +235,6 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 	    if (ss[0] == '\0')
 		continue;
 	    col->hdr_key = strdup(ss);	    
-	    col->setter.bed = beds_setter_info_string;
 	    col->icol = -1;
 	    file->n_cols++;
 	}
@@ -257,6 +260,8 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 		file->cols = (struct anno_col *) realloc(file->cols, file->n_cols*sizeof(struct anno_col));
 		col = &file->cols[file->n_cols-1];
 		col->icol = -1;
+		col->hdr_key = strndup(ss, se-ss+1);
+		col->hdr_key[se-ss] = '\0';
 	    } else {
 		for ( i = 0; i < file->n_cols; ++i ) {		    
 		    if ( strncmp(file->cols[i].hdr_key, ss, se-ss) == 0)
@@ -265,20 +270,23 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 		if ( i == file->n_cols )
 		    continue;
 		col = &file->cols[i];
-	    }
 
+	    }
+	    debug_print("key : %s", col->hdr_key);
+	    // col->setter.bed = beds_setter_info_string;
 	    bcf_hdr_append(opts->hdr_out, string.s);
 	    bcf_hdr_sync(opts->hdr_out);
 	    int hdr_id = bcf_hdr_id2int(opts->hdr_out, BCF_DT_ID,col->hdr_key);
-	    assert ( bcf_hdr_idinfo_exists(opts->hdr_out, BCF_HL_FMT, hdr_id) );
+	    assert ( bcf_hdr_idinfo_exists(opts->hdr_out, BCF_HL_INFO, hdr_id) );
 	}
 	string.l =0;
 	// set column number for each col
 	if ( strncasecmp(string.s, "#chr", 4) == 0) {
-	    int nfields;
-	    int *splits = ksplit(&string, KS_SEP_TAB, &nfields);
+	    int nfields;	    
+	    int *splits = ksplit(&string, '\t', &nfields);
+	    debug_print("nfields : %d", nfields);
 	    if (nfields < 4)
-		error("Bad header of bed database : %s. n_fields : %d", fname, nfields);
+		error("Bad header of bed database : %s. n_fields : %d, %s", fname, nfields, string.s);
 	    int k;
 	    for ( k = 3; k < nfields; ++k ) {
 		char *ss = string.s + splits[k];
@@ -303,7 +311,8 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 	col->number = bcf_hdr_id2length(opts->hdr_out, BCF_HL_INFO, hdr_id);
 	if ( col->number == BCF_VL_A || col->number == BCF_VL_R || col->number == BCF_VL_G)
 	    error("Only support fixed INFO number for bed database. %s", col->hdr_key);
-	col->ifile = file->id;	
+	col->ifile = file->id;
+	col->setter.bed = beds_setter_info_string;
     }
     if ( string.m )
 	free(string.s);
@@ -318,8 +327,10 @@ bcf1_t *anno_beds_core(struct beds_options *opts, bcf1_t *line)
     int i, j;
     for ( i = 0; i < opts->n_files; ++i ) {
 	struct beds_anno_file *file = &opts->files[i];
-	for ( j = 0; j < file->n_cols; ++j )	    
-	    col->setter.bed(opts, line, col);	    
+	for ( j = 0; j < file->n_cols; ++j ) {
+	    struct anno_col *col = &file->cols[j];
+	    col->setter.bed(opts, line, col);
+	}
     }
     return line;
 }
@@ -348,7 +359,7 @@ const char *output_fname = 0;
 int main(int argc, char **argv)
 {
     if (argc == 1)
-	error("Usage : vcf_annos -c config.json -O z -o output.vcf.gz input.vcf.gz");
+	error("Usage : bed_annos -c config.json -O z -o output.vcf.gz input.vcf.gz");
     int i;
     for ( i = 1; i < argc; ) {
 	const char *a = argv[i++];
@@ -421,7 +432,7 @@ int main(int argc, char **argv)
     for ( i = 0; i < con->beds.n_beds; ++i ) {
 	beds_databases_add(&opts, con->beds.files[i].fname, con->beds.files[i].columns);
     }
-
+    debug_print("n_files : %d", opts.n_files);
     bcf_hdr_write(fout, hdr_out);
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {
