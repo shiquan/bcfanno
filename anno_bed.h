@@ -23,6 +23,9 @@
 struct beds_anno_tsv {
     int nfields;
     int *fields;
+    // int tid;
+    int start;
+    int end;
     kstring_t string;
 };
 
@@ -35,6 +38,7 @@ struct beds_anno_file {
     int last_start;
     int last_end;
     int n_cols;
+    int m_cols;
     struct anno_col *cols;
     // memory pool    
     int cached, max;
