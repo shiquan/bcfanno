@@ -60,8 +60,17 @@ force:
 
 #plugins: $(PLUGINS)
 
-vcfanno: $(HTSLIB) version.h
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ anno_core.c vcmp.c config.c anno_setter.c kson.c vcf_annos.c -pthread $(HTSLIB) -lz
+hgvs_generate:
+	$(CC) -D_HGVS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ hgvs_generate.c
+
+vcfadd:
+	$(CC) -D_VCF_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ vcf_annos.c config.c kson.c vcmp.c
+
+bedadd:
+	$(CC) -D_BED_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ anno_bed.c config.c kson.c
+
+vcfanno: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c
 
 
 #docs: doc/bcftools.1 doc/bcftools.html

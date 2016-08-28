@@ -68,7 +68,7 @@ static void hgvs_cache_destroy(struct hgvs_cache *cache)
 	}
 	free(name->a);	    
     }
- }
+}
 static namehash_type *init_gene_name(const char *name)
 {
     int i, n = 0;
@@ -170,7 +170,7 @@ void set_format_genepred()
 {
     type = &genepred_formats;
 }
-static void genepred_prase_core(kstring_t *string, struct genepred_line *line)
+static void genepred_parse_core(kstring_t *string, struct genepred_line *line)
 {
     int nfields = 0;
     genepred_line_clear(line);    
@@ -221,10 +221,10 @@ static void genepred_prase_core(kstring_t *string, struct genepred_line *line)
     // make sure the genepred_line is filled
     line->clear = 0;
 }
-void genepred_line_praser(kstring_t *string, struct genepred_line *line)
+void genepred_line_parser(kstring_t *string, struct genepred_line *line)
 {
-    // prase string into genepred line struct
-    genepred_prase_core(string, line);
+    // parse string into genepred line struct
+    genepred_parse_core(string, line);
     // calculate the length of function regions, for plus strand, forward length is the length of UTR5, and
     // backward length is the length of UTR3, for minus strand 
     int ref_len = 0;
@@ -358,7 +358,7 @@ void genepred_line_praser(kstring_t *string, struct genepred_line *line)
 void generate_dbref_database(struct genepred_line *line)
 {
     if (line->clear == 1) return;
-    int i, j;
+    int i;
     for ( i = 0; i < line->exoncount; ++i ) {
     	kstring_t temp[2] = { KSTRING_INIT, KSTRING_INIT };
     	int types[2];
@@ -405,8 +405,8 @@ static void push_mempool(struct genepred_memory *pool, kstring_t *str)
       memset(&pool->a[pool->i], 0, sizeof(struct genepred_line));
       pool->a[pool->i++].clear = 1;
     }
-    // the prase func must return a point or go abort
-    genepred_line_praser(str, &pool->a[pool->l]);
+    // the parse func must return a point or go abort
+    genepred_line_parser(str, &pool->a[pool->l]);
     pool->l++;
 }
 static void update_mempool(struct genepred_memory *pool)
@@ -439,6 +439,7 @@ static void hgvs_memory_clear(struct genepred_memory *pool)
 static int hgvs_fill_memory(struct refgene_options *opts, bcf1_t *line)
 {
     // get the chromosome id in tabix indexed genepred database
+    assert(opts->genepred_idx);
     int id = tbx_name2id(opts->genepred_idx, bcf_hdr_id2name(opts->hdr_out, line->rid));
     // no chromosome found, return 1
     if (id == -1)
@@ -474,7 +475,7 @@ static void namehash_destroy(void *_hash)
     kh_destroy(name, hash);
 }
 
-void refgene_opts_destroy(struct refgene_options *opt)
+void refgene_options_destroy(struct refgene_options *opt)
 {
     hts_close(opt->fp);
     tbx_destroy(opt->genepred_idx);
@@ -759,7 +760,7 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
     //    |         |         |
     //    |-------------------|
     //    offset_start offset_end
-    int loc;
+    int loc = 0;
     uint8_t type;
     if ( type_start == type_end ) {
 	loc = loc_end > loc_start ?  loc_end - offset_end : loc_start - offset_start;
@@ -817,16 +818,16 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
 	goto generate_cpos;
     }
     
-    if (type_start == REG_UTR3) {
+    if (type_start & REG_UTR3) {
 	// should only be minus strand
-	if ( type_end == REG_CODING ) {
+	if ( type_end & REG_CODING ) {
 	    loc = loc_start - offset_start;
 	    type = type_start;
 	    if (loc <= 0) {
 		loc = -loc + 1;
 		type = type_end;
 	    }		    
-	} else if (type_end == REG_UTR5) {
+	} else if (type_end & REG_UTR5) {
 	    // cds region inside one exon
 	    loc = loc_start - offset_start;
 	    type = type_start;
@@ -873,8 +874,8 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
     // clear hgvs_core memory before init
     hgvs_core_clear(c);
     
-    uint32_t start_var = (uint32_t)des->start;
-    uint32_t end_var = (uint32_t)des->end;
+    // uint32_t start_var = (uint32_t)des->start;
+    // uint32_t end_var = (uint32_t)des->end;
     kstring_t *string = &c->str;
     // put names into string, usually transcript 
     // if no transcript name, use gene name then
@@ -892,7 +893,7 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
 	c->l_name2 = string->l;
     }
     if (c->l_name == 0) 
-	error ("Failed to prase genepred database. %s\t%u\t%u", line->chrom, line->txstart, line->txend);
+	error ("Failed to parse genepred database. %s\t%u\t%u", line->chrom, line->txstart, line->txend);
     kputc(':', string);
 
     // put hgvs pos into string
@@ -1184,15 +1185,18 @@ int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_co
 	free(string);
     return 0;
 }
-int refgene_column_prase(struct refgene_options *opts, char *column)
+int refgene_columns_parse(struct refgene_options *opts, char *column)
 {
+    if ( column == NULL)
+	return 1;
     kstring_t string = KSTRING_INIT;
     kputs(column, &string);
     if (opts->hdr_out == NULL)
 	error("Usage error. opts->hdr_out header structure is not inited yet.");
     int nfields = 0;
     int *splits = ksplit(&string, ',', &nfields);
-    if (nfields == 0) return 1;
+    if (nfields == 0)
+	return 1;
     opts->n_cols = nfields;
     opts->cols = (struct anno_col*)calloc(opts->n_cols, sizeof(struct anno_col));
     int i;
@@ -1217,13 +1221,13 @@ int refgene_column_prase(struct refgene_options *opts, char *column)
 	} else if ( strcmp(col->hdr_key, "HGVSDNA") == 0 ) {
 	    col->icol = hgvs_bcf_header_add_hgvsdna(opts->hdr_out);
 	} else {
-	    error("Failed to prase column tag %s", col->hdr_key);
+	    error("Failed to parse column tag %s", col->hdr_key);
 	}
 	col->number =  bcf_hdr_id2length(opts->hdr_out, BCF_HL_INFO, col->icol);
-
 	col->setter.hgvs = setter_hgvs_names;
-
     }
+    if ( opts->refgene_is_inited == 0 )
+	opts->refgene_is_inited = 1;
     free(string.s);
     free(splits);
     return 0;
@@ -1232,27 +1236,42 @@ int refgene_set_refseq_fname(struct refgene_options *opts, char *fname)
 {
     const char **var = &opts->refseq_fname;
     *var = fname;
+    // todo: init refseq here
     return 0;
 }
 int refgene_set_refgene_fname(struct refgene_options *opts, char *fname)
 {
-    const char **var = &opts->genepred_fname;
-    *var = fname;
+    if ( opts->genepred_fname == NULL ) {
+	const char **var = &opts->genepred_fname;
+	*var = fname;
+    }
+    opts->fp = hts_open(opts->genepred_fname, "r");
+    if (opts->fp == NULL)
+	error("Failed to open %s", opts->genepred_fname);
+    opts->genepred_idx = load_genepred_file(opts->genepred_fname);
+    if (opts->genepred_idx == NULL)
+	error("Failed to load index of %s", opts->genepred_fname);
     return 0;
 }
 int refgene_set_trans_fname(struct refgene_options *opts, char *fname)
 {
     const char **var = &opts->trans_list_fname;
     *var = fname;
+    // todo: set transcripts list here
     return 0;
 }
 int refgene_set_genes_fname(struct refgene_options *opts, char *fname)
 {
     const char **var = &opts->genes_list_fname;
     *var = fname;
+    // todo: set gene list here
     return 0;
 }
-
+int refgene_options_init(struct refgene_options *opts, char *fname)
+{
+    memset(opts, 0, sizeof(struct refgene_options));    
+    return 0;
+}
 #ifdef _HGVS_MAIN
 
 #include <sys/time.h>
@@ -1338,13 +1357,7 @@ int main(int argc, char **argv)
     if (opts.genepred_fname == 0)
 	error("Gene preditions database is needed. Download refGene.txt.gz or ensGene.txt.gz from UCSC websites and sort and indexed by tabix.");
 
-    opts.fp = hts_open(opts.genepred_fname, "r");
-    if (opts.fp == NULL)
-	error("Failed to open %s", opts.genepred_fname);
-    opts.genepred_idx = load_genepred_file(opts.genepred_fname);
-    if (opts.genepred_idx == NULL)
-	error("Failed to load index of %s", opts.genepred_fname);
-    
+    refgene_set_refgene_fname(&opts, opts.genepred_fname);
     htsFile *fp = hts_open(input_fname, "r");
     if (fp == NULL)
 	error("Failed to open %s.", input_fname);
@@ -1373,14 +1386,14 @@ int main(int argc, char **argv)
     double c0 = get_time();
     LOG_print("Init ...");
     bcf_hdr_t *hdr = bcf_hdr_read(fp);    
-    LOG_print("Prase header.");
+    LOG_print("Parse header.");
     // duplicate header file and sync new tag in the output header .
     // assuming output is stdout in Vcf format in default. 
     htsFile *fout = out_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(out_fname, hts_bcf_wmode(out_type));
     opts.hdr_out = bcf_hdr_dup(hdr);
     set_format_genepred();
-    // prase configure columns
-    refgene_column_prase(&opts, (char*)columns);   
+    // parse configure columns
+    refgene_column_parse(&opts, (char*)columns);   
     bcf_hdr_write(fout, opts.hdr_out);    
     // init gene_pred or refgene database, hold tabix index cache and faidx cache in memory 
     bcf1_t *line = bcf_init();
@@ -1394,7 +1407,7 @@ int main(int argc, char **argv)
     bcf_destroy(line);
     bcf_hdr_destroy(hdr);
     bcf_hdr_destroy(opts.hdr_out);
-    refgene_opts_destroy(&opts);
+    refgene_options_destroy(&opts);
     hts_close(fp);
     hts_close(fout);
     double c1 = get_time();

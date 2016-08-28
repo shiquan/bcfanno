@@ -1,7 +1,11 @@
 #include "anno.h"
+#include "utils.h"
 #include "config.h"
-// #include "plugin.h"
 #include "version.h"
+#include "anno_bed.h"
+#include "anno_vcf.h"
+#include "anno_hgvs.h"
+#include "htslib/vcf.h"
 
 static const char *hts_bcf_wmode(int file_type)
 {
@@ -10,64 +14,6 @@ static const char *hts_bcf_wmode(int file_type)
     if ( file_type & FT_GZ ) return "wz";       // compressed VCF
     return "w";                                 // uncompressed VCF
 }
-
-/* int parse_columns(struct vcf_sql_api *api) */
-/* { */
-/*     if (api == NULL)  */
-/* 	error("empty api"); */
-/*     assert(api->columns); */
-/*     assert(hand.files->readers[hand.ti].header); */
-/*     assert(hand.hdr_out); */
-/*     if (api->type == anno_is_vcf) { */
-/* 	int ncols = 0; */
-/* 	struct annot_cols_vector *v = hand.vcf_cols; */
-/* 	if (v->m == v->n) { */
-/* 	    v->m = v->n == 0 ? 2: v->n << 1; */
-/* 	    v->vcols = (struct annot_cols*)realloc(v->vcols, v->m *sizeof(struct annot_cols)); */
-/* 	} */
-/* 	struct annot_cols *ac = &v->vcols[v->n++]; */
-/* 	ac->cols = init_columns((const char*)api->columns, hand.files->readers[hand.ti].header, hand.hdr_out, &ncols, anno_is_vcf); */	
-/* 	if (ac->cols == NULL || ncols == 0) { */
-/* 	    warnings("failed to prase %s",api->columns); */
-/* 	    ac->cols = NULL; */
-/* 	    ac->ncols = 0; */
-/* 	} */
-/* 	ac->ncols = ncols; */
-/*     } else { */
-/* 	/\* TODO: api.type == api_is_sql *\/ */
-/* 	assert(1); */
-/*     } */
-/*     return 0; */
-/* } */
-/* int init_data(const char *json, const char *fname) */
-/* { */
-/*     if ( load_config(json) != 0 ) { */
-/* 	error("Load JSON file failed"); */
-/*     } */
-/*     // assume input is VCF/BCF file */
-/*     hand.files = bcf_sr_init(); */
-/*     hand.files->require_index = 1; */
-/*     hand.vcf_cols = acols_vector_init(); */
-/*     hand.sql_cols = acols_vector_init(); */    
-/*     if ( !bcf_sr_add_reader(hand.files, fname) ) { */
-/* 	error("Failed to open %s: %s\n", fname, bcf_sr_strerror(hand.files->errnum)); */
-/*     } */
-/*     hand.hdr =  hand.files->readers[0].header; */
-/*     hand.hdr_out = bcf_hdr_dup(hand.hdr); */
-/*     hand.vcmp = vcmp_init(); */
-/*     hand.tmpks.l = hand.tmpks.m = 0; */
-/*     int i; */
-/*     for (i=0; i<anno_config_file.n_apis; ++i) { */
-/* 	/\* only accept vcf/bcf for now*\/ */
-/* 	if (anno_config_file.apis[i].type == anno_is_vcf) { */	    
-/* 	    if ( !bcf_sr_add_reader(hand.files, anno_config_file.apis[i].vfile) )  */
-/* 		error("Failed to open %s: %s\n", fname, bcf_sr_strerror(hand.files->errnum)); */	    
-/* 	    hand.ti = i; */
-/* 	    parse_columns(&anno_config_file.apis[i]); */	    
-/* 	} */
-/*     } */
-/*     return 0; */
-/* } */
 
 int usage()
 {
@@ -119,17 +65,33 @@ struct args args = {
     .fname_output = 0,
     .hdr = NULL,
     .hdr_out = NULL,
-    .fp = NULL,
+    .fp_input = NULL,
     .fp_out = NULL,
     .output_type = 0,
-    .bed_opts = BED_OPTS_INIT,
-    .vcf_opts = VCF_OPTS_INIT,
-    .hgvs_opts = HGVS_OPTS_INIT,
+    .commands = KSTRING_INIT,
+    //.bed_opts = BED_OPTS_INIT,
+    //.vcf_opts = VCF_OPTS_INIT,
+    //.hgvs_opts = HGVS_OPTS_INIT,
 };
 
-int args_init() {
-}
 int args_destroy(){
+    // debug_print("destroy header");
+    bcf_hdr_destroy(args.hdr);
+    // debug_print("destroy header out");
+    bcf_hdr_destroy(args.hdr_out);
+    // debug_print("close input");
+    hts_close(args.fp_input);
+    // debug_print("close output");
+    bcf_close(args.fp_out);
+    // debug_print("close commands");
+    if (args.commands.m)
+	free(args.commands.s);
+    // debug_print("close vcfs");
+    vcfs_options_destroy(&args.vcf_opts);
+    // debug_print("close beds");
+    beds_options_destroy(&args.bed_opts);
+    // debug_print("close hgvs");
+    refgene_options_destroy(&args.hgvs_opts);
 }
 
 static int quiet_mode = 0;
@@ -140,7 +102,7 @@ int test_databases_framework()
     // test success
     return 0;
 }
-int prase_args(int argc, char **argv)
+int parse_args(int argc, char **argv)
 {
     int i;
     for (i = 0; i < argc; ++i ) {
@@ -175,21 +137,21 @@ int prase_args(int argc, char **argv)
 	    *var = argv[i++];
 	    continue;
 	}
-	if ( args.input_fname == 0 ) {
-	    args.input_fname = a;
+	if ( args.fname_input == 0 ) {
+	    args.fname_input = a;
 	    continue;
 	}
 	error("Unknown argument : %s, use -h see help information.", a);
     }
     
-    if (quiet_mode == 0) {
+    if ( quiet_mode == 0 ) {
 	LOG_print("The program was compiled at %s %s by %s.", __DATE__, __TIME__, getenv("USER"));
 	LOG_print("Args: %s", args.commands.s);	
     }
     
     if ( args.fname_json == 0 ) {
-	fprintf(stderr, "[error] No configure file is specified. Please define -c or --config argument first.");
-	fprintf(stderr, "[notice] Please DONOT puts this error message into emails or forum. This issue could be easily fixed by reading our manual carefully.");
+	fprintf(stderr, "[error] No configure file is specified. Please define -c or --config argument first.\n");
+	fprintf(stderr, "[notice] Please DONOT puts this error message into emails or forum. This issue could be easily fixed by reading our manual carefully.\n");
 	return 1;
     }
 
@@ -207,7 +169,7 @@ int prase_args(int argc, char **argv)
 	return test_databases_framework();
 
     // if input file is not set, use stdin
-    if ( args.fname_input == 0 && (!isatty(fileno(stdin))))
+    if ( args.fname_input == 0 && (!isatty(fileno(stdin))) )
 	args.fname_input = "-";
     // if no detect stdin, go error
     if ( args.fname_input == 0)
@@ -219,14 +181,12 @@ int prase_args(int argc, char **argv)
     // check input type is VCF/BCF or not
     htsFormat type = *hts_get_format(args.fp_input);
     if ( type.format  != vcf && type.format != bcf )
-	error("Unsupported input format, only accept BCF/VCF format. %s", input_fname);
+	error("Unsupported input format, only accept BCF/VCF format. %s", args.fname_input);
 
-    // init output file handler
-    args.fp_out = args.fname_output == 0 ? hts_open("-", hts_bcf_wmode(args.out_type)) : hts_open(args.fname_output, hts_bcf_wmode(args.out_type));
     // init output type
     int out_type = FT_VCF;
-    if ( out_type_string != 0 ) {
-	switch (out_type_string[0]) {
+    if ( output_fname_type != 0 ) {
+	switch (output_fname_type[0]) {
 	    case 'b':
 		out_type = FT_BCF_GZ; break;
 	    case 'u':
@@ -239,37 +199,58 @@ int prase_args(int argc, char **argv)
 		error("The output type \"%d\" not recognised\n", out_type);
 	};
     }
+    // init output file handler
+    args.fp_out = args.fname_output == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.fname_output, hts_bcf_wmode(out_type));
+
+    args.bed_opts.beds_is_inited = 0;
+    args.vcf_opts.vcfs_is_inited = 0;
+    args.hgvs_opts.refgene_is_inited = 0;
+    // set genepred format
+    set_format_genepred();
+    beds_options_init( &args.bed_opts );
+    vcfs_options_init( &args.vcf_opts );
+    refgene_options_init( &args.hgvs_opts );
+
     // read bcf header from input bcf/vcf
     args.hdr = bcf_hdr_read(args.fp_input);
     if ( args.hdr == NULL)
-	error("Failed to prase header of input.");
+	error("Failed to parse header of input.");
     // duplicate input header to generate output header
     args.hdr_out = bcf_hdr_dup(args.hdr);
+    // alias hdr_out
+    args.vcf_opts.hdr_out = args.hdr_out;
+    args.bed_opts.hdr_out = args.hdr_out;
+    args.hgvs_opts.hdr_out = args.hdr_out;
     
-    if ( config->refgene_is_set == 1) {
+    if ( con->refgene.refgene_is_set == 1) {
 	struct refgene_options *opts = &args.hgvs_opts;
 	opts->hdr_out = args.hdr_out;
-	// set genepred database, this is mandatory
-	refgene_set_refgene_fname(opts, config->refgene.refgene_fname);
-	// set refseq file in fasta format
-	refgene_set_refseq_fname(opts, config->refgene.refseq_fname);
-	// set transcripts list
-	refgene_set_trans_fname(opts, config->refgene.trans_list_fname);
-	// set gene list
-	refgene_set_genes_fname(opts, config->refgene.genes_list_fname);
-	// prase columns of refgene
-	refgene_columns_prase(opts, config->refgene.columns);
-	opts->refgene_is_inited = 1;
+	// parse columns of refgene
+	if ( refgene_columns_parse(opts, con->refgene.columns) == 1) {
+	    warnings("Init refgene columns failed; skip..");
+	    // refgene_is_init == 0 
+	} else {
+	    // set genepred database, this is mandatory
+	    refgene_set_refgene_fname(opts, con->refgene.genepred_fname);
+	    // set refseq file in fasta format
+	    refgene_set_refseq_fname(opts, con->refgene.refseq_fname);
+	    // set transcripts list
+	    refgene_set_trans_fname(opts, con->refgene.trans_list_fname);
+	    // set gene list
+	    refgene_set_genes_fname(opts, con->refgene.gene_list_fname);
+	}
     }    
 
-    for ( i = 0; i < config->n_vcfs; ++i ) {
-	
+    for ( i = 0; i < con->vcfs.n_vcfs; ++i ) {
+	vcfs_database_add(&args.vcf_opts, con->vcfs.files[i].fname, con->vcfs.files[i].columns);
     }
 
-    for ( i = 0; i < config->n_beds; ++i ) {
-
-    }
-
+    for ( i = 0; i < con->beds.n_beds; ++i ) {
+	beds_databases_add(&args.bed_opts, con->beds.files[i].fname, con->beds.files[i].columns);
+    }    
+    // write header to output
+    bcf_hdr_write(args.fp_out, args.hdr_out);
+    return 0;
 }
 bcf1_t *anno_core(bcf1_t *line)
 {
@@ -277,12 +258,14 @@ bcf1_t *anno_core(bcf1_t *line)
     if ( bcf_get_variant_types(line) == VCF_REF )
 	return line;    
     // annotate hgvs name
-    anno_refgene_core(&args.hgvs_opts, line);
+    if ( args.hgvs_opts.refgene_is_inited == 1 )
+	anno_refgene_core(&args.hgvs_opts, line);
     // annotate vcf files
-    // anno_vcfs_core(&args.vcf_opts, line);
+    if ( args.vcf_opts.vcfs_is_inited == 1 )
+	anno_vcfs_core(&args.vcf_opts, line);
     // annotate bed format datasets
-    // anno_beds_core(&args.bed_opts, line);
-    
+    if ( args.bed_opts.beds_is_inited == 1 )
+	anno_beds_core(&args.bed_opts, line);    
     return line;
 }
 void export_reports()
@@ -290,18 +273,22 @@ void export_reports()
 }
 int main(int argc, char **argv)
 {
-    // prase arguments first, if failure or just do test will return 1, else return 0
-    if ( prase_args(argc, argv) == 1 )
+    // parse arguments first, if failure or just do test will return 1, else return 0
+    if ( parse_args(--argc, ++argv) == 1 )
 	return 1;
 
     // read input vcf file by line
     bcf1_t *line = bcf_init();
-    while ( bcf_read(args.fp, args.hdr, line) == 0) {
+    while ( bcf_read(args.fp_input, args.hdr, line) == 0) {
+	// skip uninited line
 	if (line->rid == -1)
-	    continue;	
+	    continue;
+	// annotate vcf line function
 	anno_core(line);
-	bcf_write1(args.out, args.hdr_out, line);
-    }    
+	bcf_write1(args.fp_out, args.hdr_out, line);
+    }
+    // debug_print("final");
+    LOG_print("Annotate finished. Close.");
     bcf_destroy(line);
     export_reports();
     args_destroy();

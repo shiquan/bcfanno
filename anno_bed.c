@@ -156,7 +156,7 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 int beds_options_init(struct beds_options *opts)
 {
     memset(opts, 0, sizeof(struct beds_options));
-    opts->beds_is_inited = 1;
+    // opts->beds_is_inited = 1;
     return 0;
 }
 int beds_file_destroy(struct beds_anno_file *file)
@@ -204,6 +204,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 	opts->files = (struct beds_anno_file*)realloc(opts->files, opts->m_files*sizeof(struct beds_anno_file));	
     }
     struct beds_anno_file *file = &opts->files[opts->n_files];
+    memset(file, 0, sizeof(struct beds_anno_file));
     file->id = opts->n_files;
     file->fp = hts_open(fname, "r");
     if (file->fp == NULL)
@@ -213,12 +214,14 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
     if ( file->idx == NULL)
 	error("Failed to load index of %s.", fname);
     opts->n_files++;
-    file->n_cols = 0;
-    file->cols = 0;
-    file->cached = 0;
-    file->max = 0;
-    file->buffer = 0;
-
+    
+    /* file->n_cols = 0; */
+    /* file->m_cols = 0; */
+    /* file->cols = 0; */
+    /* file->cached = 0; */
+    /* file->max = 0; */
+    /* file->buffer = 0; */
+    
     file->last_id = -1;
     file->last_start = -1;
     file->last_end = -1;
@@ -260,7 +263,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 
     int n_hdr = 0;
     int m_hdr = 0;
-    struct hdr_string *hdrs = NULL;
+    // struct hdr_string *hdrs = NULL;
     while (1) {
 	string.l =0;
 	if ( hts_getline(file->fp, KS_SEP_LINE, &string) < 0 )
@@ -293,7 +296,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
 		    continue;
 		col = &file->cols[i];
 	    }
-	    debug_print("key : %s", col->hdr_key);
+	    // debug_print("key : %s", col->hdr_key);
 	    // specify setter functions here
 	    col->setter.bed = beds_setter_info_string;
 	    
@@ -340,6 +343,8 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
     }
     if ( string.m )
 	free(string.s);
+    if ( opts->beds_is_inited == 0 )
+	opts->beds_is_inited = 1;
     return 0;
 }
 
