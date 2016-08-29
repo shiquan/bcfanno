@@ -1110,7 +1110,7 @@ bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
     assert(opts->hdr_out);    
     int i, j;
     int k;    
-    int ret = 0;
+    // int ret = 0;
     // debug_print("n_files : %d", opts->n_files);
     for ( i = 0; i < opts->n_files; ++i ) {
 	struct anno_vcf_file *file = &opts->files[i];

@@ -197,7 +197,7 @@ int beds_setter_info_string(struct beds_options *opts, bcf1_t *line, struct anno
     return 0;
 }
 
-int beds_databases_add(struct beds_options *opts, const char *fname, char *columns)
+int beds_database_add(struct beds_options *opts, const char *fname, char *columns)
 {
     if ( opts->n_files == opts->m_files ) {
 	opts->m_files = opts->m_files == 0 ? 2 : opts->m_files +2;
@@ -209,7 +209,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
     file->fp = hts_open(fname, "r");
     if (file->fp == NULL)
 	error("Failed to open %s : %s", fname, strerror(errno));
-    int n;
+    // int n;
     file->idx = tbx_index_load(fname);
     if ( file->idx == NULL)
 	error("Failed to load index of %s.", fname);
@@ -262,7 +262,7 @@ int beds_databases_add(struct beds_options *opts, const char *fname, char *colum
     }
 
     int n_hdr = 0;
-    int m_hdr = 0;
+    // int m_hdr = 0;
     // struct hdr_string *hdrs = NULL;
     while (1) {
 	string.l =0;
@@ -459,7 +459,7 @@ int main(int argc, char **argv)
     opts.hdr_out = hdr_out;
 
     for ( i = 0; i < con->beds.n_beds; ++i ) {
-	beds_databases_add(&opts, con->beds.files[i].fname, con->beds.files[i].columns);
+	beds_database_add(&opts, con->beds.files[i].fname, con->beds.files[i].columns);
     }
 
     bcf_hdr_write(fout, hdr_out);

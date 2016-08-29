@@ -74,7 +74,7 @@ struct args args = {
     //.hgvs_opts = HGVS_OPTS_INIT,
 };
 
-int args_destroy(){
+void args_destroy(){
     // debug_print("destroy header");
     bcf_hdr_destroy(args.hdr);
     // debug_print("destroy header out");
@@ -246,7 +246,7 @@ int parse_args(int argc, char **argv)
     }
 
     for ( i = 0; i < con->beds.n_beds; ++i ) {
-	beds_databases_add(&args.bed_opts, con->beds.files[i].fname, con->beds.files[i].columns);
+	beds_database_add(&args.bed_opts, con->beds.files[i].fname, con->beds.files[i].columns);
     }    
     // write header to output
     bcf_hdr_write(args.fp_out, args.hdr_out);

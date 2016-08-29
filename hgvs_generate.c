@@ -1267,7 +1267,7 @@ int refgene_set_genes_fname(struct refgene_options *opts, char *fname)
     // todo: set gene list here
     return 0;
 }
-int refgene_options_init(struct refgene_options *opts, char *fname)
+int refgene_options_init(struct refgene_options *opts)
 {
     memset(opts, 0, sizeof(struct refgene_options));    
     return 0;

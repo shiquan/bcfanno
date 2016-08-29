@@ -233,5 +233,7 @@ extern int refgene_set_refseq_fname(struct refgene_options *opts, char *fname);
 extern int refgene_set_refgene_fname(struct refgene_options *opts, char *fname);
 extern int refgene_set_trans_fname(struct refgene_options *opts, char *fname);
 extern int refgene_set_genes_fname(struct refgene_options *opts, char *fname);
+extern int refgene_options_init(struct refgene_options *opts);
+extern void refgene_options_destroy(struct refgene_options *opts);
 
 #endif
