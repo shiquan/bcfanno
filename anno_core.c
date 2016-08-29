@@ -1,11 +1,12 @@
 #include "anno.h"
 #include "utils.h"
 #include "config.h"
-#include "version.h"
+#include "htslib/hts.h"
+#include "htslib/vcf.h"
 #include "anno_bed.h"
 #include "anno_vcf.h"
 #include "anno_hgvs.h"
-#include "htslib/vcf.h"
+#include "version.h"
 
 static const char *hts_bcf_wmode(int file_type)
 {
