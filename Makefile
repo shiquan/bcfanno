@@ -64,7 +64,7 @@ bedadd: $(HTSLIB)
 	$(CC) -D_BED_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_bed.c config.c kson.c $(HTSLIB)
 
 vcf2tsv: $(HTSLIB) version.h 
-	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tvs $(HTSLIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
 
 vcfanno: $(HTSLIB) version.h vcf2tsv
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
