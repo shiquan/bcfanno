@@ -487,7 +487,6 @@ void setter_bed(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
     uint32_t end = line->pos + strlen(line->d.allele[0]);
     ksprintf(&val->a, "%s\t%u\t%u",hdr->id[BCF_DT_CTG][line->rid].key, line->pos, end);
-
 }
 void setter_ref(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {

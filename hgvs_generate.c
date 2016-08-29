@@ -1393,7 +1393,7 @@ int main(int argc, char **argv)
     opts.hdr_out = bcf_hdr_dup(hdr);
     set_format_genepred();
     // parse configure columns
-    refgene_column_parse(&opts, (char*)columns);   
+    refgene_columns_parse(&opts, (char*)columns);   
     bcf_hdr_write(fout, opts.hdr_out);    
     // init gene_pred or refgene database, hold tabix index cache and faidx cache in memory 
     bcf1_t *line = bcf_init();

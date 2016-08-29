@@ -1,5 +1,4 @@
 PROG=       vcfanno
-##TEST_PROG=  test/test-rbuf
 
 all: $(PROG) $(TEST_PROG)
 
@@ -7,8 +6,6 @@ all: $(PROG) $(TEST_PROG)
 HTSDIR = htslib-1.3
 include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
-#BGZIP  = $(HTSDIR)/bgzip
-#TABIX  = $(HTSDIR)/tabix
 
 CC       = gcc
 CFLAGS   = -g -Wall -Wc++-compat -O2
@@ -21,11 +18,8 @@ DFLAGS   =
 #           ccall.o em.o prob1.o kmin.o # the original samtools calling
 INCLUDES = -I. -I$(HTSDIR)/
 
-# The polysomy command is not compiled by default because it brings dependency
-# on libgsl. The command can be compiled wth `make USE_GPL=1`. See the INSTALL
-# and LICENSE documents to understand license implications.
 
-all:$(PROG) plugins
+all:$(PROG)
 
 # See htslib/Makefile
 PACKAGE_VERSION = 0.01
@@ -60,30 +54,27 @@ force:
 
 #plugins: $(PLUGINS)
 
-hgvs_generate:
+hgvs_generate: $(HTSLIB) 
 	$(CC) -D_HGVS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ hgvs_generate.c
 
-vcfadd:
+vcfadd: $(HTSLIB) 
 	$(CC) -D_VCF_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ vcf_annos.c config.c kson.c vcmp.c
 
-bedadd:
+bedadd: $(HTSLIB) 
 	$(CC) -D_BED_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ anno_bed.c config.c kson.c
 
-vcfanno: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
+vcf2tsv: $(HTSLIB) version.h 
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ misc/vcf2tsv
+
+vcfanno: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c
 
-
-#docs: doc/bcftools.1 doc/bcftools.html
-
-#install: $(PROG) doc/bcftools.1
-#	$(INSTALL_DIR) $(DESTDIR)$(bindir) $(DESTDIR)$(man1dir)
-#	$(INSTALL_PROGRAM) $(PROG) plot-vcfstats vcfutils.pl $(DESTDIR)$(bindir)
-#	$(INSTALL_DATA) doc/bcftools.1 $(DESTDIR)$(man1dir)
+test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
 
 clean: testclean
 	-rm -f gmon.out *.o *~ $(PROG) version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
-
+	-rm -f anno_vcf bedadd vcfadd vcfanno anno_bed hgvs_generate
 
 testclean:
 	-rm -f test/*.o test/*~ $(TEST_PROG)
