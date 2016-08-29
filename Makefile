@@ -55,18 +55,18 @@ force:
 #plugins: $(PLUGINS)
 
 hgvs_generate: $(HTSLIB) 
-	$(CC) -D_HGVS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ hgvs_generate.c
+	$(CC) -D_HGVS_MAIN $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ hgvs_generate.c $(HTSLIB)
 
 vcfadd: $(HTSLIB) 
-	$(CC) -D_VCF_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ vcf_annos.c config.c kson.c vcmp.c
+	$(CC) -D_VCF_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ vcf_annos.c config.c kson.c vcmp.c $(HTSLIB)
 
 bedadd: $(HTSLIB) 
-	$(CC) -D_BED_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ anno_bed.c config.c kson.c
+	$(CC) -D_BED_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_bed.c config.c kson.c $(HTSLIB)
 
 vcf2tsv: $(HTSLIB) version.h 
-	$(CC) $(CFLAGS) $(INCLUDES) -pthread $(HTSLIB) -lz -o $@ misc/vcf2tsv
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tvs $(HTSLIB)
 
-vcfanno: $(HTSLIB) version.h 
+vcfanno: $(HTSLIB) version.h vcf2tsv
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
 
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
