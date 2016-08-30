@@ -114,7 +114,7 @@ int parse_args(int argc, char **argv)
 	};
     }
     args.hdr_in = bcf_hdr_read(args.fp_input);
-    htsFile *fout = output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(output_fname, hts_bcf_wmode(out_type));
+    args.fp_output = output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(output_fname, hts_bcf_wmode(out_type));
     args.hdr_out = bcf_hdr_dup(args.hdr_in);
     
     return 0;

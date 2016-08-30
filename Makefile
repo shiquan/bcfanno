@@ -69,7 +69,7 @@ vcf2tsv: $(HTSLIB) version.h
 vcf_rename_tags: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
-vcfanno: $(HTSLIB) version.h vcf2tsv
+vcfanno: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
 
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
