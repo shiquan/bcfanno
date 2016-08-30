@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "config.h"
 #include "htslib/hts.h"
+#include "htslib/tbx.h"
 #include "htslib/vcf.h"
 #include "anno_bed.h"
 #include "anno_vcf.h"

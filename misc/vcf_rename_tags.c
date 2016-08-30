@@ -18,6 +18,7 @@ struct args  {
     htsFile *fp_output;
     bcf_hdr_t *hdr_in;
     bcf_hdr_t *hdr_out;
+    kstring_t command;
 };
 
 struct args args = {
@@ -25,6 +26,7 @@ struct args args = {
     .fp_output = NULL,
     .hdr_in = NULL,
     .hdr_out = NULL,
+    .command = KSTRING_INIT,
 };
 
 void args_destroy() {
@@ -32,6 +34,8 @@ void args_destroy() {
     hts_close(args.fp_output);
     bcf_hdr_destroy(args.hdr_in);
     bcf_hdr_destroy(args.hdr_out);
+    if ( args.command.m )
+	free(args.command.s);
 }
 // tags list with two columns, old name -> new name
 
@@ -52,12 +56,16 @@ static const char *hts_bcf_wmode(int file_type)
 
 int parse_args(int argc, char **argv)
 {
-    if (argc == 0)
+    if (argc == 1)
 	error("Failed to parse arguments. Use -h for more information.");
+    int i;
+    for ( i = 0; i < argc; ++i )
+	kputs(argv[i], &args.command);    
+    --argc, ++argv;
     const char *input_fname = 0;
     const char *output_fname = 0;
     const char *out_type_string = 0;
-    int i;
+
     for ( i = 0; i < argc; ) {
 	const char *a = argv[i++];
 	if ( strcmp(a, "-h") == 0 )
@@ -116,7 +124,8 @@ int parse_args(int argc, char **argv)
     args.hdr_in = bcf_hdr_read(args.fp_input);
     args.fp_output = output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(output_fname, hts_bcf_wmode(out_type));
     args.hdr_out = bcf_hdr_dup(args.hdr_in);
-    
+    bcf_hdr_append(args.hdr_out, command.s);
+    bcf_hdr_sync(args.hdr_out);
     return 0;
 }
 
@@ -187,7 +196,7 @@ int tags_convert()
 }
 int main(int argc, char **argv)
 {
-    if ( parse_args(--argc, ++argv) == 1)
+    if ( parse_args(argc, argv) == 1)
 	return 1;
     tags_convert();
     bcf1_t *line = bcf_init();
