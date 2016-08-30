@@ -126,7 +126,6 @@ int parse_args(int argc, char **argv)
     args.hdr_out = bcf_hdr_dup(args.hdr_in);
     bcf_hdr_append(args.hdr_out, args.command.s);
     bcf_hdr_sync(args.hdr_out);
-    bcf_hdr_write(args.fp_output, args.hdr_out);
     return 0;
 }
 
@@ -200,6 +199,7 @@ int main(int argc, char **argv)
     if ( parse_args(argc, argv) == 1)
 	return 1;
     tags_convert();
+    bcf_hdr_write(args.fp_output, args.hdr_out);
     bcf1_t *line = bcf_init();
     while ( bcf_read(args.fp_input, args.hdr_in, line) == 0 ) {
 	bcf_write1(args.fp_output, args.hdr_out, line);
