@@ -438,7 +438,7 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
     bcf_unpack(line, args.convert->max_unpack);
 
     mcache_t *cache = args.cache;
-    ccols_t *cols = args.convert;
+    // ccols_t *cols = args.convert;
     int n_alleles = args.split_flag & SPLIT_ALT ? line->n_allele : 1;
     set_matrix_cache(cache, n_alleles);
 
@@ -632,7 +632,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 	  case BCF_BT_FLOAT:
 	      do {
 		  float *p = (float*)data;
-		  int i;
+		  int i = 0;
 		  if (iallele == -1) {
 		      for (i=0; i<n; ++i) {
 			  if (p[i] == bcf_float_vector_end) break;
