@@ -126,6 +126,7 @@ int parse_args(int argc, char **argv)
     args.hdr_out = bcf_hdr_dup(args.hdr_in);
     bcf_hdr_append(args.hdr_out, args.command.s);
     bcf_hdr_sync(args.hdr_out);
+    bcf_hdr_write(args.fp_output, args.hdr_out);
     return 0;
 }
 
