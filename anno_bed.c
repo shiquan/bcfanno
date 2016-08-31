@@ -253,6 +253,8 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	    }
 	    if (ss[0] == '\0')
 		continue;
+	    if ( strncmp(ss, "INFO/", 5) == 0)
+		ss += 5;
 	    col->hdr_key = strdup(ss);	    
 	    col->icol = -1;
 	    // debug_print("%s, %d", col->hdr_key, file->n_cols);
