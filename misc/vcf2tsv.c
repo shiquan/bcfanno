@@ -745,7 +745,7 @@ int usage(void)
     fprintf(stderr,"\t-f, --format   see man page for deatils.\n");
     fprintf(stderr,"\t-s, --split    split by [ALT].\n");
     fprintf(stderr,"\t-p, --print-header  print the header comment.\n");
-    fprintf(stderr,"\t-r,--skip-ref     skip format reference positions; suggest open this option.\n");
+    fprintf(stderr,"\t-r, --skip-ref     skip format reference positions; suggest open this option.\n");
     fprintf(stderr,"Website :\n");
     fprintf(stderr,"https://github.com/shiquan/vcfanno\n");
     return 1;
@@ -829,6 +829,10 @@ int run(int argc, char**argv)
 
     while ( bcf_sr_next_line(sr) ) {
 	bcf1_t *line = bcf_sr_get_line(sr, 0);
+	if (line->rid == -1)
+	    continue;
+	if ( args.skip_ref == 1 && bcf_get_variant_types(line) == VCF_REF )
+	    continue;
 	convert_line(header, line);
 	if (args.mempool->l) printf("%s",args.mempool->s);
 	args.mempool->l = 0;
