@@ -280,7 +280,7 @@ int vcfanno_config_debug(struct vcfanno_config *config)
 	LOG_print("[beds] %d", i);
 	LOG_print("[beds] file : %s", config->beds.files[i].fname);
 	if (config->beds.files[i].columns != NULL)
-	    LOG_print("[beds] header : %s", config->beds.files[i].columns);	    
+	    LOG_print("[beds] columns : %s", config->beds.files[i].columns);	    
     }
     return 0;
 }

@@ -917,7 +917,7 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    if ( !bcf_hdr_idinfo_exists(hdr_out, BCF_HL_FMT, hdr_id) ) {
 		bcf_hrec_t *hrec = bcf_hdr_get_hrec(file->hdr, BCF_HL_FMT, "ID", ss, NULL);
 		if ( hrec == NULL ) {
-		    warnings("The tag \"%s\" is not defined in header. Skip..", ss);
+		    warnings("The tag \"%s\" is not defined in column %s. Skip..", ss, columns);
 		    continue;
 		}
 		temp.l = 0;
@@ -949,7 +949,7 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    if ( !bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, hdr_id) ) {
 		bcf_hrec_t *hrec = bcf_hdr_get_hrec(file->hdr, BCF_HL_INFO, "ID", ss, NULL);
 		if ( hrec == NULL ) {
-		    warnings("The tag \"%s\" is not defined in header. Skip.", ss);
+		    warnings("The tag \"%s\" is not defined in columns. Skip.", ss, columns);
 		    continue;
 		}		    
 		temp.l = 0;

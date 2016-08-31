@@ -313,8 +313,11 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	    int nfields;	    
 	    int *splits = ksplit(&string, '\t', &nfields);
 
-	    if (nfields < 4)
-		error("Bad header of bed database : %s. n_fields : %d, %s", fname, nfields, string.s);
+	    if (nfields < 4) {
+		fprintf(stderr, "[error] Bad header of bed database : %s. n_fields : %d, %s", fname, nfields, string.s);
+		fprintf(stderr, "[notice] this error usually happened because the header line is seperated by spaces but not tab!");
+		exit(1);
+	    }
 	    int k;
 	    for ( k = 3; k < nfields; ++k ) {
 		char *ss = string.s + splits[k];
