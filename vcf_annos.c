@@ -892,7 +892,7 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    col->replace = REPLACE_EXISTING;
 	    ss++;
 	}
-	if ( ss == NULL || ss[0] == '\0' ) {
+	if ( ss == NULL || *ss == '\0' || *ss == ' ' ) {
 	    warnings("Empty tag.");
 	    continue;
 	}
@@ -948,8 +948,10 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    int hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
 	    if ( !bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, hdr_id) ) {
 		bcf_hrec_t *hrec = bcf_hdr_get_hrec(file->hdr, BCF_HL_INFO, "ID", ss, NULL);
-		if ( hrec == NULL )
-		    error("The tag \"%s\" is not defined in header.", ss);
+		if ( hrec == NULL ) {
+		    warnings("The tag \"%s\" is not defined in header. Skip.", ss);
+		    continue;
+		}		    
 		temp.l = 0;
 		bcf_hrec_format(hrec, &temp);
 		bcf_hdr_append(hdr_out, temp.s);
