@@ -72,6 +72,9 @@ vcf_rename_tags: $(HTSLIB) version.h
 vcfanno: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
 
+vcfanno_debug: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
+	$(CC) -DDEBUG_MODE $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
+
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
 
 clean: testclean
