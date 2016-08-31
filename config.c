@@ -84,6 +84,7 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
     const kson_node_t *root = json->root;
     if (root == NULL)
 	error("Format error. Root node is empty, check configure file.");
+    //kson_format(root);
 #define BRANCH_INIT(_node) ( (_node)->v.str == NULL ? NULL : strdup((_node)->v.str) )
     int i;
     for (i = 0; i < root->n; ++i ) {
@@ -145,6 +146,7 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 	    vcfs_config->files = (struct file_config*)malloc(vcfs_config->n_vcfs*sizeof(struct file_config));
 	    int n_files = 0;
 	    int j;
+
 	    for ( j = 0; j < (long)node->n; ++j ) {
 		const kson_node_t *node1 = node->v.child[j];
 		if ( node1 == NULL )
@@ -155,6 +157,9 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 		file_config->columns = NULL;
 		for ( k = 0; k < node1->n; ++k ) {
 		    const kson_node_t *node2 = kson_by_index(node1, k);
+		    if ( node2 == NULL || node2->key == NULL)
+			continue;
+
 		    if ( strcmp(node2->key, "file") == 0 )
 			file_config->fname = BRANCH_INIT(node2);
 		    else if ( strcmp(node2->key, "columns") == 0 )
@@ -190,6 +195,7 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 	    beds_config->files = (struct file_config*)malloc(beds_config->n_beds*sizeof(struct file_config));
 	    int n_files = 0;
 	    int j;
+
 	    for ( j = 0; j < (long)node->n; ++j ) {
 		const kson_node_t *node1 = node->v.child[j];
 		if ( node1 == NULL )
@@ -200,9 +206,11 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 		file_config->columns = NULL;
 		for ( k = 0; k < node1->n; ++k ) {
 		    const kson_node_t *node2 = kson_by_index(node1, k);
+		    if (node2 == NULL || node2->key == NULL)
+			continue;
 		    if ( strcmp(node2->key, "file") == 0 )
 			file_config->fname = BRANCH_INIT(node2);
-		    else if ( strcmp(node2->key, "header") == 0 )
+		    else if ( strcmp(node2->key, "columns") == 0 )
 			file_config->columns = BRANCH_INIT(node2);
 		    else
 			warnings("Unknown key : %s. skip ..", node1->key);
