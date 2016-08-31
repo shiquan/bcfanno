@@ -39,7 +39,8 @@
 #define KSTRING_INIT { 0, 0, 0}
 
 enum col_type {
-    is_unknown,
+    _pormote_to_int = -1, // use a minus value to promote every enum type to a int type
+    is_unknown = 0,
     is_chrom,
     is_pos,
     is_id,
@@ -66,6 +67,7 @@ typedef struct _multi_cols_cache_per_allele mcache_pa_t;
 typedef struct _multi_cols_cache mcache_t;
 typedef struct _convert_cols ccols_t;
 typedef struct _mval mval_t;
+
 struct _col {
     enum col_type type;
     int number; // BCF_VL_*
@@ -123,6 +125,7 @@ struct args {
     int skip_ref;
     int print_header;
     int split_flag;
+    int skip_reference;
     ccols_t *convert;
     mcache_t *cache;
     kstring_t *mempool;
@@ -133,6 +136,7 @@ struct args {
 struct args args = {
     .skip_ref = 0,
     .print_header = 1,
+    .skip_reference = 0,
     .split_flag = SPLIT_DEFAULT,
     .convert = NULL,
     .cache = NULL,
@@ -668,7 +672,8 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
     }
     // flag tag
     if (inf->len <=0) {
-	kputc('1', &val->a);
+	// kputc('1', &val->a);
+	kputs("Yes", &val->a);
 	return;
     }
 
@@ -694,6 +699,11 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 		else ksprintf(&val->a, "%g", inf->v1.f);
 		break;
 
+	    case BCF_BT_CHAR:
+		if (inf->v1.i == bcf_str_missing ) kputc('.', &val->a);
+		else kputc(inf->v1.i, &val->a);
+		break;
+		
 	    default:
 		error("todo: type %d\n", inf->type);
 
@@ -735,6 +745,7 @@ int usage(void)
     fprintf(stderr,"\t-f, --format   see man page for deatils.\n");
     fprintf(stderr,"\t-s, --split    split by [ALT].\n");
     fprintf(stderr,"\t-p, --print-header  print the header comment.\n");
+    fprintf(stderr,"\t-r,--skip-ref     skip format reference positions; suggest open this option.\n");
     fprintf(stderr,"Website :\n");
     fprintf(stderr,"https://github.com/shiquan/vcfanno\n");
     return 1;

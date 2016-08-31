@@ -276,6 +276,7 @@ bcf1_t *anno_core(bcf1_t *line)
 void export_reports()
 {
 }
+
 int main(int argc, char **argv)
 {
     // parse arguments first, if failure or just do test will return 1, else return 0
