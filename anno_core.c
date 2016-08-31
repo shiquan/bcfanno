@@ -258,7 +258,10 @@ bcf1_t *anno_core(bcf1_t *line)
 {
     // do nothing for reference positions
     if ( bcf_get_variant_types(line) == VCF_REF )
-	return line;    
+	return line;
+#ifdef DEBUG_MODE
+    debug_print("%d : %d", line->rid, line->pos+1);
+#endif
     // annotate hgvs name
     if ( args.hgvs_opts.refgene_is_inited == 1 )
 	anno_refgene_core(&args.hgvs_opts, line);
