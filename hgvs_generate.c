@@ -163,6 +163,7 @@ int hgvs_bcf_header_add_flankseq(bcf_hdr_t *hdr)
 // ref: http://asia.ensembl.org/info/genome/variation/consequences.jpg
 int hgvs_bcf_header_add_vartype(bcf_hdr_t *hdr)
 {
+    return 0;
 }
 
 static struct genepred_format refgene_formats = {
