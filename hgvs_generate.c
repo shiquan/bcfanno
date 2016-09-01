@@ -1294,7 +1294,7 @@ int refgene_set_refgene_fname(struct refgene_options *opts, char *fname)
 	if (nfields < 10) 
 	    error("Bad format; inconsistent columns : %s.", fname);
 	
-	if ( *(string.s + splits[type->strand]) != '+' && *(string.s + splits[type->strand] != '-') )
+	if ( memcmp(string.s + splits[type->strand], "+", 1)  && memcmp(string.s + splits[type->strand], "-", 1) )
 	    error("Bad format; strand column inconsistent : %s.", fname);
 	break;
     }
