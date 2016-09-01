@@ -12,6 +12,9 @@
 #include "htslib/faidx.h"
 #include "anno_hgvs.h"
 
+// variants in genome reference positions in raw vcf file,
+// recommand hgvs nomenclature to describe variants,]
+// http://varnomen.hgvs.org
 char str_init[2];
 
 KHASH_MAP_INIT_STR(name, char*)
@@ -131,6 +134,36 @@ int hgvs_bcf_header_add_hgvsdna(bcf_hdr_t *hdr)
     }
     return id;
 }
+// function regions
+// Intergenic, Promoter, UTR5, CDS{n}, Intron{n}, UTR3, Noncoding Exon{n}
+int hgvs_bcf_header_add_funcreg(bcf_hdr_t *hdr)
+{
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FuncReg");
+    if (id == -1) {
+	bcf_hdr_append(hdr, "##INFO=<ID=FuncReg,Number=G,Type=String,Description=\"Function regions in DNA level\">");
+	bcf_hdr_sync(hdr);
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
+    return id;
+}
+int hgvs_bcf_header_add_flankseq(bcf_hdr_t *hdr)
+{
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+    if (id == -1) {
+	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=G,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+	bcf_hdr_sync(hdr);
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
+    return id;
+}
+// variants types
+// synonymous, missense, nonsense, inframe insertion, inframe deletion, stop gain, frameshift, splitsites,
+// ref: http://asia.ensembl.org/info/genome/variation/consequences.jpg
+int hgvs_bcf_header_add_vartype(bcf_hdr_t *hdr)
+{
+}
 
 static struct genepred_format refgene_formats = {
     .chrom = 2,
@@ -170,6 +203,7 @@ void set_format_genepred()
 {
     type = &genepred_formats;
 }
+
 static void genepred_parse_core(kstring_t *string, struct genepred_line *line)
 {
     int nfields = 0;
@@ -1248,6 +1282,23 @@ int refgene_set_refgene_fname(struct refgene_options *opts, char *fname)
     opts->fp = hts_open(opts->genepred_fname, "r");
     if (opts->fp == NULL)
 	error("Failed to open %s", opts->genepred_fname);
+    // test the genepred format, here check the columns number and strand column should be either '+' or '-'
+    kstring_t string = KSTRING_INIT;
+    for (;;) {
+	hts_getline(fp, '\n', &string);
+	// skip empty and comments
+	if (string.l == NULL || string.s[0] == '#')
+	    continue;
+	int nfields;
+	int *splits = ksplit(&string, 0, &nfields);
+	if (nfields < 10) 
+	    error("Bad format; inconsistent columns : %s.", fname);
+	
+	if ( *(string.s + splits[type->strand]) != '+' && *(string.s + splits[type->strand] != '-') )
+	    error("Bad format; strand column inconsistent : %s.", fname);
+	break;
+    }
+    free(string.s);
     opts->genepred_idx = load_genepred_file(opts->genepred_fname);
     if (opts->genepred_idx == NULL)
 	error("Failed to load index of %s", opts->genepred_fname);

@@ -254,8 +254,8 @@ int vcfanno_load_config(struct vcfanno_config *config, const char * config_fname
 int vcfanno_config_debug(struct vcfanno_config *config)
 {
     int i;
-    LOG_print("author : %s", config->author == NULL ? "Unknown" : config->author);
-    LOG_print("config file ID : %s", config->config_id == NULL ? "not set" : config->config_id);
+    LOG_print("configure file writer : %s", config->author == NULL ? "Unknown" : config->author);
+    LOG_print("configure file ID : %s", config->config_id == NULL ? "Unknown" : config->config_id);
     LOG_print("reference sequence : %s", config->reference_version == NULL ? "Unknown" : config->reference_version);    
 
     if ( config->refgene.refgene_is_set == 1) {
