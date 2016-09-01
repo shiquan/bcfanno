@@ -1285,9 +1285,9 @@ int refgene_set_refgene_fname(struct refgene_options *opts, char *fname)
     // test the genepred format, here check the columns number and strand column should be either '+' or '-'
     kstring_t string = KSTRING_INIT;
     for (;;) {
-	hts_getline(fp, '\n', &string);
+	hts_getline(opts->fp, '\n', &string);
 	// skip empty and comments
-	if (string.l == NULL || string.s[0] == '#')
+	if (string.l == 0 || string.s[0] == '#')
 	    continue;
 	int nfields;
 	int *splits = ksplit(&string, 0, &nfields);
