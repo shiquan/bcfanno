@@ -87,7 +87,6 @@ struct _convert_cols {
 struct _mval {
     enum col_type type;
     int sample_id;
-    //int m, l; // m : max memory cache
     kstring_t a;
 };
 
@@ -535,8 +534,32 @@ void setter_filter(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	kputc('.', &val->a);
     }
 }
+// example : chr pos A T
+// hom-ref for homozygous reference allele, A/A
+// ref-alt for heterozygosity, A/T
+// hom-alt for homozygous alternatve allele, T/T
+// multi-alt for multi-alternative alleles, T/G
+// uncov-ref for uncovered allele and reference allele, ./A
+// uncov-alt for uncovered allele and alternative allele, ./T
+// uncov for uncovered, ./.
 void setter_zygosity(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
+    bcf_fmt_t *fmt = bcf_get_fmt_id(line, c->id);
+    if ( fmt == NULL )
+	error("no found TG tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+    int sample_id = val->sample_id;
+
+#define BRANCH(type_t, missing, vector_end) do {\
+	type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size);\
+	int i;\
+	int allele1 = -2; \
+	int allele2 = -2;\
+	assert(fmt->n <= 2);\
+	allele1 = (ptr[0]>>1)-1;\
+	if (fmt->n == 2) \
+	    allele2 = (ptr[1]>>1) -1;\
+	if (allele1 ==  
+	    
 
 }
 void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
