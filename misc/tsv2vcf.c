@@ -18,9 +18,9 @@
 #include <htslib/faidx.h>
 #include <htslib/vcf.h>
 #include <htslib/bgzf.h>
-#include <htslib/synced_bcf_reader.h>
+// #include <htslib/synced_bcf_reader.h>
 #include <htslib/kstring.h>
-#include <htslib/kseq.h>
+// #include <htslib/kseq.h>
 
 KSTREAM_INIT(gzFile, gzread, 8192)
 
@@ -61,6 +61,8 @@ tsv_t *tsv_init(const char *rules)
     if (tmp.m) free(tmp.s);
     return tsv;    
 }
+
+
 void tsv_destroy(tsv_t *tsv)
 {
     int i;
