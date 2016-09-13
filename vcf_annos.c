@@ -136,6 +136,8 @@ int vcf_setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_co
 {
     bcf1_t *rec = (bcf1_t*) data;
     bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
+    if ( !(line->unpacked & BCF_UN_INFO) ) bcf_unpack(line, BCF_UN_INFO);
+    if ( !(rec->unpacked & BCF_UN_INFO) ) bcf_unpack(rec, BCF_UN_INFO);
     int flag = bcf_get_info_flag(hdr,rec,col->hdr_key,NULL,NULL);
     bcf_update_info_flag(opts->hdr_out,line,col->hdr_key,NULL,flag);
     return 0;
@@ -206,6 +208,8 @@ int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 {
     bcf1_t *rec = (bcf1_t*) data;
     bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
+    if ( !(line->unpacked & BCF_UN_INFO) ) bcf_unpack(line, BCF_UN_INFO);
+    if ( !(rec->unpacked & BCF_UN_INFO) ) bcf_unpack(rec, BCF_UN_INFO);
     int ntmpi = bcf_get_info_int32(hdr, rec, col->hdr_key, &opts->tmpi, &opts->mtmpi);
     // debug_print("ntmpi : %d", ntmpi);
     if ( ntmpi < 0 ) return 0;    // nothing to add
@@ -289,7 +293,9 @@ int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_co
 {
     bcf1_t *rec = (bcf1_t*) data;
     bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
-    int ntmpf = bcf_get_info_float(hdr,rec,col->hdr_key,&opts->tmpf,&opts->mtmpf);
+    if ( !(line->unpacked & BCF_UN_INFO) ) bcf_unpack(line, BCF_UN_INFO);
+    if ( !(rec->unpacked & BCF_UN_INFO) ) bcf_unpack(rec, BCF_UN_INFO);
+    int ntmpf = bcf_get_info_float(hdr,rec,col->hdr_key,&opts->tmpf,&opts->mtmpf);    
     if ( ntmpf < 0 ) return 0;    // nothing to add
 
     if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
@@ -427,6 +433,8 @@ int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 {
     bcf1_t *rec = (bcf1_t*) data;
     bcf_hdr_t *hdr = opts->files[col->ifile].hdr;
+    if ( !(line->unpacked & BCF_UN_INFO) ) bcf_unpack(line, BCF_UN_INFO);
+    if ( !(rec->unpacked & BCF_UN_INFO) ) bcf_unpack(rec, BCF_UN_INFO);
     int ntmps = bcf_get_info_string(hdr,rec,col->hdr_key,&opts->tmps,&opts->mtmps);
     if ( ntmps < 0 ) return 0;    // nothing to add
 
@@ -445,8 +453,9 @@ int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-
     bcf_hdr_t *header = opts->hdr_out;
+    if ( !(line->unpacked & BCF_UN_FMT) ) bcf_unpack(line, BCF_UN_FMT);
+    if ( !(rec->unpacked & BCF_UN_FMT) ) bcf_unpack(rec, BCF_UN_FMT);
     int nsrc = bcf_get_genotypes(header, rec, &opts->tmpi, &opts->mtmpi);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
@@ -650,8 +659,9 @@ int setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *
 int vcf_setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
     bcf1_t *rec = (bcf1_t*) data;
-
     bcf_hdr_t *header = opts->hdr_out;
+    if ( !(line->unpacked & BCF_UN_FMT) ) bcf_unpack(line, BCF_UN_FMT);
+    if ( !(rec->unpacked & BCF_UN_FMT) ) bcf_unpack(rec, BCF_UN_FMT);
     int nsrc = bcf_get_format_int32(header, rec, col->hdr_key, &opts->tmpi, &opts->mtmpi);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
@@ -717,6 +727,8 @@ int vcf_setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_
 {
     bcf1_t *rec = (bcf1_t*) data;
     bcf_hdr_t *header = opts->hdr_out;
+    if ( !(line->unpacked & BCF_UN_FMT) ) bcf_unpack(line, BCF_UN_FMT);
+    if ( !(rec->unpacked & BCF_UN_FMT) ) bcf_unpack(rec, BCF_UN_FMT);
     int nsrc = bcf_get_format_float(header, rec, col->hdr_key, &opts->tmpf, &opts->mtmpf);
     if ( nsrc==-3 ) return 0;    // the tag is not present
     if ( nsrc<=0 ) return 1;     // error
@@ -791,6 +803,8 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
     bcf1_t *rec = (bcf1_t*) data;
     opts->tmpp[0] = opts->tmps;
     bcf_hdr_t *header = opts->hdr_out;
+    if ( !(line->unpacked & BCF_UN_FMT) ) bcf_unpack(line, BCF_UN_FMT);
+    if ( !(rec->unpacked & BCF_UN_FMT) ) bcf_unpack(rec, BCF_UN_FMT);
     int ret = bcf_get_format_string(header,rec,col->hdr_key,&opts->tmpp,&opts->mtmps);
     opts->tmps = opts->tmpp[0]; // tmps might be realloced
     if ( ret==-3 ) return 0;    // the tag is not present
@@ -959,7 +973,7 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 		hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
 		assert( bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, hdr_id));
 	    }
-
+	    
 	    switch ( bcf_hdr_id2type(hdr_out, BCF_HL_INFO, hdr_id) ) {
 		case BCF_HT_FLAG:
 		    col->setter.vcf = vcf_setter_info_flag;
