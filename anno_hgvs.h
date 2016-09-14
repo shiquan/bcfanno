@@ -120,6 +120,7 @@ struct hgvs_cache {
 // 
 // [ reference : http:// www.HGVS.org/varnomen ]
 enum hgvs_variant_type {
+    var_type_nonref = -1, // for gatk <NONREF> allele
     var_type_ref = 0,
     var_type_snp,
     var_type_dels,

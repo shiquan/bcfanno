@@ -116,7 +116,7 @@ int hgvs_bcf_header_add_trans(bcf_hdr_t *hdr)
 {
     int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Transcript");
     if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=Transcript,Number=G,Type=String,Description=\"Transcript names\">");
+	bcf_hdr_append(hdr, "##INFO=<ID=Transcript,Number=A,Type=String,Description=\"Transcript names\">");
 	bcf_hdr_sync(hdr);
 	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Transcript");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
@@ -127,7 +127,7 @@ int hgvs_bcf_header_add_hgvsdna(bcf_hdr_t *hdr)
 {
     int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
     if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=G,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
 	bcf_hdr_sync(hdr);
 	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
@@ -140,7 +140,7 @@ int hgvs_bcf_header_add_funcreg(bcf_hdr_t *hdr)
 {
     int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FuncReg");
     if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=FuncReg,Number=G,Type=String,Description=\"Function regions in DNA level\">");
+	bcf_hdr_append(hdr, "##INFO=<ID=FuncReg,Number=A,Type=String,Description=\"Function regions in DNA level\">");
 	bcf_hdr_sync(hdr);
 	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
@@ -151,7 +151,7 @@ int hgvs_bcf_header_add_flankseq(bcf_hdr_t *hdr)
 {
     int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
     if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=G,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
 	bcf_hdr_sync(hdr);
 	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
@@ -529,6 +529,8 @@ void refgene_options_destroy(struct refgene_options *opt)
 }
 static void hgvs_des_destory(struct hgvs_des *des)
 {
+    if (des->type == var_type_ref || des->type == var_type_nonref)
+	return;
     if ( des->ref_length > 0 )
 	free(des->ref);
     if ( des->alt_length > 0 )
@@ -566,7 +568,7 @@ static char *rev_seqs(const char *dna_seqs, unsigned long n)
 }
 static void hgvs_des_reverse(struct hgvs_des *des, uint8_t strand)
 {
-    if ( des->type == var_type_ref )
+    if ( des->type == var_type_ref || des->type == var_type_nonref)
 	return;
     if ( des->strand == strand )
 	return;
@@ -592,6 +594,11 @@ static struct hgvs_des *describe_variants(const char *ref, const char *alt, int 
     const char *r = ref;
     // pos may differ from _pos, but _pos will not change in this function
     int pos = _pos;
+    // for GATK users, <NON_REF> allele will be treat as ref
+    if ( strcmp(alt, "<NON_REF>") == 0 ) {
+      des->type = var_type_nonref;
+      return des;
+    }
     // skip same string from start
     while (*a && *r && toupper(*a) == toupper(*r)) { a++; r++; pos++; }
     
@@ -907,15 +914,17 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
 }
 static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct hgvs_core *c)
 {
+  hgvs_core_clear(c);
+  kstring_t *string = &c->str;
+  
+    if (des->type == var_type_ref || des->type == var_type_nonref)  {
+      kputc('.', string);
+      return 0;
+    }
+
     if (des->start > line->txend || des->end < line->txstart)
 	return 1;
-    // error("Variants is not in this transcript. des->start: %u, des->end: %d, genepred_line: %s\t%u\t%u", des->start, des->end, line->chrom, line->txstart, line->txend);
-    // clear hgvs_core memory before init
-    hgvs_core_clear(c);
-    
-    // uint32_t start_var = (uint32_t)des->start;
-    // uint32_t end_var = (uint32_t)des->end;
-    kstring_t *string = &c->str;
+
     // put names into string, usually transcript 
     // if no transcript name, use gene name then
     char *name = line->name1;
@@ -1019,6 +1028,8 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
 static void generate_hgvs(struct refgene_options *opts, bcf1_t *line)
 {
     struct genepred_memory *buffer = &opts->buffer;
+    if ( buffer->l == 0 )
+      return;
     struct hgvs_cache *cache = &opts->cache;
     int n_alleles = line->n_allele -1;
     if (n_alleles == 0)
@@ -1114,6 +1125,10 @@ static char *generate_transcript_string(struct hgvs_cache *cache)
 	    kputc(',', &str);
 	// foreach allele
 	struct hgvs *name = &cache->a[i];
+	// for <NON_REF>
+	if (name->l == 0)
+	  kputc('.', &str);
+	
 	for ( j = 0; j < name->l; ++j ) {
 	    struct hgvs_core *core = &name->a[j];
 	    if ( core->l_name )
@@ -1189,6 +1204,7 @@ int anno_refgene_core(struct refgene_options *opts, bcf1_t *line)
     // skip reference positions, usually vcfanno will check the type of position in the first step, get error if see ref here
     if ( bcf_get_variant_types(line) == VCF_REF )
 	error("This is a reference position. Should not come here. %s : %d", bcf_seqname(opts->hdr_out, line), line->pos+1);
+
     // fill memory pool and init hgvs names structure, return 1 if no transcript found
     if ( hgvs_names_init(opts, line) != 0 )
 	return 1;
@@ -1215,13 +1231,13 @@ static char *hgvs_get_names_string(struct hgvs_cache *cache, const char *key)
 }
 int setter_hgvs_names(struct refgene_options *opts, bcf1_t *line, struct anno_col *col)
 {
-    // uint32_t end = bcf_calend(line);
-    // hgvs_names_init(opts, line);
     char *string = hgvs_get_names_string(&opts->cache, col->hdr_key);
-    // debug_print("%s", string);
+
+    if ( string == NULL )
+      return 1;
     setter_hgvs_string(opts->hdr_out, line, col->hdr_key, string);
     if ( string )
-	free(string);
+      free(string);
     return 0;
 }
 int refgene_columns_parse(struct refgene_options *opts, char *column)
