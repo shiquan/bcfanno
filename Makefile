@@ -1,14 +1,17 @@
 PROG=       vcfanno
+DEBUG_PROG= vcfanno_debug
 
-all: $(PROG) $(TEST_PROG)
+all: $(PROG)
 
+debug: $(DEBUG_PROG)
 # Adjust $(HTSDIR) to point to your top-level htslib directory
 HTSDIR = htslib-1.3
 include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
 
 CC       = gcc
-CFLAGS   = -g -Wall -Wc++-compat -O0
+CFLAGS   = -Wall -Wc++-compat -O3
+DEBUG_CFLAGS   = -g -Wall -Wc++-compat -O0
 DFLAGS   =
 #OBJS     = main.o vcfindex.o tabix.o \
 #           vcfstats.o vcfisec.o vcfmerge.o vcfquery.o vcffilter.o filter.o vcfsom.o \
@@ -73,7 +76,7 @@ vcfanno: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
 
 vcfanno_debug: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
-	$(CC) -DDEBUG_MODE $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
 
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
 

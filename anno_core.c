@@ -9,6 +9,14 @@
 #include "anno_hgvs.h"
 #include "version.h"
 
+// time stat
+#include <sys/time.h>
+
+static double init_time = 0;
+static double refgene_anno_time = 0;
+static double vcf_anno_time = 0;
+static double bed_anno_time = 0;
+
 static const char *hts_bcf_wmode(int file_type)
 {
     if ( file_type == FT_BCF ) return "wbu";    // uncompressed BCF
@@ -259,9 +267,7 @@ bcf1_t *anno_core(bcf1_t *line)
     // do nothing for reference positions
     if ( bcf_get_variant_types(line) == VCF_REF )
 	return line;
-#ifdef DEBUG_MODE
-    debug_print("%d : %d", line->rid, line->pos+1);
-#endif
+
     // annotate hgvs name
     if ( args.hgvs_opts.refgene_is_inited == 1 )
 	anno_refgene_core(&args.hgvs_opts, line);
@@ -279,6 +285,8 @@ void export_reports()
 
 int main(int argc, char **argv)
 {
+    time_t t1;
+    t1 = time(NULL);
     // parse arguments first, if failure or just do test will return 1, else return 0
     if ( parse_args(--argc, ++argv) == 1 )
 	return 1;
