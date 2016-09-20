@@ -215,13 +215,6 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	error("Failed to load index of %s.", fname);
     opts->n_files++;
     
-    /* file->n_cols = 0; */
-    /* file->m_cols = 0; */
-    /* file->cols = 0; */
-    /* file->cached = 0; */
-    /* file->max = 0; */
-    /* file->buffer = 0; */
-    
     file->last_id = -1;
     file->last_start = -1;
     file->last_end = -1;

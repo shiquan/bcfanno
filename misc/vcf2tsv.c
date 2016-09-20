@@ -549,18 +549,6 @@ void setter_zygosity(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *va
 	error("no found TG tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
     int sample_id = val->sample_id;
 
-#define BRANCH(type_t, missing, vector_end) do {\
-	type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size);\
-	int i;\
-	int allele1 = -2; \
-	int allele2 = -2;\
-	assert(fmt->n <= 2);\
-	allele1 = (ptr[0]>>1)-1;\
-	if (fmt->n == 2) \
-	    allele2 = (ptr[1]>>1) -1;\
-	if (allele1 ==  
-	    
-
 }
 void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {

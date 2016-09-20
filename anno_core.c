@@ -9,13 +9,12 @@
 #include "anno_hgvs.h"
 #include "version.h"
 
+// cache ANNOCORE_BUFFER_LINES lines into buffers; for each buffer pool all lines come from one chromosome,
+// if no enough lines, just put as much as possible
+#define ANNOCORE_BUFFER_LINES 1000
+
 // time stat
 #include <sys/time.h>
-
-static double init_time = 0;
-static double refgene_anno_time = 0;
-static double vcf_anno_time = 0;
-static double bed_anno_time = 0;
 
 static const char *hts_bcf_wmode(int file_type)
 {
@@ -271,12 +270,18 @@ bcf1_t *anno_core(bcf1_t *line)
     // annotate hgvs name
     if ( args.hgvs_opts.refgene_is_inited == 1 )
 	anno_refgene_core(&args.hgvs_opts, line);
+
+    // stat type module
+    
     // annotate vcf files
-    if ( args.vcf_opts.vcfs_is_inited == 1 )
-	anno_vcfs_core(&args.vcf_opts, line);
+    anno_vcfs_core(&args.vcf_opts, line);
+
     // annotate bed format datasets
     if ( args.bed_opts.beds_is_inited == 1 )
-	anno_beds_core(&args.bed_opts, line);    
+	anno_beds_core(&args.bed_opts, line);
+
+    // filter set module
+    
     return line;
 }
 void export_reports()
@@ -285,8 +290,6 @@ void export_reports()
 
 int main(int argc, char **argv)
 {
-    time_t t1;
-    t1 = time(NULL);
     // parse arguments first, if failure or just do test will return 1, else return 0
     if ( parse_args(--argc, ++argv) == 1 )
 	return 1;

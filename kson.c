@@ -37,8 +37,8 @@ kson_node_t *kson_parse_core(const char *json, long *_n, int *error, long *parse
 
     assert(sizeof(size_t) == sizeof(kson_node_t*));
     *error = KSON_OK;
-     int icom = 0;
-    const char *com;
+    //int icom = 0;
+    //const char *com;
     for (p = json; *p; ++p) {
         while (*p && isspace(*p)) ++p;
         if (*p == 0) break;

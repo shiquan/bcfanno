@@ -84,6 +84,7 @@ clean: testclean
 	-rm -f gmon.out *.o *~ $(PROG) version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
 	-rm -f anno_vcf bedadd vcfadd vcfanno anno_bed hgvs_generate
+	-rm -f config vcfanno_debug vcf2tsv tsv2vcf vcf_rename_tags
 
 testclean:
 	-rm -f test/*.o test/*~ $(TEST_PROG)
