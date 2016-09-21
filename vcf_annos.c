@@ -1068,7 +1068,7 @@ int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column
 // find the bcf line from database of same positions and allele
 static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_t *line)
 {
-    if ( file->cached && file->buffer[file->cached-1].pos >= line->pos )
+    if ( file->cached && file->buffer[file->cached-1]->pos >= line->pos )
         return 0;
     
     if ( file->itr ) {
@@ -1076,10 +1076,11 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 	file->itr = NULL;
     }
     int len = 0;
+    int i;
     for (i = 1; i < line->n_allele; i++)
         if ( len > line->d.var[i].n )
             len = line->d.var[i].n;
-    int end_pos = len < 0 ? line->pos - len : len->pos;
+    int end_pos = len < 0 ? line->pos - len : line->pos;
     
     if ( file->tbx_idx ) {
 	int tid = tbx_name2id(file->tbx_idx, bcf_seqname(hdr_out, line));
