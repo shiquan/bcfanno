@@ -516,7 +516,7 @@ static void namehash_destroy(void *_hash)
 
 int refgene_options_destroy(struct refgene_options *opt)
 {
-    if ( opts->refgene_is_inited == 0 )
+    if ( opt->refgene_is_inited == 0 )
         return 1;
     hts_close(opt->fp);
     tbx_destroy(opt->genepred_idx);
