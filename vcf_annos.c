@@ -1080,7 +1080,7 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
     for (i = 1; i < line->n_allele; i++)
         if ( len > line->d.var[i].n )
             len = line->d.var[i].n;
-    int end_pos = len < 0 ? line->pos - len : line->pos;
+    int end_pos = len < 0 ? line->pos - len : line->pos + 1;
     
     if ( file->tbx_idx ) {
 	int tid = tbx_name2id(file->tbx_idx, bcf_seqname(hdr_out, line));
