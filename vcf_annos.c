@@ -1080,7 +1080,7 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
     for (i = 1; i < line->n_allele; i++)
         if ( len > line->d.var[i].n )
             len = line->d.var[i].n;
-    int end_pos = len < 0 ? line->pos - len : line->pos + 1;
+    int end_pos = len < 0 ? line->pos - len : line->pos;
     
     if ( file->tbx_idx ) {
 	int tid = tbx_name2id(file->tbx_idx, bcf_seqname(hdr_out, line));
@@ -1088,14 +1088,14 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 	    warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
 	    return 1;
 	}
-	file->itr = tbx_itr_queryi(file->tbx_idx, tid, line->pos, end_pos);
+	file->itr = tbx_itr_queryi(file->tbx_idx, tid, line->pos, end_pos +1);
     } else if ( file->bcf_idx ) {
 	int tid = bcf_hdr_name2id(file->hdr, bcf_seqname(hdr_out, line));
 	if ( tid == -1) {
 	    warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
 	    return 1;
 	}
-	file->itr = bcf_itr_queryi(file->bcf_idx, tid, line->pos, end_pos);	
+	file->itr = bcf_itr_queryi(file->bcf_idx, tid, line->pos, end_pos +1);	
     } else {
 	error("no index");
     }
