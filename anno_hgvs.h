@@ -228,7 +228,7 @@ extern int hgvs_bcf_header_add_hgvsdna(bcf_hdr_t *hdr);
 extern int hgvs_bcf_header_add_trans(bcf_hdr_t *hdr);
 extern void set_format_refgene();
 extern void set_format_genepred();
-extern void refgene_opts_destroy(struct refgene_options *opts);
+extern int refgene_opts_destroy(struct refgene_options *opts);
 extern int refgene_columns_parse(struct refgene_options *opts, char *columns);
 extern int refgene_set_refseq_fname(struct refgene_options *opts, char *fname);
 extern int refgene_set_refgene_fname(struct refgene_options *opts, char *fname);
