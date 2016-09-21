@@ -1195,8 +1195,8 @@ int hgvs_names_init(struct refgene_options *opts, bcf1_t *line)
 int anno_refgene_core(struct refgene_options *opts, bcf1_t *line)
 {
     // if refgene options not inited, skip all the next steps
-    // if (opts->refgene_is_inited == 0)
-    // return 1;
+    if (opts->refgene_is_inited == 0)
+        return 1;
     // retrieve the regions this variants located first, check the memory pool and update the pool if the regions is out of
     // cached positions. just skip if the variant type of line is a ref.    
     if ( line->pos < 0 )
