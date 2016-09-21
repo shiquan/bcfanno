@@ -514,8 +514,10 @@ static void namehash_destroy(void *_hash)
     kh_destroy(name, hash);
 }
 
-void refgene_options_destroy(struct refgene_options *opt)
+int refgene_options_destroy(struct refgene_options *opt)
 {
+    if ( opts->refgene_is_inited == 0 )
+        return 1;
     hts_close(opt->fp);
     tbx_destroy(opt->genepred_idx);
     if ( opt->check_refseq == 1 )
@@ -526,6 +528,7 @@ void refgene_options_destroy(struct refgene_options *opt)
 	namehash_destroy(opt->transhash);
     hgvs_memory_clear(&opt->buffer);
     hgvs_cache_clear(&opt->cache);
+    return 0;
 }
 static void hgvs_des_destory(struct hgvs_des *des)
 {
