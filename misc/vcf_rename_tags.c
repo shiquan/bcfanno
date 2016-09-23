@@ -118,7 +118,7 @@ int parse_args(int argc, char **argv)
 	    case 'v':
 		out_type = FT_VCF; break;
 	    default :
-		error("The output type \"%d\" not recognised\n", out_type);
+		error("The output type %s not recognised\n", out_type_string);
 	};
     }
     args.hdr_in = bcf_hdr_read(args.fp_input);

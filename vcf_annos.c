@@ -1153,7 +1153,7 @@ bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 		continue;
 	    if (dat->pos > line->pos)
 		break;
-	    // debug_print("dat->pos : %d, line->pos : %d", dat->pos,line->pos);
+
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
 		col->setter.vcf(opts, line, col, dat);
