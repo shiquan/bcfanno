@@ -206,6 +206,11 @@ void *split_string(char *string, int *n, int type)
         //for ( i = 0; i < *n; ++i )
         //   s[i] = strdup(tmp.s+splits[i]);
         char *s = strdup(tmp.s);
+        char *ss = s;
+        while (*ss) {
+            if (*ss == ';') {*ss = '|';}
+            ss++;
+        }
         return (void*)s;
     }
     
