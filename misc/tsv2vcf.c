@@ -103,7 +103,7 @@ void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line
     } else {
         for ( i = 0; i < length;  i++) {
             if ( seq2num[(int)name[i]] == 4 )
-                error("bad seq at %s:%d %s vs %s", chrom, pos, name, seq;)
+                error("bad seq at %s:%d %s vs %s", chrom, pos, name, seq);
 
             if ( seq2num[(int)name[i]] != seq2num[(int)seq[i]] ) {
                 if (seq2num[(int)name[length-i-1]] + seq2num[(int)seq[i]] == 3) {
