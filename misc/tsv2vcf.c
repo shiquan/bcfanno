@@ -229,7 +229,8 @@ static void bcf_hdr_set_chrs(bcf_hdr_t *hdr, faidx_t *fai)
 struct args {
     const char *header_fname;
     const char *input_fname;
-    const char *output_fname;    
+    const char *output_fname;
+    const char *reference_fname;
     // char *columns;
     int output_type;
     int n_cols, m_cols;
@@ -242,7 +243,8 @@ struct args {
 struct args args = {
     .header_fname = 0,
     .input_fname = 0,
-    .output_fname = 0,    
+    .output_fname = 0,
+    .reference_fname = 0,
     //.columns = 0,
     .output_type = FT_VCF,
     .n_cols = 0,
@@ -264,7 +266,7 @@ int parse_line(struct line *line)
 
 int usage(char *prog)
 {
-    fprintf(stderr,"Usage : %s -header|-h header.txt -O z -o out.vcf.gz in.tsv.gz\n", prog);
+    fprintf(stderr,"Usage : %s -header|-h header.txt -r reference.fa -O z -o out.vcf.gz in.tsv.gz\n", prog);
     return 1;
 }
 int parse_args(int argc, char **argv)
@@ -286,7 +288,9 @@ int parse_args(int argc, char **argv)
             var = &out_type;
         else if ( strcmp(a, "-o") == 0 && args.output_fname == 0 )
             var = &args.output_fname;
-
+        else if ( strcmp(a, "-r") == 0 && args.reference_fname == 0)
+            var = &args.reference_fname;
+        
         if ( var != 0 ) {
             if ( i == argc)
                 error("Missing argument after %s", a);
@@ -309,7 +313,9 @@ int parse_args(int argc, char **argv)
     
     if ( args.input_fname == 0 )
         return usage(argv[0]);
-    
+    if ( args.reference_fname == 0)
+        return usage(argv[0]);
+    args.fai = fai_load(args.reference_fname);
     if ( out_type != 0 ) {
         switch (out_type[0]) {
             case 'b':
