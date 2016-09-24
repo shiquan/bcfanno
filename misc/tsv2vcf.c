@@ -374,7 +374,7 @@ int init_columns(bcf_hdr_t *hdr)
     int i;
     int n;
     int *splits = ksplit(&head, '\t', &n);
-    if ( strcasecmp("#chr", head.s + splits[0]) || strcasecmp("#chrom", head.s + splits[0]) ||
+    if ( (strcasecmp("#chr", head.s + splits[0]) && strcasecmp("#chrom", head.s + splits[0])) ||
          ( strcasecmp("pos", head.s + splits[1]) && strcasecmp("start", head.s + splits[1])) ) {
         error("Failed to parse title of %s, %s.", args.input_fname, head.s);        
     }
