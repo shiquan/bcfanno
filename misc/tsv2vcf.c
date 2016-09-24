@@ -457,7 +457,7 @@ int convert_tsv_vcf()
     free(line.string.s);
     bcf_hdr_destroy(hdr);
     hts_close(fp_input);
-    hts_close(fp_output);
+
     return 0;    
 }
 
