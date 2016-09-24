@@ -139,9 +139,10 @@ void *split_string(char *string, int *n, int type)
     }
     
     if ( type == BCF_HT_STR || type == BCF_HT_FLAG) {
-        char **s = (char**)calloc(*n, sizeof(char*));
-        for ( i = 0; i < *n; ++i )
-            s[i] = strdup(tmp.s+splits[i]);
+        //char **s = (char**)calloc(*n, sizeof(char*));
+        //for ( i = 0; i < *n; ++i )
+        //   s[i] = strdup(tmp.s+splits[i]);
+        char *s = strdup(tmp.s+splits[i];
         return (void*)s;
     }
     
