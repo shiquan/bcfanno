@@ -69,14 +69,17 @@ bedadd: $(HTSLIB)
 vcf2tsv: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
 
+tsv2vcf: $(HTSLIB) version.h
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/tsv2vcf.c $(HTSLIB)
+
 vcf_rename_tags: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
 vcfanno: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
-	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
+	$(CC) $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -o $@
 
-vcfanno_debug: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_core.c vcmp.c config.c kson.c vcf_annos.c anno_bed.c hgvs_generate.c $(HTSLIB)
+vcfanno_debug: $(HTSLIB) version.h 
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -o $@
 
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
 

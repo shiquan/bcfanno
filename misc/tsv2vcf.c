@@ -7,19 +7,18 @@
  * added in vcfconverter, see man page for details.
  */
 
-#include <stdio.h>
+#include "utils.h"
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <getopt.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include "htslib/hts.h"
 #include "htslib/faidx.h"
 #include "htslib/vcf.h"
 #include "htslib/bgzf.h"
 #include "htslib/kstring.h"
+#include "htslib/kseq.h"
+
+#ifndef KSTRING_INIT
+#define KSTRING_INIT { 0, 0, 0 }
+#endif
 
 struct line {
     int n;
@@ -31,15 +30,14 @@ void clear_line(struct line *line)
 {
     if (line->n > 0)
         free(line->splits);
-    line-n = -1;
+    line->n = -1;
     line->string.l = 0;
 }
-
 struct tsv_col;
-typedef int (*tsv_setter_t)(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *, struct line *);
+typedef int (*tsv_setter_t)( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *, struct line *);
 
 struct tsv_col {
-    char *name; // tags name
+    char *key; // tags name
     int col; // column number in databases
     int type;
     int hdr_id;
@@ -48,12 +46,34 @@ struct tsv_col {
 
 char *get_col_string(struct line *line, int col)
 {
-    assert(col->col >= 0);
+    assert(col >= 0);
     if ( col >= line->n )
         return NULL;
     return line->string.s + line->splits[col];
 }
-int setter_chrom(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *line)
+struct ref_alt_spec {
+    int ref_col;
+    int alt_col;
+    kstring_t string;
+};
+void contruct_alleles(struct ref_alt_spec *spec, struct line *line)
+{
+    spec->string.l = 0;
+    if ( spec->ref_col == -1 ) {
+        kputc('.', &spec->string);
+    } else {
+        char *name = get_col_string(line, spec->ref_col);
+        kputs(name, &spec->string);
+    }
+    if ( spec->alt_col == -1)
+        return;
+
+    char *name = get_col_string(line, spec->alt_col);
+    kputc(',', &spec->string);
+    kputs(name, &spec->string);
+}
+
+int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
     char *name = get_col_string(line, col->col);
     if (name == NULL)
@@ -61,10 +81,10 @@ int setter_chrom(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line 
     int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, name);
     if ( id == -1 )
         return 0;
-    line->rid = id;
+    rec->rid = id;
     return 0;
 }
-int setter_pos(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *line)
+int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
     char *name = get_col_string(line, col->col);
     if (name == NULL || name[0] == '.')
@@ -72,10 +92,10 @@ int setter_pos(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *l
     int pos = atoi(name);
     if (pos < 0)
         return 0;
-    line->pos = pos-1;
+    rec->pos = pos-1;
     return 0;
 }
-int setter_start(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *line)
+int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
     char *name = get_col_string(line, col->col);
     if (name == NULL || name[0] == '.')
@@ -83,58 +103,90 @@ int setter_start(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line 
     int pos = atoi(name);
     if (pos < 0)
         return 0;
-    line->pos = pos;    
+    rec->pos = pos;    
     return 0;
 }
-int setter_ref(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *line)
+
+int vcf_setter_alleles( bcf_hdr_t *hdr, bcf1_t *rec,  char *allele_string)
 {
+    bcf_update_alleles_str(hdr, rec, allele_string);
+    return 0;    
+}
+
+void *split_string(char *string, int *n, int type)
+{
+    if ( string == NULL || (string[0] == '.' && string[1] == 0)) {
+        *n = 0;
+        return NULL;
+    }
     
-    return 0;
-}
-int setter_alt(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *line)
-{
-    return 0;
+    kstring_t tmp = KSTRING_INIT;
+    kputs(string, &tmp);
+    int *splits = ksplit(&tmp, ',', n);       
+    int i;
+    if ( type == BCF_HT_INT ) {
+        int *a = (int *)calloc(*n, sizeof(int));
+        for ( i = 0; i < *n; ++i )
+            a[i] = atoi(tmp.s+splits[i]);
+        return (void*)a;
+    }
+    
+    if ( type == BCF_HT_REAL ) {
+        float *a = calloc(*n, sizeof(float));
+        for ( i = 0; i < *n; ++i )
+            a[i] = atoi(tmp.s+splits[i]);
+        return (void*)a;    
+    }
+    
+    if ( type == BCF_HT_STR || type == BCF_HT_FLAG) {
+        char **s = calloc(*n, sizeof(char*));
+        for ( i = 0; i < *n; ++i )
+            s[i] = strdup(tmp.s+splits[i]);
+        return (void*)s;
+    }
+    
+    *n = 0;
+    error("Unknown type %s : %d.", string, type);
+    return NULL;
 }
 // for INFO, return 1 on success, return 0 on failure.
-int setter_info(bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *line, struct line *line)
+int setter_info( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
+    char *name = get_col_string(line, col->col);
+    if (name == NULL || (name[0] == '.' && name[1] == 0 ))
+        return 0;
+
+    int n = 0;
+    void *value = split_string(name, &n, col->type);
+
+    if ( n == 0 )
+        return 0;
+    bcf_update_info(hdr, rec, col->key, value, n, col->type);       
     return 1;
 }
-int tsv_register(bcf_hdr_t *hdr, char *name, struct tsv_col *col)
+int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
 {
     col->type = -1;
     col->hdr_id = -1;
 
     if ( strcasecmp("#chr", name) == 0 || strcasecmp("#chrom", name) == 0 ) {
         col->setter = setter_chrom;
-        col->name = strdup("CHR"); // should allocate memory for name
+        col->key = strdup("CHR"); // should allocate memory for name
         return 0;
     }
 
     if ( strcasecmp("pos", name ) == 0 ) {
         col->setter = setter_pos;
-        col->name = strdup("POS"); 
+        col->key = strdup("POS"); 
         return 0;
     }
 
     if ( strcasecmp("start", name ) == 0 ) {
         col->setter = setter_start;
-        col->name = strdup("START"); 
+        col->key = strdup("START"); 
         return 0;
     }
 
-    if ( strcasecmp("ref", name) == 0 ) {
-        col->setter = setter_ref;
-        col->name = strdup("REF"); 
-        return 0;
-    }
-
-    if ( strcasecmp("alt", name) == 0 ) {
-        col->setter = setter_alt;
-        col->name = strdup("ALT"); 
-        return 0;        
-    }
-    
     if ( strcasecmp("end", name) == 0 ) {
         // append END tag in the header, this is mandontary
         col->hdr_id = bcf_hdr_id2int(hdr, BCF_HL_INFO, "END");
@@ -143,28 +195,48 @@ int tsv_register(bcf_hdr_t *hdr, char *name, struct tsv_col *col)
             bcf_hdr_sync(hdr);
             col->hdr_id = bcf_hdr_id2int(hdr, BCF_HL_INFO, "END");
         }
-        col->name = strdup("END");
+        col->type = bcf_hdr_id2type(hdr, BCF_HL_INFO, col->hdr_id);
+        col->key = strdup("END");
         return 0;
     }
 
     col->hdr_id = bcf_hdr_id2int(hdr, BCF_HL_INFO, name);
     if (col->hdr_id == -1)
         return 1;
-    
+    col->type = bcf_hdr_id2type(hdr, BCF_HL_INFO, col->hdr_id);
     col->setter = setter_info;        
-    col->name = strdup(name);
+    col->key = strdup(name);
     return 0;
 }
+static const char *hts_bcf_wmode(int file_type)
+{
+    if ( file_type == FT_BCF ) return "wbu";    // uncompressed BCF
+    if ( file_type & FT_BCF ) return "wb";      // compressed BCF
+    if ( file_type & FT_GZ ) return "wz";       // compressed VCF
+    return "w";                                 // uncompressed VCF
+}
+static void bcf_hdr_set_chrs(bcf_hdr_t *hdr, faidx_t *fai)
+{
+    int i, n = faidx_nseq(fai);
+    for (i=0; i<n; i++)
+    {
+        const char *seq = faidx_iseq(fai,i);
+        int len = faidx_seq_len(fai, seq);
+        bcf_hdr_printf(hdr, "##contig=<ID=%s,length=%d>", seq,len);
+    }
+}
+
 struct args {
     const char *header_fname;
     const char *input_fname;
     const char *output_fname;    
-    //const char *columns;
+    // char *columns;
     int output_type;
     int n_cols, m_cols;
-    tsv_col_t *cols;
+    struct tsv_col *cols;
     faidx_t *fai;
     kstring_t comment;
+    struct ref_alt_spec alleles;
 };
 
 struct args args = {
@@ -178,6 +250,7 @@ struct args args = {
     .cols = 0,
     .fai = 0,
     .comment = KSTRING_INIT,
+    .alleles = { -1, -1, KSTRING_INIT },
 };
 int parse_line(struct line *line)
 {
@@ -185,7 +258,8 @@ int parse_line(struct line *line)
         free(line->splits);
     line->splits = ksplit(&line->string, '\t', &line->n);
     if ( line->n < 3 )
-        return 0;    
+        return 0;
+    return 1;
 }
 
 int usage(char *prog)
@@ -207,7 +281,7 @@ int parse_args(int argc, char **argv)
         const char *a = argv[i++];
         const char **var = 0;
         if ((strcmp(a, "-header") == 0 || strcmp(a, "-h") == 0) && args.header_fname == 0) 
-            var = &header_fname;
+            var = &args.header_fname;
         else if ( strcmp(a, "-O") == 0 && out_type == 0 )
             var = &out_type;
         else if ( strcmp(a, "-o") == 0 && args.output_fname == 0 )
@@ -216,7 +290,7 @@ int parse_args(int argc, char **argv)
         if ( var != 0 ) {
             if ( i == argc)
                 error("Missing argument after %s", a);
-            *var = &argv[i++];
+            *var = argv[i++];
             continue;
         }
 
@@ -234,7 +308,7 @@ int parse_args(int argc, char **argv)
         args.input_fname = "-";
     
     if ( args.input_fname == 0 )
-        return usage();
+        return usage(argv[0]);
     
     if ( out_type != 0 ) {
         switch (out_type[0]) {
@@ -251,7 +325,7 @@ int parse_args(int argc, char **argv)
                 args.output_type = FT_VCF;
                 break;
             default:
-                error("The output type %s not recognised.", args.output_type);
+                error("The output type %d not recognised.", args.output_type);
         }
     }    
     return 0;
@@ -262,10 +336,10 @@ int init_columns(bcf_hdr_t *hdr)
     htsFile *fp = hts_open(args.header_fname, "rb");
     if ( fp == 0)
         error("Failed to open %s.",args.header_fname);
-    kstring str = KSTRING_INIT;
+    kstring_t str = KSTRING_INIT;
     while ( hts_getline(fp, KS_SEP_LINE, &str) > 0 ) {
         if ( strncmp(str.s,"##INFO=", 7) ) {
-            warning("Unknown format, check the line %s : %s.", args.header_fname, str.s);
+            warnings("Unknown format, check the line %s : %s.", args.header_fname, str.s);
             continue;
         }
         if ( bcf_hdr_append(hdr, str.s) )
@@ -276,7 +350,6 @@ int init_columns(bcf_hdr_t *hdr)
     hts_close(fp);
     
     htsFile *fp_input = hts_open(args.input_fname, "r");
-    kstring_t str = KSTRING_INIT;
     kstring_t head = KSTRING_INIT;
     do {
         if ( hts_getline(fp_input, KS_SEP_LINE, &str) == 0 )
@@ -290,24 +363,42 @@ int init_columns(bcf_hdr_t *hdr)
         str.l = 0;
     } while(1);
     free(str.s);
-    if ( comment.l == 0 )
+    if ( head.l == 0 )
         error("No title found in file, %s.", args.input_fname);
-    
+    int i;
     int n;
     int *splits = ksplit(&head, '\t', &n);
-    if ( strcasencmp("#chr", head.s + splits[0], 3) ||
+    if ( strcasecmp("#chr", head.s + splits[0]) || strcasecmp("#chrom", head.s + splits[0]) ||
          ( strcasecmp("pos", head.s + splits[1]) && strcasecmp("start", head.s + splits[1])) ) {
         error("Failed to parse title of %s, %s.", args.input_fname, head.s);        
     }
+
     for ( i = 0; i < n; ++i ) {
+        if ( strcasecmp("ref", head.s+splits[i]) == 0 ) {
+            args.alleles.ref_col = i;
+            continue;
+        }
+
+        if ( strcasecmp("alt", head.s+splits[i]) == 0 ) {
+            args.alleles.alt_col = i;
+            continue;
+        }
         if ( args.n_cols == args.m_cols ) {
             args.m_cols += 8;
             args.cols = realloc(args.cols, args.m_cols *sizeof(struct tsv_col));
         }
-        if ( tsv_register(head.s+splits[i], &args.cols[args.n_cols]) )
+        if ( tsv_register(hdr, head.s+splits[i], &args.cols[args.n_cols]) )
             continue;
         args.cols[args.n_cols].col = i;
         args.n_cols++;        
+    }
+
+    if ( args.alleles.ref_col == -1 ) {
+        warnings("No ref column.");
+    }
+
+    if ( args.alleles.alt_col == -1 ) {
+        warnings("No alt column.");        
     }
     
     return 0;
@@ -319,8 +410,8 @@ int convert_tsv_vcf()
     if (init_columns(hdr) )
         error("Empty columns.");
 
-    htsFile *fp_output = args.output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) :
-        hts_open(args.output_fname, hts_bcf_wmode(out_type));
+    htsFile *fp_output = args.output_fname == 0 ? hts_open("-", hts_bcf_wmode(args.output_type)) :
+        hts_open(args.output_fname, hts_bcf_wmode(args.output_type));
 
     bcf1_t *rec = bcf_init();
     bcf_float_set_missing(rec->qual);
@@ -340,9 +431,10 @@ int convert_tsv_vcf()
         bcf_clear(rec);
         n = 0;
         for ( i = 0; i < args.n_cols; ++i ) {
-            n += args.cols[i].setter(args.cols[i], rec, &line);
+            n += args.cols[i].setter(hdr, &args.cols[i], rec, &line);
         }
-        
+        contruct_alleles(&args.alleles, &line);
+        vcf_setter_alleles(hdr, rec, args.alleles.string.s);
         if ( n )
             bcf_write(fp_output, hdr, rec);
         clear_line(&line);
@@ -360,8 +452,9 @@ int convert_tsv_vcf()
 int release_memory()
 {
     int i;
-    for (i = 0; i < args.n; ++i )
-        free(args.cols[i].name);
+    for (i = 0; i < args.n_cols; ++i )
+        free(args.cols[i].key);
+    free(args.alleles.string.s);
     free(args.cols);
     fai_destroy(args.fai);
     return 0;
