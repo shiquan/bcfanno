@@ -353,6 +353,7 @@ int init_columns(bcf_hdr_t *hdr)
         
         str.l = 0;
     }
+    bcf_hdr_sync(hdr);
     hts_close(fp);
     
     htsFile *fp_input = hts_open(args.input_fname, "r");
@@ -369,6 +370,8 @@ int init_columns(bcf_hdr_t *hdr)
         str.l = 0;
     } while(1);
     free(str.s);
+    hts_close(fp_input);
+    
     if ( head.l == 0 )
         error("No title found in file, %s.", args.input_fname);
     int i;
@@ -393,6 +396,7 @@ int init_columns(bcf_hdr_t *hdr)
             args.m_cols += 8;
             args.cols = (struct tsv_col *)realloc(args.cols, args.m_cols *sizeof(struct tsv_col));
         }
+        
         if ( tsv_register(hdr, head.s+splits[i], &args.cols[args.n_cols]) )
             continue;
         args.cols[args.n_cols].col = i;
