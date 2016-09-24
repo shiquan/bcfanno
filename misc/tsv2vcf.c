@@ -132,14 +132,14 @@ void *split_string(char *string, int *n, int type)
     }
     
     if ( type == BCF_HT_REAL ) {
-        float *a = calloc(*n, sizeof(float));
+        float *a = (float*)calloc(*n, sizeof(float));
         for ( i = 0; i < *n; ++i )
             a[i] = atoi(tmp.s+splits[i]);
         return (void*)a;    
     }
     
     if ( type == BCF_HT_STR || type == BCF_HT_FLAG) {
-        char **s = calloc(*n, sizeof(char*));
+        char **s = (char**)calloc(*n, sizeof(char*));
         for ( i = 0; i < *n; ++i )
             s[i] = strdup(tmp.s+splits[i]);
         return (void*)s;
@@ -385,7 +385,7 @@ int init_columns(bcf_hdr_t *hdr)
         }
         if ( args.n_cols == args.m_cols ) {
             args.m_cols += 8;
-            args.cols = realloc(args.cols, args.m_cols *sizeof(struct tsv_col));
+            args.cols = (struct tsv_col *)realloc(args.cols, args.m_cols *sizeof(struct tsv_col));
         }
         if ( tsv_register(hdr, head.s+splits[i], &args.cols[args.n_cols]) )
             continue;
