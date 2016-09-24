@@ -113,10 +113,10 @@ void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line
         }
         if ( strand ) {
             for ( i = 0; i < length; i++) 
-                kputc((int)seq[seq2num[(int)name[length-i-1]]], &spec->string);
+                kputc(seqs[seq2num[(int)name[length-i-1]]], &spec->string);
         } else {
             for ( i = 0; i < length; i++)
-                kputc((int)seq[seq2num[(int)name[i]]], &spec->string);            
+                kputc(seqs[seq2num[(int)name[i]]], &spec->string);            
         }        
     }
 
@@ -126,10 +126,10 @@ void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line
         kputc(',', &spec->string);
         if ( strand ) {
             for ( i = 0; i < length; ++i )
-                kputc((int)seq[seq2num[(int)name[length-i-1]]], &spec->string);
+                kputc(seqs[seq2num[(int)name[length-i-1]]], &spec->string);
         } else {
             for ( i = 0; i < length; ++i )
-                kputc((int)seq[seq2num[(int)name[i]]], &spec->string);
+                kputc(seqs[seq2num[(int)name[i]]], &spec->string);
         }
     }
 }
