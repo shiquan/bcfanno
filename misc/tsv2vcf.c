@@ -200,10 +200,10 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
         return 0;
     }
 
-    col->hdr_id = bcf_hdr_id2int(hdr, BCF_HL_INFO, name);
+    col->hdr_id = bcf_hdr_id2int(hdr, BCF_DT_ID, name);
     if (col->hdr_id == -1)
         return 1;
-    col->type = bcf_hdr_id2type(hdr, BCF_HL_INFO, col->hdr_id);
+    col->type = bcf_hdr_id2type(hdr, BCF_DT_ID, col->hdr_id);
     col->setter = setter_info;        
     col->key = strdup(name);
     return 0;
@@ -352,7 +352,7 @@ int init_columns(bcf_hdr_t *hdr)
             error("Could not parse %s : %s.", args.header_fname, str.s);
         
         str.l = 0;
-    }
+    } 
     bcf_hdr_sync(hdr);
     hts_close(fp);
     
