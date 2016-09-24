@@ -57,7 +57,7 @@ struct ref_alt_spec {
     kstring_t string;
 };
 
-void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line, const char *chrom, int pos)
+void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line, const char *chrom, int pos)
 {
     static int seq2num[256] = {
 	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
@@ -97,19 +97,19 @@ void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line
                 kputc(seqs[3-seq2num[(int)name[0]]], &spec->string);
                 strand = 1;
             } else {
-                error("bad seq at %s:%d %s vs %s", chrom, pos, name, seq);
+                error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
             }
         }
     } else {
         for ( i = 0; i < length;  i++) {
             if ( seq2num[(int)name[i]] == 4 )
-                error("bad seq at %s:%d %s vs %s", chrom, pos, name, seq);
+                error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
 
             if ( seq2num[(int)name[i]] != seq2num[(int)seq[i]] ) {
                 if (seq2num[(int)name[length-i-1]] + seq2num[(int)seq[i]] == 3) {
                     strand = 1;
                 } else {
-                    error("bad seq at %s:%d %s vs %s", chrom, pos, name, seq);
+                    error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
                 }
             }                 
         }
@@ -508,7 +508,7 @@ int convert_tsv_vcf()
         for ( i = 0; i < args.n_cols; ++i ) {
             n += args.cols[i].setter(hdr, &args.cols[i], rec, &line);
         }
-        contruct_alleles(args.fai, &args.alleles, &line, bcf_seqname(hdr, rec), rec->pos+1);
+        construct_alleles(args.fai, &args.alleles, &line, bcf_seqname(hdr, rec), rec->pos);
         vcf_setter_alleles(hdr, rec, args.alleles.string.s);
         if ( n )
             bcf_write(fp_output, hdr, rec);
