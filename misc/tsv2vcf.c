@@ -419,6 +419,7 @@ int convert_tsv_vcf()
     htsFile *fp_output = args.output_fname == 0 ? hts_open("-", hts_bcf_wmode(args.output_type)) :
         hts_open(args.output_fname, hts_bcf_wmode(args.output_type));
 
+    bcf_hdr_write(fp_output, hdr);
     bcf1_t *rec = bcf_init();
     bcf_float_set_missing(rec->qual);
     struct line line = {
