@@ -56,21 +56,82 @@ struct ref_alt_spec {
     int alt_col;
     kstring_t string;
 };
-void contruct_alleles(struct ref_alt_spec *spec, struct line *line)
-{
-    spec->string.l = 0;
-    if ( spec->ref_col == -1 ) {
-        kputc('.', &spec->string);
-    } else {
-        char *name = get_col_string(line, spec->ref_col);
-        kputs(name, &spec->string);
-    }
-    if ( spec->alt_col == -1)
-        return;
 
-    char *name = get_col_string(line, spec->alt_col);
-    kputc(',', &spec->string);
-    kputs(name, &spec->string);
+void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line, const char *chrom, int pos)
+{
+    static int seq2num[256] = {
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	0 , 1 , 2 , 3 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 0 , 4 , 1 , 4 , 4 , 4 , 2 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 3 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 0 , 4 , 1 , 4 , 4 , 4 , 2 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 3 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
+	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4
+    };
+    const char seqs[5] = "ACGTN";
+    
+    spec->string.l = 0;
+    
+    char *name  = spec->ref_col == -1 ? "N" : get_col_string(line, spec->ref_col);
+    int length = strlen(name);
+    int n = 0;
+    char *seq = faidx_fetch_seq(fai, chrom, pos, pos+length-1, &n);
+    int i = 0;
+    int strand = 0; // 0 for plus, 1 for minus
+    if ( length == 1) {
+        if (seq2num[(int)name[0]] == 4 ) {
+            kputc('N', &spec->string); // assume plus strand
+        } else {
+            if ( seq2num[(int)name[0]] == seq2num[(int)seq[0]] ) {
+                kputc(seqs[seq2num[(int)name[0]]], &spec->string);
+            } else if ( seq2num[(int)name[0]] + seq2num[(int)seq[length-i-1]] == 3 ) {
+                kputc(seqs[3-seq2num[(int)name[0]]], &spec->string);
+                strand = 1;
+            }
+        }
+    } else {
+        for ( i = 0; i < length;  i++) {
+            if ( seq2num[(int)name[i]] == 4 )
+                error("bad seq : %s vs %s", name, seq);
+
+            if ( seq2num[(int)name[i]] != seq2num[(int)seq[i]] ) {
+                if (seq2num[(int)name[length-i-1]] + seq2num[(int)seq[i]] == 3) {
+                    strand = 1;
+                } else {
+                    error("bad seq : %s vs %s", name, seq);
+                }
+            }                 
+        }
+        if ( strand ) {
+            for ( i = 0; i < length; i++) 
+                kputc((int)seq[seq2num[(int)name[length-i-1]]], &spec->string);
+        } else {
+            for ( i = 0; i < length; i++)
+                kputc((int)seq[seq2num[(int)name[i]]], &spec->string);            
+        }        
+    }
+
+    name = get_col_string(line, spec->alt_col);
+    if ( name ) {
+        length = strlen(name);
+        kputc(',', &spec->string);
+        if ( strand ) {
+            for ( i = 0; i < length; ++i )
+                kputc((int)seq[seq2num[(int)name[length-i-1]]], &spec->string);
+        } else {
+            for ( i = 0; i < length; ++i )
+                kputc((int)seq[seq2num[(int)name[i]]], &spec->string);
+        }
+    }
 }
 
 int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
@@ -87,7 +148,7 @@ int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
 int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
     char *name = get_col_string(line, col->col);
-    if (name == NULL || name[0] == '.')
+    if (name == NULL || (int)name[0] == '.')
         return 0;
     int pos = atoi(name);
     if (pos < 0)
@@ -98,7 +159,7 @@ int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *l
 int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
     char *name = get_col_string(line, col->col);
-    if (name == NULL || name[0] == '.')
+    if (name == NULL || (int)name[0] == '.')
         return 0;
     int pos = atoi(name);
     if (pos < 0)
@@ -154,7 +215,7 @@ void *split_string(char *string, int *n, int type)
 int setter_info( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
 {
     char *name = get_col_string(line, col->col);
-    if (name == NULL || (name[0] == '.' && name[1] == 0 ))
+    if (name == NULL || ((int)name[0] == '.' && (int)name[1] == 0 ))
         return 0;
 
     int n = 0;
@@ -445,7 +506,7 @@ int convert_tsv_vcf()
         for ( i = 0; i < args.n_cols; ++i ) {
             n += args.cols[i].setter(hdr, &args.cols[i], rec, &line);
         }
-        contruct_alleles(&args.alleles, &line);
+        contruct_alleles(args.fai, &args.alleles, &line, bcf_seqname(hdr, rec), rec->pos+1);
         vcf_setter_alleles(hdr, rec, args.alleles.string.s);
         if ( n )
             bcf_write(fp_output, hdr, rec);
