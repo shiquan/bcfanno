@@ -96,6 +96,8 @@ void contruct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line
             } else if ( seq2num[(int)name[0]] + seq2num[(int)seq[length-i-1]] == 3 ) {
                 kputc(seqs[3-seq2num[(int)name[0]]], &spec->string);
                 strand = 1;
+            } else {
+                error("bad seq : %s vs %s", name, seq);
             }
         }
     } else {
