@@ -279,7 +279,7 @@ int parse_args(int argc, char **argv)
         kputs(argv[i], &args.comment);
     
     const char *out_type = 0;
-    for (i = 0; i < argc; ) {
+    for (i = 1; i < argc; ) {
         const char *a = argv[i++];
         const char **var = 0;
         if ((strcmp(a, "-header") == 0 || strcmp(a, "-h") == 0) && args.header_fname == 0) 
