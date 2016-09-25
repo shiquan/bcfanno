@@ -547,6 +547,7 @@ int release_memory()
     free(args.alleles.string.s);
     free(args.cols);
     fai_destroy(args.fai);
+    free(args.comment.s);
     return 0;
 }
 
