@@ -419,7 +419,9 @@ int parse_args(int argc, char **argv)
 
         if ( strcmp(a, "-forcre") == 0 ) {
             args.force = 1;
+            continue;
         }
+        
         if ( args.input_fname == 0) {
             args.input_fname = a;
             continue;
