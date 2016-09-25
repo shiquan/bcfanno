@@ -191,6 +191,7 @@ void *split_string(char *string, int *n, int type)
         int *a = (int *)calloc(*n, sizeof(int));
         for ( i = 0; i < *n; ++i )
             a[i] = atoi(tmp.s+splits[i]);
+        free(tmp.s);
         free(splits);
         return (void*)a;
     }
@@ -199,6 +200,7 @@ void *split_string(char *string, int *n, int type)
         float *a = (float*)calloc(*n, sizeof(float));
         for ( i = 0; i < *n; ++i )
             a[i] = atoi(tmp.s+splits[i]);
+        free(tmp.s);
         free(splits);
         return (void*)a;    
     }
@@ -213,9 +215,11 @@ void *split_string(char *string, int *n, int type)
             if (*ss == ';') {*ss = '|';}
             ss++;
         }
+        free(tmp.s);
         free(splits);
         return (void*)s;
     }
+    free(tmp.s);
     if ( splits )
         free(splits);
     *n = 0;
