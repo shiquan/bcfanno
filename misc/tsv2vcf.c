@@ -234,7 +234,8 @@ int setter_info( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *
 
     if ( n == 0 )
         return 0;
-    bcf_update_info(hdr, rec, col->key, value, n, col->type);       
+    bcf_update_info(hdr, rec, col->key, value, n, col->type);
+    free(value);
     return 1;
 }
 int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
@@ -483,7 +484,8 @@ int init_columns(bcf_hdr_t *hdr)
     if ( args.alleles.alt_col == -1 ) {
         warnings("No alt column.");        
     }
-    
+    free(head.s);
+    free(splits);
     return 0;
 }
 int convert_tsv_vcf()
