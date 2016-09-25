@@ -121,7 +121,7 @@ void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *lin
                 kputc(seqs[seq2num[(int)name[i]]], &spec->string);            
         }        
     }
-
+    free(seq);
     name = get_col_string(line, spec->alt_col);
     if ( name ) {
         length = strlen(name);
@@ -191,6 +191,7 @@ void *split_string(char *string, int *n, int type)
         int *a = (int *)calloc(*n, sizeof(int));
         for ( i = 0; i < *n; ++i )
             a[i] = atoi(tmp.s+splits[i]);
+        free(splits);
         return (void*)a;
     }
     
@@ -198,6 +199,7 @@ void *split_string(char *string, int *n, int type)
         float *a = (float*)calloc(*n, sizeof(float));
         for ( i = 0; i < *n; ++i )
             a[i] = atoi(tmp.s+splits[i]);
+        free(splits);
         return (void*)a;    
     }
     
@@ -211,9 +213,11 @@ void *split_string(char *string, int *n, int type)
             if (*ss == ';') {*ss = '|';}
             ss++;
         }
+        free(splits);
         return (void*)s;
     }
-    
+    if ( splits )
+        free(splits);
     *n = 0;
     error("Unknown type %s : %d.", string, type);
     return NULL;
@@ -521,7 +525,7 @@ int convert_tsv_vcf()
     }
     if ( hts_close(fp_output))
         error("Failed to close %s", args.output_fname);
-
+    bcf_destroy(rec);
     free(line.string.s);
     bcf_hdr_destroy(hdr);
     hts_close(fp_input);
