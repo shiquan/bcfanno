@@ -160,7 +160,6 @@ int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *l
     if (pos < 0)
         return 0;
     rec->pos = pos-1;
-    pos_is_set = 1;
     return 0;
 }
 int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
@@ -172,7 +171,6 @@ int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
     if (pos < 0)
         return 0;
     rec->pos = pos;
-    start_is_set = 1;
     return 0;
 }
 
@@ -261,13 +259,15 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
 
     if ( strcasecmp("pos", name ) == 0 ) {
         col->setter = setter_pos;
-        col->key = strdup("POS"); 
+        col->key = strdup("POS");
+        pos_is_set = 1;
         return 0;
     }
 
     if ( strcasecmp("start", name ) == 0 ) {
         col->setter = setter_start;
-        col->key = strdup("START"); 
+        col->key = strdup("START");
+        start_is_set = 1;
         return 0;
     }
 
