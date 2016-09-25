@@ -20,6 +20,10 @@
 #define KSTRING_INIT { 0, 0, 0 }
 #endif
 
+static int pos_is_set = 0;
+static int start_is_set = 0;
+static int end_is_set = 0;
+
 struct line {
     int n;
     int *splits;
@@ -156,6 +160,7 @@ int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *l
     if (pos < 0)
         return 0;
     rec->pos = pos-1;
+    pos_is_set = 1;
     return 0;
 }
 int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
@@ -166,7 +171,8 @@ int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
     int pos = atoi(name);
     if (pos < 0)
         return 0;
-    rec->pos = pos;    
+    rec->pos = pos;
+    start_is_set = 1;
     return 0;
 }
 
@@ -275,9 +281,10 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
         }
         col->type = bcf_hdr_id2type(hdr, BCF_HL_INFO, col->hdr_id);
         col->key = strdup("END");
+        end_is_set = 1;
         return 0;
     }
-
+    
     col->hdr_id = bcf_hdr_id2int(hdr, BCF_DT_ID, name);
     if (col->hdr_id == -1)
         return 1;
@@ -414,8 +421,9 @@ int parse_args(int argc, char **argv)
     }    
     return 0;
 }
+
 int init_columns(bcf_hdr_t *hdr)
-{
+{    
     // init header.txt
     htsFile *fp = hts_open(args.header_fname, "rb");
     if ( fp == 0)
@@ -427,8 +435,7 @@ int init_columns(bcf_hdr_t *hdr)
             continue;
         }
         if ( bcf_hdr_append(hdr, str.s) )
-            error("Could not parse %s : %s.", args.header_fname, str.s);
-        
+            error("Could not parse %s : %s.", args.header_fname, str.s);        
         str.l = 0;
     } 
     bcf_hdr_sync(hdr);
@@ -455,8 +462,7 @@ int init_columns(bcf_hdr_t *hdr)
     int i;
     int n;
     int *splits = ksplit(&head, '\t', &n);
-    if ( (strcasecmp("#chr", head.s + splits[0]) && strcasecmp("#chrom", head.s + splits[0])) ||
-         ( strcasecmp("pos", head.s + splits[1]) && strcasecmp("start", head.s + splits[1])) ) {
+    if ( strcasecmp("#chr", head.s + splits[0]) && strcasecmp("#chrom", head.s + splits[0]) )  {
         error("Failed to parse title of %s, %s.", args.input_fname, head.s);        
     }
 
@@ -488,6 +494,10 @@ int init_columns(bcf_hdr_t *hdr)
     if ( args.alleles.alt_col == -1 ) {
         warnings("No alt column.");        
     }
+    if ( pos_is_set == 0 && start_is_set == 0)
+        error("No position column is set.");
+    if ( start_is_set == 1 && end_is_set == 0)
+        warnings("End column is not set, treat start position zero based.");
     free(head.s);
     free(splits);
     return 0;
