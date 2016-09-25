@@ -417,7 +417,7 @@ int parse_args(int argc, char **argv)
             continue;
         }
 
-        if ( strcmp(a, "-forcre") == 0 ) {
+        if ( strcmp(a, "-force") == 0 ) {
             args.force = 1;
             continue;
         }
