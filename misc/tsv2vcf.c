@@ -60,6 +60,39 @@ struct ref_alt_spec {
     int alt_col;
     kstring_t string;
 };
+struct args {
+    const char *header_fname;
+    const char *input_fname;
+    const char *output_fname;
+    const char *reference_fname;
+    int pos_column;
+    int chr_column;
+    int force;
+    // char *columns;
+    int output_type;
+    int n_cols, m_cols;
+    struct tsv_col *cols;
+    faidx_t *fai;
+    kstring_t comment;
+    struct ref_alt_spec alleles;
+};
+
+struct args args = {
+    .header_fname = 0,
+    .input_fname = 0,
+    .output_fname = 0,
+    .reference_fname = 0,
+    .pos_column = 0,
+    .chr_column = 0,
+    .force = 0,
+    .output_type = FT_VCF,
+    .n_cols = 0,
+    .m_cols = 0,
+    .cols = 0,
+    .fai = 0,
+    .comment = KSTRING_INIT,
+    .alleles = { -1, -1, KSTRING_INIT },    
+};
 
 void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line, const char *chrom, int pos)
 {
@@ -101,19 +134,32 @@ void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *lin
                 kputc(seqs[3-seq2num[(int)name[0]]], &spec->string);
                 strand = 1;
             } else {
-                error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                if ( args.force ) {
+                    warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                    kputc(seqs[seq2num[(int)name[0]]], &spec->string);
+                } else {
+                    error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                }
             }
         }
     } else {
         for ( i = 0; i < length;  i++) {
-            if ( seq2num[(int)name[i]] == 4 )
-                error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
-
+            if ( seq2num[(int)name[i]] == 4 )  {
+                if ( args.force ) {
+                    warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);                    
+                } else {
+                    error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                }
+            }
             if ( seq2num[(int)name[i]] != seq2num[(int)seq[i]] ) {
                 if (seq2num[(int)name[length-i-1]] + seq2num[(int)seq[i]] == 3) {
                     strand = 1;
                 } else {
-                    error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                    if ( args.force ) {
+                        warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);                        
+                    } else {
+                        error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                    }
                 }
             }                 
         }
@@ -250,8 +296,10 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
 {
     col->type = -1;
     col->hdr_id = -1;
-
-    if ( strcasecmp("#chr", name) == 0 || strcasecmp("#chrom", name) == 0 ) {
+    while ( *name == '#' )
+        name++;
+    
+    if ( strcasecmp("chr", name) == 0 || strcasecmp("chrom", name) == 0) {
         col->setter = setter_chrom;
         col->key = strdup("CHR"); // should allocate memory for name
         return 0;
@@ -311,34 +359,6 @@ static void bcf_hdr_set_chrs(bcf_hdr_t *hdr, faidx_t *fai)
     }
 }
 
-struct args {
-    const char *header_fname;
-    const char *input_fname;
-    const char *output_fname;
-    const char *reference_fname;
-    // char *columns;
-    int output_type;
-    int n_cols, m_cols;
-    struct tsv_col *cols;
-    faidx_t *fai;
-    kstring_t comment;
-    struct ref_alt_spec alleles;
-};
-
-struct args args = {
-    .header_fname = 0,
-    .input_fname = 0,
-    .output_fname = 0,
-    .reference_fname = 0,
-    //.columns = 0,
-    .output_type = FT_VCF,
-    .n_cols = 0,
-    .m_cols = 0,
-    .cols = 0,
-    .fai = 0,
-    .comment = KSTRING_INIT,
-    .alleles = { -1, -1, KSTRING_INIT },
-};
 int parse_line(struct line *line)
 {
     if ( line->n > 0 )
@@ -351,9 +371,17 @@ int parse_line(struct line *line)
 
 int usage(char *prog)
 {
-    fprintf(stderr,"Usage : %s -header|-h header.txt -r reference.fa -O z -o out.vcf.gz in.tsv.gz\n", prog);
+    fprintf(stderr, "Usage : %s -header|-h header.txt -r reference.fa [-force -pos column -O z -o out.vcf.gz] in.tsv.gz\n", prog);
+    fprintf(stderr, "        -header, -h     header file\n");
+    fprintf(stderr, "        -r              reference file\n");
+    fprintf(stderr, "        -pos            position column, if set will skip pos,start,end column in the title\n");
+    fprintf(stderr, "        -chr            chr column, if set will skip first column in the title\n");
+    fprintf(stderr, "        -force          if reference seq and fasta file are inconsistent, just give a warning\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
     return 1;
 }
+
 int parse_args(int argc, char **argv)
 {
     if ( argc == 1 )
@@ -364,6 +392,8 @@ int parse_args(int argc, char **argv)
         kputs(argv[i], &args.comment);
     
     const char *out_type = 0;
+    const char *pos_column = 0;
+    const char *chr_column = 0;
     for (i = 1; i < argc; ) {
         const char *a = argv[i++];
         const char **var = 0;
@@ -375,6 +405,10 @@ int parse_args(int argc, char **argv)
             var = &args.output_fname;
         else if ( strcmp(a, "-r") == 0 && args.reference_fname == 0)
             var = &args.reference_fname;
+        else if ( strcmp(a, "-pos") == 0 && args.pos_column == 0)
+            var = &pos_column;
+        else if ( strcmp(a, "-chr") == 0 && args.chr_column == 0)
+            var = &chr_column;
         
         if ( var != 0 ) {
             if ( i == argc)
@@ -383,6 +417,9 @@ int parse_args(int argc, char **argv)
             continue;
         }
 
+        if ( strcmp(a, "-forcre") == 0 ) {
+            args.force = 1;
+        }
         if ( args.input_fname == 0) {
             args.input_fname = a;
             continue;
@@ -418,7 +455,12 @@ int parse_args(int argc, char **argv)
             default:
                 error("The output type %d not recognised.", args.output_type);
         }
-    }    
+    }
+    if ( pos_column )
+        args.pos_column = atoi(pos_column);
+    if ( chr_column )
+        args.chr_column = atoi(chr_column);
+    
     return 0;
 }
 
@@ -480,9 +522,28 @@ int init_columns(bcf_hdr_t *hdr)
             args.m_cols += 8;
             args.cols = (struct tsv_col *)realloc(args.cols, args.m_cols *sizeof(struct tsv_col));
         }
-        
+        if ( args.chr_column > 0) {
+            if (args.chr_column == i + 1) {
+                tsv_register(hdr, "CHR", &args.cols[args.n_cols]);
+                goto col_increase;
+            } else if (strcasecmp(head.s+splits[i], "#chr") == 0 || strcasecmp(head.s+splits[i], "#chrom") == 0) {
+                continue;
+            }
+        }
+
+        if ( args.pos_column > 0) {
+            if (args.pos_column == i + 1) {
+                tsv_register(hdr, "POS", &args.cols[args.n_cols]);
+                goto col_increase;
+            } else if ( strcasecmp(head.s+splits[i], "pos") == 0 || strcasecmp(head.s+splits[i], "start") == 0 ||
+                        strcasecmp(head.s+splits[i], "end") == 0 ) {
+                continue;
+            }
+        }
+
         if ( tsv_register(hdr, head.s+splits[i], &args.cols[args.n_cols]) )
             continue;
+      col_increase:
         args.cols[args.n_cols].col = i;
         args.n_cols++;        
     }
