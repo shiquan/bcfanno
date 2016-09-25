@@ -191,6 +191,8 @@ int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
     char *name = get_col_string(line, col->col);
     if (name == NULL)
         return 0;
+    if (name[0] == '.')
+        return 0;
     int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, name);
     if ( id == -1 )
         return 0;
@@ -201,6 +203,8 @@ int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *l
 {
     char *name = get_col_string(line, col->col);
     if (name == NULL || (int)name[0] == '.')
+        return 0;
+    if (name[0] == '.')
         return 0;
     int pos = atoi(name);
     if (pos < 0)
@@ -598,6 +602,8 @@ int convert_tsv_vcf()
         }
         construct_alleles(args.fai, &args.alleles, &line, bcf_seqname(hdr, rec), rec->pos);
         vcf_setter_alleles(hdr, rec, args.alleles.string.s);
+        if (line->rid == 0 && line->pos == 0)
+            continue;
         if ( n )
             bcf_write(fp_output, hdr, rec);
         clear_line(&line);
