@@ -602,7 +602,7 @@ int convert_tsv_vcf()
         }
         construct_alleles(args.fai, &args.alleles, &line, bcf_seqname(hdr, rec), rec->pos);
         vcf_setter_alleles(hdr, rec, args.alleles.string.s);
-        if (line->rid == 0 && line->pos == 0)
+        if (rec->rid == 0 && rec->pos == 0)
             continue;
         if ( n )
             bcf_write(fp_output, hdr, rec);
