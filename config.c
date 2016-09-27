@@ -55,6 +55,55 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
     free(config);    
 }
 
+// return 0 for empty line
+static int parse_comment_line(kstring_t *string)
+{
+    if ( string->l == 0 )
+        return 0;
+    
+    char *ss = string->s;
+    char *se = string->s + string->l -1;
+
+    while (ss && (*ss == ' ' || *ss == '\t'))
+        ss++;
+    
+    if ( ss > se || *ss == '#') {
+        string->l = 0;
+        return 0;
+    }
+    
+    while (se && (*se == ' ' || *se == '\t'))
+        se--;
+
+    if ( ss != string->s || se - ss + 1 != string->l ) {    
+        string->l = se-ss+1;
+        memmove(string->s, ss, string->l);
+        string->s[string->l] = '\0';
+    }
+
+    if ( ss == se )
+        return 1;
+    char *sp = ss;
+    se--;
+    int mark = 0;
+    for ( ;; ) {
+        if (sp == se)
+            break;
+        if (*sp == '/') {
+            if ( mark == 1 ) {
+                string->l = sp - ss -1;
+                string->s[string->l] = '\0';
+                return string->l ? 1 : 0;
+            } else {
+                mark = 1;
+            }
+        } else {
+            mark = 0;
+        }
+        sp++;
+    }
+    return string->l ? 1 : 0;
+}
 static char *skip_comments(const char *json_fname)
 {
     htsFile *fp;
@@ -65,23 +114,13 @@ static char *skip_comments(const char *json_fname)
     kstring_t string = KSTRING_INIT;
     kstring_t temp = KSTRING_INIT;
 
-    while ( hts_getline(fp, KS_SEP_LINE, &temp) > 0 ) {
-        if ( temp.l == 0 )
-            continue;
-        char *ss = temp.s;
-        char *se = temp.s + temp.l -1;
-        while ( ss && (*ss == ' ' || *se == '\t' ))
-            ss++;
-        if (*ss == '#' || *ss== '\0')
-            continue;
+    while ( hts_getline(fp, '\n', &temp) > 0 ) {
         
-        while ( se != ss && (*se == ' ' || *se == '\t'))
-            se--;
-        
-        memmove(temp.s, ss, se -ss);
-        temp.l = se -ss +1;
-        temp.s[temp.l] = '\0';
+        if ( parse_comment_line(&temp) == 0)
+            continue;
+
         kputs(temp.s, &string);
+        kputc('\n', &string);
         temp.l = 0;
     }
     if ( temp.m )
@@ -96,6 +135,9 @@ static char *skip_comments(const char *json_fname)
     }
     json[i] = '\0';
     string.l = i;
+#ifdef DEBUG_MODE
+    debug_print("%s", json);
+#endif
     return json;
 }
 
@@ -105,6 +147,7 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
     if (root == NULL)
 	error("Format error. Root node is empty, check configure file.");
     //kson_format(root);
+
 #define BRANCH_INIT(_node) ( (_node)->v.str == NULL ? NULL : strdup((_node)->v.str) )
     int i;
     for (i = 0; i < root->n; ++i ) {
