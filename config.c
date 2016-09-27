@@ -72,12 +72,12 @@ static char *skip_comments(const char *json_fname)
         char *se = temp.s + temp.l -1;
         while ( ss && (*ss == ' ' || *se == '\t' ))
             ss++;
+        if (*ss == '#' || *ss== '\0')
+            continue;
+        
         while ( se != ss && (*se == ' ' || *se == '\t'))
             se--;
-        if ( ss == se )
-            continue;
-        if (*ss == '#')
-            continue;
+        
         memmove(string.s, ss, se -ss);
         string.l = se -ss +1;
         string.s[string.l] = '\0';
