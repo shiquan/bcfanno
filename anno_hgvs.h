@@ -63,13 +63,50 @@ struct genepred_line {
 
 enum func_region_type {
     func_region_unknown,
-    func_region_split_sites,
+//    func_region_split_sites,
     func_region_cds,
     func_region_intron,
     func_region_utr5,
     func_region_utr3,
     func_region_intergenic,
 };
+
+enum var_type {
+    _var_type_promoter_to_int = -1,
+    var_is_reference,
+    var_is_synonymous,
+    var_is_inframe_insertion,
+    var_is_inframe_deletion,
+    var_is_stop_gained,
+    var_is_stop_lost,
+    var_is_stop_retained,
+    var_is_splice_donor,
+    var_is_splice_acceptor,
+};
+
+static inline char *var_type_string(enum var_type type)
+{
+    static const char vartypes[10] = {
+        "reference",
+        "synonymous",
+        "inframe insertion",
+        "inframe deletion",
+        "stop gained",
+        "stop lost",
+        "stop retained",
+        "splice donor",
+        "splice acceptor",
+        NULL,
+    };
+    return vartypes[type];
+}
+
+struct var_func_type {
+    enum func_region_type func;
+    enum var_type vartype;
+    int count; // for cds or intron count
+};
+
 //  hgvs_core keeps transcript/protein name, the format of hgvs name is construct by
 //                                    l_name   l_name2  l_type
 //                                    |        |        |
@@ -83,7 +120,7 @@ struct hgvs_core {
     uint16_t l_name2; // name2 offset in data cache, if no name2, l_name2 should be 0
     uint16_t l_type; // the byte after type offset, usually offset of '.'
     kstring_t str;
-    enum func_region_type type;
+    struct var_func_type type;   
 };
 
 // Dynamic allocate and init technology.
@@ -119,6 +156,8 @@ struct hgvs_cache {
 // Format (repeat position): “prefix”“position_repeat_unit””["”copy_number””]”, e.g. g.123_125[36]
 // 
 // [ reference : http:// www.HGVS.org/varnomen ]
+// hgvs_variant_type is different from var_type, for var_type is more concern about function, but
+// hgvs_variant_type is just describe the change on DNA level
 enum hgvs_variant_type {
     var_type_nonref = -1, // for gatk <NONREF> allele
     var_type_ref = 0,

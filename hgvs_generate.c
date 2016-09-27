@@ -140,30 +140,37 @@ int hgvs_bcf_header_add_funcreg(bcf_hdr_t *hdr)
 {
     int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FuncReg");
     if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=FuncReg,Number=A,Type=String,Description=\"Function regions in DNA level\">");
+	bcf_hdr_append(hdr, "##INFO=<ID=FuncReg,Number=A,Type=String,Description=\"Function regions in DNA level. utr-5, split-sites, cds, exon, intron, intergenic, utr-3.\">");
 	bcf_hdr_sync(hdr);
-	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FuncReg");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
     }
     return id;
 }
 int hgvs_bcf_header_add_flankseq(bcf_hdr_t *hdr)
 {
-    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FLKSEQ");
     if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=HGVSDNA,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+	bcf_hdr_append(hdr, "##INFO=<ID=FLKSEQ,Number=1,Type=String,Description=\"Three nearby bases of current position.\">");
 	bcf_hdr_sync(hdr);
-	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "HGVSDNA");
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FLKSEQ");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
     }
     return id;
 }
 // variantion types
-// synonymous, missense, nonsense, inframe insertion, inframe deletion, stop gain, frameshift, splitsites,
+// synonymous, missense, inframe insertion, inframe deletion, stop gained, stop lost, stop retained, splice donor, splice acceptor, referenece
 // ref: http://asia.ensembl.org/info/genome/variation/consequences.jpg
 int hgvs_bcf_header_add_vartype(bcf_hdr_t *hdr)
 {
-    return 0;
+    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "VarType");
+    if (id == -1) {
+	bcf_hdr_append(hdr, "##INFO=<ID=VarType,Number=A,Type=String,Description=\"Variant type.\">");
+	bcf_hdr_sync(hdr);
+	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FLKSEQ");
+	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
+    return id;
 }
 
 // variantion descriptions
@@ -692,6 +699,7 @@ static struct hgvs_des *describe_variants(const char *ref, const char *alt, int 
     des->end = pos + des->ref_length -1;
     return des;
 }
+// todo : check indels is in trf regions or not
 static void check_cnv_hgvs_des(struct hgvs_des *des, struct genepred_line *line, faidx_t *fai, htsFile *fp)
 {
     if (des->type == var_type_ins) {
@@ -723,6 +731,10 @@ static void find_exons_loc(uint32_t pos, int exoncount, struct exon_pair *pair, 
 	    *l1 = l;
     } 
 }
+
+#define get_start(a, l) (a[l/2].start)
+#define get_end(a, l) (a[l/2].end)
+
 // convert pos to hgvs pos string
 static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand, struct exon_pair *pair, struct exon_offset_pair *locs, int *is_coding, char **cpos)
 {
@@ -743,10 +755,10 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
     uint32_t pos_start, pos_end, loc_start, loc_end;
     uint8_t type_start, type_end;
     if ( l1 & 1 ) {
-	pos_start = pair[l1/2].end;
-	pos_end = pair[l2/2].end;
-	loc_start = locs[l1/2].end >> OFFSET_BITWISE;
-	loc_end = locs[l2/2].end >> OFFSET_BITWISE;
+	pos_start = get_end(pair, l1);
+	pos_end = get_end(pair, l2);
+	loc_start = get_end(locs, l1) >> OFFSET_BITWISE;
+	loc_end = get_end(locs, l2) >> OFFSET_BITWISE;
 	type_start = locs[l1/2].end & REG_MASK;
 	type_end =  locs[l2/2].end & REG_MASK;
     } else {
@@ -803,6 +815,8 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
 	*cpos = str.s;
 	return offset_start < 4 || offset_end < 4 ? func_region_split_sites :func_region_intron;
     }
+
+
     // if pos in exon
     // pos_[start, end] is the locs of near edges,
     //    pos_start pos       pos_end
@@ -894,7 +908,7 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
 	goto generate_cpos;
     }
     // if not found the type of start 
-    error("This is an impossible stituation. type_start : %d", type_start);
+    error("Format ERROR. This is an impossible stituation. type_start : %d", type_start);
 
   generate_cpos:
     assert(loc > 0);    
@@ -915,6 +929,9 @@ static enum func_region_type pos_convert(int32_t pos, int exoncount, int strand,
     *cpos = str.s;
     return ftype;
 }
+#undef get_start
+#undef get_end
+
 static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, struct hgvs_core *c)
 {
   hgvs_core_clear(c);

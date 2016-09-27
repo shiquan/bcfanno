@@ -253,7 +253,7 @@ void *split_string(char *string, int *n, int type)
     if ( type == BCF_HT_REAL ) {
         float *a = (float*)calloc(*n, sizeof(float));
         for ( i = 0; i < *n; ++i )
-            a[i] = atoi(tmp.s+splits[i]);
+            a[i] = atof(tmp.s+splits[i]);
         free(tmp.s);
         free(splits);
         return (void*)a;    
