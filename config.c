@@ -78,9 +78,9 @@ static char *skip_comments(const char *json_fname)
         while ( se != ss && (*se == ' ' || *se == '\t'))
             se--;
         
-        memmove(string.s, ss, se -ss);
-        string.l = se -ss +1;
-        string.s[string.l] = '\0';
+        memmove(temp.s, ss, se -ss);
+        temp.l = se -ss +1;
+        temp.s[temp.l] = '\0';
         kputs(temp.s, &string);
         temp.l = 0;
     }
