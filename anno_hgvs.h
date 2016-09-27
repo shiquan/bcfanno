@@ -63,7 +63,7 @@ struct genepred_line {
 
 enum func_region_type {
     func_region_unknown,
-//    func_region_split_sites,
+    func_region_split_sites,
     func_region_cds,
     func_region_intron,
     func_region_utr5,
@@ -84,9 +84,9 @@ enum var_type {
     var_is_splice_acceptor,
 };
 
-static inline char *var_type_string(enum var_type type)
+static inline const char *var_type_string(enum var_type type)
 {
-    static const char vartypes[10] = {
+    static const char* vartypes[10] = {
         "reference",
         "synonymous",
         "inframe insertion",

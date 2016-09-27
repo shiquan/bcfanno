@@ -43,7 +43,7 @@ static void hgvs_core_clear(struct hgvs_core *c)
     c->str.l = 0;
     c->l_name = 0;
     c->l_type = 0;
-    c->type = func_region_unknown;
+    // c->type = func_region_unknown;
 }
 static void hgvs_clear(struct hgvs *name)
 {
@@ -572,7 +572,7 @@ static char *rev_seqs(const char *dna_seqs, unsigned long n)
     char *rev = (char*)calloc(n+1, sizeof(char));
     int i;
     for ( i = 0; i < n; ++i )
-	rev[i] = rev_seqs_matrix[dna_seqs[n-i-1]];    
+	rev[i] = rev_seqs_matrix[(int)dna_seqs[n-i-1]];    
     rev[n] = '\0';
     return rev;
 }
@@ -967,7 +967,7 @@ static int generate_hgvs_core(struct genepred_line *line, struct hgvs_des *des, 
     // put hgvs pos into string
     char *pos1;
     int is_coding = -1;
-    c->type = pos_convert(des->start, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding, &pos1);
+    pos_convert(des->start, line->exoncount, line->strand, line->exons, line->dna_ref_offsets, &is_coding, &pos1);
     // put the type of transcript
     if (is_coding == 1)
 	kputs("c.", string);

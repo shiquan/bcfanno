@@ -2,10 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <htslib/kstring.h>
+
 #include "kson.h"
 #include "config.h"
 #include "utils.h"
+#include "htslib/hts.h"
+#include "htslib/kstring.h"
+#include "htslib/kseq.h"
 
 #ifndef KSTRING_INIT
 #define KSTRING_INIT { 0, 0, 0}
@@ -54,18 +57,35 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
 
 static char *skip_comments(const char *json_fname)
 {
-    FILE *fp;
-    fp = fopen(json_fname, "rb");
+    htsFile *fp;
+    fp = hts_open(json_fname, "rb");
     if ( fp == NULL ) 
 	error("Failed to open %s.", json_fname);
-
-    int temp;
+    
     kstring_t string = KSTRING_INIT;
-    char buf[1024];
-    while ( (temp = fread(buf, 1, 1024, fp) ) != 0 ) 
-	kputsn(buf, temp, &string);
-    fclose(fp);
+    kstring_t temp = KSTRING_INIT;
 
+    while ( hts_getline(fp, KS_SEP_LINE, &temp) > 0 ) {
+        if ( temp.l == 0 )
+            continue;
+        char *ss = temp.s;
+        char *se = temp.s + temp.l -1;
+        while ( ss && (*ss == ' ' || *se == '\t' ))
+            ss++;
+        while ( se != ss && (*se == ' ' || *se == '\t'))
+            se--;
+        if ( ss == se )
+            continue;
+        if (*ss == '#')
+            continue;
+        memmove(string.s, ss, se -ss);
+        string.l = se -ss +1;
+        string.s[string.l] = '\0';
+        kputs(temp.s, &string);
+        temp.l = 0;
+    }
+    if ( temp.m )
+        free(temp.s);
     int i, j;
     char *json = string.s;
     for ( i = 0, j = 0; i < string.l && j < string.l; ++i, ++j ) {
