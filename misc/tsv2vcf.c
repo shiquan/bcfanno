@@ -94,49 +94,77 @@ struct args args = {
     .alleles = { -1, -1, KSTRING_INIT },    
 };
 
+int seq2num(char c)
+{
+    int i;
+    switch(c) {
+        case 'a':
+        case 'A':
+            i = 0;
+            break;
+        case 'c':
+        case 'C':
+            i = 1;
+            break;
+        case 'g':
+        case 'G':
+            i = 2;
+            break;
+        case 't':
+        case 'T':
+            i = 3;
+            break;
+
+        default:
+            i = 4;
+            break;
+    }
+    return i;
+}
 void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line, const char *chrom, int pos)
 {
-    static int seq2num[256] = {
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	0 , 1 , 2 , 3 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 0 , 4 , 1 , 4 , 4 , 4 , 2 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 3 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 0 , 4 , 1 , 4 , 4 , 4 , 2 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 3 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 
-	4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 4
-    };
     const char seqs[5] = "ACGTN";
     
     spec->string.l = 0;
     
     char *name  = spec->ref_col == -1 ? "N" : get_col_string(line, spec->ref_col);
-    int length = strlen(name);
+    int is_insertion = 0;
+    int length;
+    if (name == NULL || name == '\0' || strcmp(name, "(null)") == 0) { // insertion
+        length = 1;
+        is_insertion = 1;
+    } else {
+        length = strlen(name);
+    }
     int n = 0;
     char *seq = faidx_fetch_seq(fai, chrom, pos, pos+length-1, &n);
     int i = 0;
     int strand = 0; // 0 for plus, 1 for minus
-    if ( length == 1) {
-        if (seq2num[(int)name[0]] == 4 ) {
+    if ( is_insertion ) {
+        kputc(seqs[seq2num(seq[0])], &spec->string);
+        kputc(',', &spec->string);
+        kputc(seqs[seq2num(seq[0])], &spec->string);
+        name = get_col_string(line, spec->alt_col);
+        for ( i =0; i < strlen(name); ++i ) {
+            kputc(seqs[seq2num(name[i])], &spec->string);
+        }
+        free(seq);
+        return;
+    }
+    
+    if ( length == 1) {        
+        if (seq2num(name[0]) == 4 ) {
             kputc('N', &spec->string); // assume plus strand
         } else {
-            if ( seq2num[(int)name[0]] == seq2num[(int)seq[0]] ) {
-                kputc(seqs[seq2num[(int)name[0]]], &spec->string);
-            } else if ( seq2num[(int)name[0]] + seq2num[(int)seq[length-i-1]] == 3 ) {
-                kputc(seqs[3-seq2num[(int)name[0]]], &spec->string);
+            if ( seq2num(name[0]) == seq2num(seq[0]) ) {
+                kputc(seqs[seq2num(name[0])], &spec->string);
+            } else if ( seq2num(name[0]) + seq2num(seq[length-i-1]) == 3 ) {
+                kputc(seqs[3-seq2num(name[0])], &spec->string);
                 strand = 1;
             } else {
                 if ( args.force ) {
                     warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
-                    kputc(seqs[seq2num[(int)name[0]]], &spec->string);
+                    kputc(seqs[seq2num(name[0])], &spec->string);
                 } else {
                     error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
                 }
@@ -144,15 +172,15 @@ void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *lin
         }
     } else {
         for ( i = 0; i < length;  i++) {
-            if ( seq2num[(int)name[i]] == 4 )  {
+            if ( seq2num(name[i]) == 4 )  {
                 if ( args.force ) {
                     warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);                    
                 } else {
                     error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
                 }
             }
-            if ( seq2num[(int)name[i]] != seq2num[(int)seq[i]] ) {
-                if (seq2num[(int)name[length-i-1]] + seq2num[(int)seq[i]] == 3) {
+            if ( seq2num(name[i]) != seq2num(seq[i]) ) {
+                if (seq2num(name[length-i-1]) + seq2num(seq[i]) == 3) {
                     strand = 1;
                 } else {
                     if ( args.force ) {
@@ -165,24 +193,26 @@ void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *lin
         }
         if ( strand ) {
             for ( i = 0; i < length; i++) 
-                kputc(seqs[seq2num[(int)name[length-i-1]]], &spec->string);
+                kputc(seqs[seq2num(name[length-i-1])], &spec->string);
         } else {
             for ( i = 0; i < length; i++)
-                kputc(seqs[seq2num[(int)name[i]]], &spec->string);            
+                kputc(seqs[seq2num(name[i])], &spec->string);            
         }        
     }
     free(seq);
     name = get_col_string(line, spec->alt_col);
-    if ( name ) {
-        length = strlen(name);
-        kputc(',', &spec->string);
-        if ( strand ) {
-            for ( i = 0; i < length; ++i )
-                kputc(seqs[seq2num[(int)name[length-i-1]]], &spec->string);
-        } else {
-            for ( i = 0; i < length; ++i )
-                kputc(seqs[seq2num[(int)name[i]]], &spec->string);
-        }
+    if ( name == NULL || (name[0] == '.' && name[1] == 0) || strcmp(name, "(null)") == 0) {
+        kputs(",.", &spec->string);
+        return;
+    }
+    length = strlen(name);
+    kputc(',', &spec->string);
+    if ( strand ) {
+        for ( i = 0; i < length; ++i )
+            kputc(seqs[seq2num(name[length-i-1])], &spec->string);
+    } else {
+        for ( i = 0; i < length; ++i )
+            kputc(seqs[seq2num(name[i])], &spec->string);
     }
 }
 
