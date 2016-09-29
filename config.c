@@ -81,17 +81,17 @@ static int parse_comment_line(kstring_t *string)
         string->s[string->l] = '\0';
     }
 
-    if ( ss == se )
+    if ( string->l == 1)
         return 1;
-    char *sp = ss;
-    se--;
+    ss = string->s;
+    se = string->s + string->l -2;
     int mark = 0;
     for ( ;; ) {
-        if (sp == se)
+        if (ss == se)
             break;
-        if (*sp == '/') {
+        if (*ss == '/') {
             if ( mark == 1 ) {
-                string->l = sp - ss -1;
+                string->l = ss - string->s -1;
                 string->s[string->l] = '\0';
                 return string->l ? 1 : 0;
             } else {
@@ -100,7 +100,7 @@ static int parse_comment_line(kstring_t *string)
         } else {
             mark = 0;
         }
-        sp++;
+        ss++;
     }
     return string->l ? 1 : 0;
 }
@@ -125,20 +125,21 @@ static char *skip_comments(const char *json_fname)
     }
     if ( temp.m )
         free(temp.s);
-    int i, j;
-    char *json = string.s;
-    for ( i = 0, j = 0; i < string.l && j < string.l; ++i, ++j ) {
-        if ( json[i] == '/' && i < string.l -1 && json[i+1]=='/' ) {
-	    for ( j = i + 2; j < string.l && json[j] != '\n'; ++j);
-        }
-	json[i] = json[j];
-    }
-    json[i] = '\0';
-    string.l = i;
-#ifdef DEBUG_MODE
-    debug_print("%s", json);
-#endif
-    return json;
+    /* int i, j; */
+/*     char *json = string.s; */
+/*     for ( i = 0, j = 0; i < string.l && j < string.l; ++i, ++j ) { */
+/*         if ( json[i] == '/' && i < string.l -1 && json[i+1]=='/' ) { */
+/* 	    for ( j = i + 2; j < string.l && json[j] != '\n'; ++j); */
+/*         } */
+/* 	json[i] = json[j]; */
+/*     } */
+/*     json[i] = '\0'; */
+/*     string.l = i; */
+ #ifdef DEBUG_MODE 
+    debug_print("%s", string.s); 
+ #endif 
+/*     return json; */
+    return string.s;
 }
 
 static int load_config_core(struct vcfanno_config *config, kson_t *json)
