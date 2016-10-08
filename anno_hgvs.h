@@ -24,7 +24,7 @@ struct exon_pair {
 // offset 4:  is_utr3
 // 
 
-#define OFFSET_BITWISE   4
+#define LOCBIT   4
 #define REG_NONCODING  1
 #define REG_CODING     2
 #define REG_UTR5       4
@@ -36,6 +36,9 @@ struct exon_offset_pair {
     uint32_t end;
 };
 
+#define BLOCK_START 0
+#define BLOCK_END   1
+
 struct genepred_line {
     // mark the memory is allocated or not inside this struct,
     // clear == 0 for empty, clear == 1 recall clear_genepred_line to free it.
@@ -44,8 +47,7 @@ struct genepred_line {
     // however, for other insitutions they have different preference, Ensemble like to use ensemble id, NCBI like
     // use RefSeq accession to represent the chromosome and updated version. Please make sure all the databases have
     // same nomenclature before annotation.
-    char *chrom;
-    
+    char *chrom;    
     uint32_t txstart;
     uint32_t txend;
     // '-' for minus, '+' for plus strand
@@ -57,14 +59,16 @@ struct genepred_line {
     uint32_t cdsstart;
     uint32_t cdsend;
     uint32_t exoncount;
-    struct exon_pair *exons;
-    struct exon_offset_pair *dna_ref_offsets;
+    // [start, end]
+    uint32_t *exons[2];
+    uint32_t *dna_ref_offsets[2];
 };
 
 enum func_region_type {
     func_region_unknown,
-    func_region_split_sites,
+    //func_region_split_sites,
     func_region_cds,
+    func_region_noncoding,
     func_region_intron,
     func_region_utr5,
     func_region_utr3,
@@ -82,11 +86,12 @@ enum var_type {
     var_is_stop_retained,
     var_is_splice_donor,
     var_is_splice_acceptor,
+    var_is_complex,
 };
 
 static inline const char *var_type_string(enum var_type type)
 {
-    static const char* vartypes[10] = {
+    static const char* vartypes[11] = {
         "reference",
         "synonymous",
         "inframe insertion",
@@ -96,6 +101,7 @@ static inline const char *var_type_string(enum var_type type)
         "stop retained",
         "splice donor",
         "splice acceptor",
+        "complex",
         NULL,
     };
     return vartypes[type];
@@ -104,7 +110,8 @@ static inline const char *var_type_string(enum var_type type)
 struct var_func_type {
     enum func_region_type func;
     enum var_type vartype;
-    int count; // for cds or intron count
+    int start_flag; // region start flag for cds or intron count,
+    // flag & 1 == 1 for intron else for cds/utr/exon
 };
 
 //  hgvs_core keeps transcript/protein name, the format of hgvs name is construct by
@@ -269,10 +276,10 @@ extern void set_format_refgene();
 extern void set_format_genepred();
 //extern int refgene_opts_destroy(struct refgene_options *opts);
 extern int refgene_columns_parse(struct refgene_options *opts, char *columns);
-extern int refgene_set_refseq_fname(struct refgene_options *opts, char *fname);
-extern int refgene_set_refgene_fname(struct refgene_options *opts, char *fname);
-extern int refgene_set_trans_fname(struct refgene_options *opts, char *fname);
-extern int refgene_set_genes_fname(struct refgene_options *opts, char *fname);
+extern int refgene_set_refseq_fname(struct refgene_options *opts, const char *fname);
+extern int refgene_set_refgene_fname(struct refgene_options *opts, const char *fname);
+extern int refgene_set_trans_fname(struct refgene_options *opts, const char *fname);
+extern int refgene_set_genes_fname(struct refgene_options *opts, const char *fname);
 extern int refgene_options_init(struct refgene_options *opts);
 extern int refgene_options_destroy(struct refgene_options *opts);
 

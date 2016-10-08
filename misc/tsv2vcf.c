@@ -1,10 +1,7 @@
-/* vcfconverter.c -- convert from tab-separated to VCF/BCF with extra INFO field
+/*  tsv2vcf.c -- convert from tab-separated text file to VCF/BCF with extra INFO field
  * 
  *  Author:
  *      Shi Quan  shiquan.cn@gmail.com
- *
- * This program is reconstruct from Petr Danecek's tsv2vcf.c and vcfconvert.c. New functions 
- * added in vcfconverter, see man page for details.
  */
 
 #include "utils.h"
@@ -56,6 +53,9 @@ char *get_col_string(struct line *line, int col)
     return line->string.s + line->splits[col];
 }
 struct ref_alt_spec {
+    int chrom_col;
+    int pos_col;
+    int end_col; 
     int ref_col;
     int alt_col;
     kstring_t string;
@@ -91,7 +91,7 @@ struct args args = {
     .cols = 0,
     .fai = 0,
     .comment = KSTRING_INIT,
-    .alleles = { -1, -1, KSTRING_INIT },    
+    .alleles = { -1, -1, -1, -1, KSTRING_INIT },    
 };
 
 int seq2num(char c)
@@ -121,40 +121,97 @@ int seq2num(char c)
     }
     return i;
 }
-void construct_alleles(faidx_t *fai, struct ref_alt_spec *spec, struct line *line, const char *chrom, int pos)
+// 1 on success, 0 on failure
+int check_is_number(char *string)
 {
-    const char seqs[5] = "ACGTN";
-    
-    spec->string.l = 0;
-    
-    char *name  = spec->ref_col == -1 ? "N" : get_col_string(line, spec->ref_col);
-    int is_insertion = 0;
-    int length;
-    if (name == NULL || name == '\0' || strcmp(name, "(null)") == 0) { // insertion
-        length = 1;
-        is_insertion = 1;
-    } else {
-        length = strlen(name);
+    char *ss = string;
+
+    while ( ss && *ss != '\0' ) {
+        if ( isspace(*ss) )
+            continue;
+        if ( !isdigit((int)*ss)) {
+            warnings("%s is looks not like a number.", string);
+            return 0;
+        }
     }
-    int n = 0;
-    char *seq = faidx_fetch_seq(fai, chrom, pos, pos+length-1, &n);
+    return 1;
+}
+// construct chrom, pos and ref, alt (optional) for bcf1_t *rec
+// 1 on failure, 0 on success
+int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr, struct line *line, bcf1_t *rec)
+{
+    const char seqs[5] = "ACGTN";    
+    spec->string.l = 0;
+    char *chrom = get_col_string(line, spec->chrom_col);
+    int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, chrom);
+    if ( id == -1 ) {
+        warnings("Chromosome %s not found in reference.", chrom);
+        return 1;
+    }
+    rec->rid = id;
+
+    char *start_s = get_col_string(line, spec->pos_col);
+    if ( check_is_number(start_s) == 0 ) {
+        rec->pos = -1;
+        return 1;
+    }
+    
+    int start = atoi(start_s);
+    if (pos_is_set ) start --;
+    assert(start >= 0);
+    
+    int end = 0;    
+    if ( end_is_set ) {
+        assert(spec->end_col >= 0);
+        char *end_s = get_col_string(line, spec->end_col);
+        if ( check_is_number(end_s) ) {
+            end = atoi(end_s);           
+        }
+    }
+
+    // convert region only
+    if ( spec->ref_col == -1 && spec->alt_col == -1 ) {
+        rec->pos = start;
+        if ( end ) {
+            bcf_update_info_int32(h
+        }
+        return 0;
+    }
+    char *ref  = spec->ref_col == -1 ? NULL : get_col_string(line, spec->ref_col);
+    
+    char *alt =  get_col_string(line, spec->alt_col);
+    
+    int is_capped = 1; // assume the indel variants are capped to left base
+    int ref_length;
+
+    if (ref == NULL || *ref == '\0' || strcmp(ref, "(null)") == 0) {
+        is_capped = 0;
+        ref_length = 0;
+    } else {
+        ref_length = strlen(ref);
+    }
+    // if end position specified, check the length of reference consistent with region length
+    if ( is_capped && length != end - start )
+        error("Unconsistent reference length : %s\t%d\t%d vs. %d", chrom, start, end, length);
+    // if nocapped, left offset 1 base in the genome corrdinate
+    if ( is_capped == 0) {
+        start--;
+        ref_length = 1;
+    }
+    int n;
+    char *seq = faidx_fetch_seq(fai, chrom, start, start+ref_length-1, &n);
+    
     int i = 0;
     int strand = 0; // 0 for plus, 1 for minus
-    if ( is_insertion ) {
-        kputc(seqs[seq2num(seq[0])], &spec->string);
-        kputc(',', &spec->string);
-        kputc(seqs[seq2num(seq[0])], &spec->string);
-        name = get_col_string(line, spec->alt_col);
-        for ( i =0; i < strlen(name); ++i ) {
-            kputc(seqs[seq2num(name[i])], &spec->string);
-        }
-        free(seq);
-        return;
-    }
-    
-    if ( length == 1) {        
-        if (seq2num(name[0]) == 4 ) {
-            kputc('N', &spec->string); // assume plus strand
+
+
+    if ( ref_length == 1) {
+        // assume plus strand
+        if ( is_capped == 0 ) {
+            kputc(seq2num(seq[0]), &spec->string);
+            kputc(',', &spec->string);
+            kputc(seq2num(seq[0]), &spec->string);
+            
         } else {
             if ( seq2num(name[0]) == seq2num(seq[0]) ) {
                 kputc(seqs[seq2num(name[0])], &spec->string);
@@ -223,10 +280,7 @@ int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
         return 0;
     if (name[0] == '.')
         return 0;
-    int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, name);
-    if ( id == -1 )
-        return 0;
-    rec->rid = id;
+
     return 0;
 }
 int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
@@ -520,6 +574,7 @@ int init_columns(bcf_hdr_t *hdr)
     hts_close(fp);
     
     htsFile *fp_input = hts_open(args.input_fname, "r");
+
     kstring_t head = KSTRING_INIT;
     do {
         if ( hts_getline(fp_input, KS_SEP_LINE, &str) == 0 )
@@ -595,6 +650,17 @@ int init_columns(bcf_hdr_t *hdr)
         error("No position column is set.");
     if ( start_is_set == 1 && end_is_set == 0)
         warnings("End column is not set, treat start position zero based.");
+    if ( pos_is_set == 1 && start_is_set == 1) {
+        warnings("Redundancy columns, pos column and start column both set. Skip pos column..");
+        pos_is_set = 0;        
+    }
+    if ( pos_is_set == 1 && end_is_set == 1)  {
+        warnings("error Format; pos and end position both set; assuming pos is 1 based, but standard bed format required 0 based start position. Skip end position ..");
+        end_is_set == 0;
+    }
+
+        
+    
     free(head.s);
     free(splits);
     return 0;
