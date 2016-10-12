@@ -4,7 +4,8 @@
     "ref":"hg19", // hg19, hg38
     "hgvs": {
 	"gene_data":"/Users/shiquan/Documents/Workdir/03.codes/database/refgene/hg19_refgene.version.tsv.gz",
-	"columns":"Gene,Transcript,HGVSDNA",
+        "refseq":"/Users/shiquan/Documents/Workdir/03.codes/database/refgene/refMrna.fa.gz",
+	"columns":"Gene,Transcript,HGVSDNA,VarType,ExIn_id",
     },
     "vcfs": [
 	{
@@ -15,6 +16,10 @@
 	    "file":"/Users/shiquan/Documents/Workdir/03.codes/database/allele_frequence/ExAC.r0.3.sites.vep.hg19.vcf.gz",
 	    "columns":"INFO/AF,INFO/AN_EAS",
 	},
+        {
+            "file":"/Users/shiquan/Documents/02.codes/databases/preditions/dbscsnv.bcf",
+            "columns":"dbscSNV_ADA_SCORE,dbscSNV_RF_SCORE",
+        },
     ],
     "beds": [
 	{

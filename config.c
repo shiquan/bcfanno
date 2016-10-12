@@ -194,7 +194,10 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 	    if ( refgene_config->columns == NULL || refgene_config->columns[0] == '\0' )
 		error("No columns specified in HGVS configure.");
 	    if ( refgene_config->genepred_fname == NULL || refgene_config->genepred_fname[0] == '\0' )
-		error("No gene_data specified in HGVS configure.");
+		error("No genepred databases specified in HGVS configure.");
+            if ( refgene_config->refseq_fname == NULL || refgene_config->refseq_fname[0] == '\0' )
+		error("No refseq.fa specified in HGVS configure.");
+            
 	    refgene_config->refgene_is_set = 1;
 	} else if ( strcmp(node->key, "vcfs") == 0) {
 	    if ( node->type != KSON_TYPE_BRACKET )
