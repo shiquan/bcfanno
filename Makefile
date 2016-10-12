@@ -58,7 +58,7 @@ force:
 #plugins: $(PLUGINS)
 
 hgvs_generate: $(HTSLIB) 
-	$(CC) -D_HGVS_MAIN $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ hgvs_generate.c $(HTSLIB)
+	$(CC) -D_HGVS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ sequence.c genepred.c hgvs_generate.c $(HTSLIB)
 
 vcfadd: $(HTSLIB) 
 	$(CC) -D_VCF_ANNOS_MAIN $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ vcf_annos.c config.c kson.c vcmp.c $(HTSLIB)
@@ -76,10 +76,10 @@ vcf_rename_tags: $(HTSLIB) version.h
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
 vcfanno: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
-	$(CC) $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -pthread -o $@
+	$(CC) $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -pthread -o $@
 
 vcfanno_debug: $(HTSLIB) version.h 
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -pthread -o $@
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -pthread -o $@
 
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
 

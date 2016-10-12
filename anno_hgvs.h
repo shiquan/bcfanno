@@ -2,69 +2,11 @@
 #define VCFANNO_HGVS_HEADER
 
 #include "anno.h"
-
-// for each transcript, the region span several exon partial regions, use exon_pair[] stand each exons
-// and exon_offset_pair[] is the offset / coding coordiante consider of cdsstart 
-struct exon_pair {
-    uint32_t start;
-    uint32_t end;
-};
-
-// 
-// The dna reference offset for DNA coding and noncoding transcript consist of two parts. the offset value
-// and the function region construct a 32-bits value.
-// coding/nocoding coordinate
-// 32                        4321
-// |_________________________||||
-// ONLY one-bit below is accept per value
-// 
-// offset 1:  is_noncoding
-// offset 2:  is_coding
-// offset 3:  is_utr5
-// offset 4:  is_utr3
-// 
-
-#define LOCBIT   4
-#define REG_NONCODING  1
-#define REG_CODING     2
-#define REG_UTR5       4
-#define REG_UTR3       8
-#define REG_MASK       0xF
-
-struct exon_offset_pair {
-    uint32_t start;
-    uint32_t end;
-};
-
-#define BLOCK_START 0
-#define BLOCK_END   1
-
-struct genepred_line {
-    // mark the memory is allocated or not inside this struct,
-    // clear == 0 for empty, clear == 1 recall clear_genepred_line to free it.
-    int clear;
-    // chromosome names, usually names is start with "chr", like chr1, chr2, ..., chrM, which is UCSC style.
-    // however, for other insitutions they have different preference, Ensemble like to use ensemble id, NCBI like
-    // use RefSeq accession to represent the chromosome and updated version. Please make sure all the databases have
-    // same nomenclature before annotation.
-    char *chrom;    
-    uint32_t txstart;
-    uint32_t txend;
-    // '-' for minus, '+' for plus strand
-    char strand;
-    // usually gene name, or ensemble gene id
-    char *name1;
-    // transcript name or null for some gene_pred file
-    char *name2; 
-    uint32_t cdsstart;
-    uint32_t cdsend;
-    uint32_t exoncount;
-    // [start, end]
-    uint32_t *exons[2];
-    uint32_t *dna_ref_offsets[2];
-};
+#include "sequence.h"
+#include "genepred.h"
 
 enum func_region_type {
+    _func_region_promote_to_int = -1,
     func_region_unknown,
     //func_region_split_sites,
     func_region_cds,
@@ -74,38 +16,6 @@ enum func_region_type {
     func_region_utr3,
     func_region_intergenic,
 };
-
-enum var_type {
-    _var_type_promoter_to_int = -1,
-    var_is_reference,
-    var_is_synonymous,
-    var_is_inframe_insertion,
-    var_is_inframe_deletion,
-    var_is_stop_gained,
-    var_is_stop_lost,
-    var_is_stop_retained,
-    var_is_splice_donor,
-    var_is_splice_acceptor,
-    var_is_complex,
-};
-
-static inline const char *var_type_string(enum var_type type)
-{
-    static const char* vartypes[11] = {
-        "reference",
-        "synonymous",
-        "inframe insertion",
-        "inframe deletion",
-        "stop gained",
-        "stop lost",
-        "stop retained",
-        "splice donor",
-        "splice acceptor",
-        "complex",
-        NULL,
-    };
-    return vartypes[type];
-}
 
 struct var_func_type {
     enum func_region_type func;
@@ -197,36 +107,8 @@ struct hgvs_des {
     // the copy number only valid if variants type is var_type_copy, for most case, my algrithm only check
     // mark var_type_dels or var_type_ins in the first step, and check the near sequences from refseq 
     // databases and if there is copy number changed (more or less), the variants will update to var_type_copy 
-    int copy_number;
-    int copy_number_ori;
-};
-
-// Refgene gene names, transcript names, HGVS names generate
-struct genepred_memory {
-    int rid;
-    uint32_t start;
-    uint32_t end;
-    // l for used length, m for max length, i for inited length
-    int l, m, i;
-    struct genepred_line *a;
-};
-
-#define GENEPRED_MEMORY_INIT {.rid = -1, .start = 0, .end = 0, .l = 0, .m = 0, .i = 0, .a = 0 }
-
-// map each column right for each format.
-// in default refgene have one more `bin` column in the first column than genepred format
-struct genepred_format {
-    int chrom;
-    int name1;
-    int name2; 
-    int strand;
-    int txstart;
-    int txend;
-    int cdsstart;
-    int cdsend;
-    int exoncount;
-    int exonstarts;
-    int exonends;
+    int tandam_repeat_number;
+    int tandam_repeat_number_ori;
 };
 
 // See UCSC website for more details about refgene format, there is no 
@@ -261,7 +143,7 @@ struct refgene_options {
     int n_cols;
     struct anno_col *cols;
     // memory pool
-    struct genepred_memory buffer;
+    struct gp_mempool buffer;
     struct hgvs_cache cache;
 };
 
