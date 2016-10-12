@@ -257,26 +257,16 @@ void genepred_parser(kstring_t *string, struct genepred *line)
         line->backward_length = fwd_len;
     }
     
-#define swap(type, a, b) do {\
-        type t = a; \
-        a = b; \
-        b = t;\
-    } while (0)
 
     // for minus strand, reverse the transcript locations of genepred::loc[][], becase minus transcript
     // encode from backward
     if ( line->strand == '-') {
-        if ( line->exoncount == 1 ) {
-            swap(uint32_t, line->loc[BLOCK_START][0], line->loc[BLOCK_END][0]);            
-        } else {
-            for (i = 0; i < line->exoncount/2; ++i ) {
-                swap(uint32_t, line->loc[BLOCK_START][i], line->loc[BLOCK_START][line->exoncount-i -1]);
-                swap(uint32_t, line->loc[BLOCK_END][i], line->loc[BLOCK_END][line->exoncount-i -1]);
-            }
-            swap(uint32_t*, line->loc[BLOCK_END], line->loc[BLOCK_START]);
-        }
+        for (i = 0; i < line->exoncount; ++i ) {
+            line->loc[BLOCK_START][i] = line->reference_length - line->loc[BLOCK_START][i] + 1;
+            line->loc[BLOCK_END][i] = line->reference_length - line->loc[BLOCK_END][i] + 1;
+        }        
     }
-#undef swap
+
 
     // calculate the genepred::dna_ref_offsets[][]
     

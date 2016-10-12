@@ -438,6 +438,7 @@ static int describe_vartype(struct genepred *line, int l1, int l2, struct hgvs_d
     struct var_func_type *type = &c->type;    
     int is_strand = line->strand == '+';
     type->start_flag = is_strand ? l1 : line->exoncount * 2 - l2 -1;
+    
     if ( c->type.func == func_region_intron) {
         type->vartype = var_is_intron;
         return 0;
@@ -448,26 +449,24 @@ static int describe_vartype(struct genepred *line, int l1, int l2, struct hgvs_d
         return 0;
     }
     
-    int upstream_offset = des->start - read_start(line->exons, l1/2);
-    int downstream_offset  = read_end(line->exons, l2/2) - des->start;
-    assert(upstream_offset>=0 && downstream_offset >= 0);
 
-    uint32_t loc_start = 0, loc_end = 0;    
-    loc_start = read_start(line->loc, type->start_flag/2);
-    loc_end  = read_end(line->loc, type->start_flag/2);
+    int upstream_offset = 0;
+    int downstream_offset = 0;
+    uint32_t loc_start = 0, loc_end = 0;
     
-    if ( !is_strand) {
-#define swap(type, a, b) do {\
-        type t = a; \
-        a = b; \
-        b = t;\
-    } while (0)
-        swap(uint32_t, loc_start, loc_end);
-        swap(int, upstream_offset, downstream_offset);
-#undef swap
-    }
+    if ( is_strand ) {
+        upstream_offset = des->start - read_start(line->exons, l1/2);
+        downstream_offset = read_end(line->exons, l2/2) - des->start;
+        loc_start = read_start(line->loc, l1/2);
+        loc_end  = read_end(line->loc, l2/2);
+    } else {
+        upstream_offset = read_end(line->exons, l2/2) - des->start;
+        downstream_offset = des->start - read_start(line->exons, l1/2);
+        loc_start  = read_end(line->loc, l2/2);
+        loc_end  = read_start(line->loc, l1/2);
+    }    
+    assert(upstream_offset>=0 && downstream_offset >= 0);
     assert(loc_end > loc_start);
-    
     // for intron block
     if ( type->start_flag & 1) {
         if ( upstream_offset < 3)
@@ -478,9 +477,10 @@ static int describe_vartype(struct genepred *line, int l1, int l2, struct hgvs_d
             type->vartype = var_is_intron;
         return 0;
     }
-
-    int var_loc = upstream_offset + loc_start;
+   
+    int var_loc = upstream_offset + loc_start;    
     int coding_end_loc = line->reference_length - line->backward_length;
+    
     if ( var_loc <= line->forward_length ) {
         type->vartype = var_is_utr5;
         return 0;
@@ -490,13 +490,13 @@ static int describe_vartype(struct genepred *line, int l1, int l2, struct hgvs_d
         return 0;
     }
     
-    int coding_start, coding_end;
-    coding_start =  loc_start < line->forward_length ? line->forward_length + 1 : loc_start;
-    coding_end = loc_end > coding_end_loc ? loc_end : coding_end_loc;
-    int block_length = coding_end - coding_start;
+    int coding_start = 0, coding_end = 0;
+    coding_start =  loc_start > line->forward_length ? loc_start : line->forward_length + 1;
+    coding_end = loc_end > coding_end_loc ? coding_end_loc : loc_end;
+    int block_length = coding_end - coding_start + 1;
     char *seq = retrieve_refseq_block(line->name1, coding_start, coding_end);
     type->vartype = check_var_type(seq, block_length, loc_start, des->ref, des->ref_length, des->alt, des->alt_length);
-    return 0;    
+    return 0;
 }
 
 // purpose: find the most nearest edge for variant position
@@ -601,23 +601,22 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
             //    |-------------------|
             //    offset_start offset_end
             func = func_region_cds;
-            
+            type = left_type;
             if ( left_type == right_type ) {
                 loc = right_loc > left_loc ? right_loc - right_offset : left_loc - left_offset;
-                type = left_type;
             } else {
                 // if the block cross two different function regions, like utr5 to cds1
                 if ( !(left_type & (REG_UTR3 | REG_UTR5 | REG_CODING)) )
                     error("Unknown type. left_type : %d", left_type);
                 if ( !(right_type & (REG_UTR3 | REG_UTR5 | REG_CODING)) )	
                     error("Unknown type. right_type : %d", right_type);
-
+                
                 if ( left_type & REG_UTR5 ) {
                     loc = left_loc - left_offset;
                     if ( loc <= 0 ) {
+                        type = right_type;
                         if ( right_type & REG_CODING ) {
                             loc = 1 - loc;
-                            type = right_type;
                         } else if ( right_type & REG_UTR3 ) {
                             // all the cds region enclosed in one exon, closed with UTRs
                             int loc1 = right_loc - right_offset;
@@ -629,22 +628,20 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                                 type = right_type;
                             }                        
                         }
-                    } else {
-                        type = left_type;
                     }
                 } else if ( left_type & REG_CODING ) {
+
                     if ( right_type & REG_UTR3 ) {
                         // plus strand
-                        loc = right_loc - right_offset;
-                        type = right_type;
-                        if ( loc <= 0 ) {
-                            loc = left_loc + left_offset;
-                            type = left_type;
-                        }
+                        loc = left_loc + left_offset;
+
+                        if ( loc > 0 ) {
+                            loc = right_loc - right_offset;
+                            type = right_type;
+                        } 
                     } else if ( right_type & REG_UTR5 ) {
                         // minus strand
                         loc = left_loc - left_offset;
-                        type = left_type;
                         if ( loc <= 0 ) {
                             loc = 1 - loc;
                             type = right_type;
@@ -654,20 +651,22 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                     // should only happened in minus strand
                     if ( right_type & REG_CODING ) {
                         loc = left_loc - left_offset;
-                        type = left_type;
                         if ( loc <= 0 ) {
                             loc = 1 - loc;
                             type = right_type;
                         } 
                     } else if ( right_type & REG_UTR5 ) {
                         // cds region enclosed in one exon
-                        loc = left_loc - left_offset, type = left_type;                    
+                        loc = left_loc - left_offset;
                         if ( loc <= 0 ) {
                             int loc1 = right_loc - right_offset;
-                            if ( loc1 <= 0 )
-                                loc = 1 - loc, type = REG_CODING;
-                            else 
-                                loc = loc1, type = right_type;                       
+                            if ( loc1 <= 0 ) {
+                                loc = 1 - loc;
+                                type = REG_CODING;
+                            } else {
+                                loc = loc1;
+                                type = right_type;
+                            }
                         }
                     }
                 } // end left type is UTR3
@@ -936,12 +935,13 @@ static char *generate_transcript_string(struct hgvs_cache *cache)
         if ( hgvs->l == 0 || (hgvs->l == 1 && hgvs->a[0].str.s[0] == '.')) 
             continue;	
 	for ( j = 0; j < hgvs->l; ++j ) {
+            if ( j )
+                kputc('|', &str);
 	    struct hgvs_core *core = &hgvs->a[j];
 	    if ( core->l_name )
 		kputsn(core->str.s, core->l_name, &str);
 	    else
 		kputc('.', &str);
-	    kputc('|', &str);
 	}
         break;
     }
@@ -957,12 +957,13 @@ static char *generate_hgvsvarnomen_string(struct hgvs_cache *cache)
 	// foreach allele
 	struct hgvs *name = &cache->a[i];
 	for ( j = 0; j < name->l; ++j ) {
+            if ( j )
+                kputc('|', &str);
 	    struct hgvs_core *core = &name->a[j];
 	    if (core->l_name)
 		kputs(core->str.s, &str);
 	    else
 		kputc('.', &str);
-	    kputc('|', &str);
 	}
     }
     return str.s;
@@ -998,9 +999,10 @@ static char *generate_vartype_string(struct hgvs_cache *cache)
             kputc(',', &str);
         struct hgvs *hgvs = &cache->a[i];
         for ( j = 0; j < hgvs->l; ++j ) {
+            if ( j )
+                kputc('|', &str);
             struct var_func_type *type = &hgvs->a[j].type;
             kputs(var_type_string(type->vartype), &str);
-            kputc('|', &str);
         }
     }
     return str.s;
@@ -1015,6 +1017,8 @@ static char *generate_exin_ids(struct hgvs_cache *cache)
         if ( hgvs->l == 0 || (hgvs->l == 1 && hgvs->a[0].str.s[0] == '.')) 
             continue;
         for (j=0; j < hgvs->l; ++j) {
+            if ( j )
+                kputc('|', &str);
             struct var_func_type *type = &hgvs->a[j].type;
             if ( type->func == func_region_intron ) {
                 assert(type->start_flag&1);
@@ -1030,7 +1034,6 @@ static char *generate_exin_ids(struct hgvs_cache *cache)
                 else if ( type->func == func_region_utr3)
                     kputs("(UTR3)", &str);
             }
-            kputc('|', &str);
         }
         break;
     }
