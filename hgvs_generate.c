@@ -552,8 +552,8 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
     int left_offset, right_offset; // offset are length between pos and nearest edges, 0 based
     uint8_t left_type, right_type; // function region of start and end of the block
     // location and type of the variant
-    int loc;
-    uint8_t type;
+    int loc = 0;
+    uint8_t type = 0;
     int i = 0;
     kstring_t temp = KSTRING_INIT;
 
@@ -594,13 +594,14 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                 kputc('+', &temp);
             kputw(offset, &temp);        
         } else {
-            func = func_region_cds;
             // if pos in exon
             // pos_[start, end] is the locs of near edges,
             //    pos_start pos       pos_end
             //    |         |         |
             //    |-------------------|
             //    offset_start offset_end
+            func = func_region_cds;
+            
             if ( left_type == right_type ) {
                 loc = right_loc > left_loc ? right_loc - right_offset : left_loc - left_offset;
                 type = left_type;
@@ -611,7 +612,6 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                 if ( !(right_type & (REG_UTR3 | REG_UTR5 | REG_CODING)) )	
                     error("Unknown type. right_type : %d", right_type);
 
-                func = func_region_cds;            
                 if ( left_type & REG_UTR5 ) {
                     loc = left_loc - left_offset;
                     if ( loc <= 0 ) {
@@ -629,7 +629,9 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                                 type = right_type;
                             }                        
                         }
-                    }                
+                    } else {
+                        type = left_type;
+                    }
                 } else if ( left_type & REG_CODING ) {
                     if ( right_type & REG_UTR3 ) {
                         // plus strand
@@ -691,6 +693,7 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
         kputs("n.", string);
     else
         kputs("c.", string);
+    
     c->l_type = string->l;
     
     // generate location
@@ -709,10 +712,16 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
 static int generate_hgvs_changes(struct genepred *line, struct hgvs_des *des, struct hgvs_core *c)
 {
     kstring_t *string = &c->str;
+
+    // if no-change
+    if (c->type.vartype == var_is_reference) {
+        kputc('=',string);
+        return 0;
+    }
     // generate variant changes
     char *ref = strndup(des->ref, des->ref_length);
     char *alt = strndup(des->alt, des->alt_length);
-
+    
     if ( des->type == var_type_snp) {
         ksprintf(string, "%s>%s", ref, alt);
     } else if ( des->type == var_type_dels) {
