@@ -1134,8 +1134,8 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 // check if allele matches
 int match_allele(bcf1_t *line, bcf1_t *dat)
 {
-    int line_type = bcf_get_variant_type(line);
-    int dat_type = bcf_get_variant_type(dat);
+    int line_type = bcf_get_variant_types(line);
+    int dat_type = bcf_get_variant_types(dat);
 
     if ( (line_type & dat_type) == 0 )
         return 1;
