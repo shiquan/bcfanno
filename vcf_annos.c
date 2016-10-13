@@ -1131,7 +1131,19 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
     } 
     return file->cached ? 0 : 1;      
 }
-   
+// check if allele matches
+int match_allele(bcf1_t *line, bcf1_t *dat)
+{
+    int i, j;
+    for ( i = 1; i < line->n_allele; i++) {
+        for ( j = 1; j < dat->n_allele; j++) {
+            if ( strcmp(line->d.allele[i], dat->d.allele[j]) == 0 )
+                return 0;
+        }
+    }
+    // if no matchs
+    return 0;
+}
 bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 {
     // just skip the next steps if vcfs databases not inited
@@ -1153,7 +1165,9 @@ bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 		continue;
 	    if (dat->pos > line->pos)
 		break;
-
+            if ( match_allele(line, dat) )
+                continue;
+            
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
 		col->setter.vcf(opts, line, col, dat);
