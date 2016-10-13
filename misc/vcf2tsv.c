@@ -656,7 +656,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 			  else ksprintf(string, "%g", p[i]);
 		      }
 		  } else {
-		      assert(iallele < n);
+		      //assert(iallele <= n);
 		      if (p[iallele] == bcf_float_vector_end || p[iallele] == bcf_float_missing) kputc('.', string);
 		      else ksprintf(string, "%g", p[i]);
 		  }
