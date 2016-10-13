@@ -1134,6 +1134,11 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 // check if allele matches
 int match_allele(bcf1_t *line, bcf1_t *dat)
 {
+    int line_type = bcf_get_variant_type(line);
+    int dat_type = bcf_get_variant_type(dat);
+
+    if ( (line_type & dat_type) == 0 )
+        return 1;
     int i, j;
     for ( i = 1; i < line->n_allele; i++) {
         for ( j = 1; j < dat->n_allele; j++) {
@@ -1142,7 +1147,7 @@ int match_allele(bcf1_t *line, bcf1_t *dat)
         }
     }
     // if no matchs
-    return 0;
+    return 1;
 }
 bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 {
