@@ -1068,9 +1068,11 @@ int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column
 // find the bcf line from database of same positions and allele
 static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_t *line)
 {
-    if ( file->cached && file->buffer[file->cached-1]->pos >= line->pos )
+
+    if ( file->cached && file->buffer[0]->rid == line->rid && file->buffer[file->cached-1]->pos >= line->pos )
         return 0;
-    
+    else 
+        file->cached = 0;
     if ( file->itr ) {
 	hts_itr_destroy(file->itr);
 	file->itr = NULL;
@@ -1099,7 +1101,7 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
     } else {
 	error("no index");
     }
-    file->cached = 0;
+
     // no records in this vcf file
     if ( file->itr == NULL )
 	return 1;
