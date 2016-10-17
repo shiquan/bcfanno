@@ -207,7 +207,8 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	error("Empty string");
 
     col_t *c = (col_t*)malloc(sizeof(col_t));
-
+    memset(c, 0, sizeof(col_t));
+    
     char *q = p;
     if (!strncmp(q, "FMT/", 4)) {
 	q += 4;
@@ -276,9 +277,10 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	if (c->type == is_format) {
 	    c->setter = setter_format;
 	    c->id = bcf_hdr_id2int(h, BCF_DT_ID, q);
-	    c->unpack |= BCF_UN_FMT;
 	    if (c->id == -1)
 		error("Tag %s not exists in header!", q);
+            c->unpack |= BCF_UN_FMT;
+            c->number = bcf_hdr_id2length(h, BCF_HL_FMT, c->id);
 	} else {
 	    c->type = c->type == is_unknown ? is_info : c->type;
 	    c->setter = setter_info;
@@ -286,8 +288,8 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	    if (c->id == -1)
 		error("Tag %s not exists in header!", q);
 	    c->unpack |= BCF_UN_SHR;
+            c->number = bcf_hdr_id2length(h, BCF_HL_INFO, c->id);
 	}
-        c->number = bcf_hdr_id2length(h, BCF_DT_ID, c->id);
     }
 #undef same_string	
     return c;
@@ -615,6 +617,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 	  case BCF_BT_CHAR:
 	      do {
 		  char *p = (char*)data;
+                  char *end = p + n;
 		  int i;
 		  if (iallele == -1) {
 		      for (i=0; i<n && *p; ++i,++p) {
@@ -623,9 +626,20 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 		      }
 		  } else {
 		      //p += iallele;
-		      for (i=0; i<n && *p; ++i,++p) {
-			  if (*p == bcf_str_missing) kputc('.', string);
-			  else kputc(*p, string);
+                      for ( ;iallele > 0; ) {
+                          while (p && *p != ',')
+                              p++;
+                          p++;
+                          --iallele;
+                      }
+                      assert(p < end);
+		      for ( i = 0; i<n && *p && *p != ','; ++p,++i) {
+			  if (*p == bcf_str_missing) {
+                              kputc('.', string);
+                              break;
+                          } else {
+                              kputc(*p, string);
+                          }
 		      }
 		      /* if (*p) kputc(*p, string); */
 		      /* else kputc('.', string); */
@@ -721,7 +735,11 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 
 	}	
     } else {
-	int iallele = ale == -1 || c->number == BCF_VL_G || c->number == BCF_VL_FIXED ? -1 : c->number == BCF_VL_R ? ale -1 : ale;
+	int iallele = -1;
+        if ( c->number == BCF_VL_R )
+            iallele = ale;
+        else if ( c->number == BCF_VL_A)
+            iallele = ale -1;
 	process_fmt_array(iallele, &val->a, inf->len, inf->type, inf->vptr);
     }
 

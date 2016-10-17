@@ -291,7 +291,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 		    continue;
 		col = &file->cols[i];
 	    }
-	    // debug_print("key : %s", col->hdr_key);
+
 	    // specify setter functions here
 	    col->setter.bed = beds_setter_info_string;
 	    
