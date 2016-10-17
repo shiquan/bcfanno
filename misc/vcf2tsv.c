@@ -287,7 +287,7 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 		error("Tag %s not exists in header!", q);
 	    c->unpack |= BCF_UN_SHR;
 	}
-        c->number = bcf_hdr_id2number(h, BCF_DT_ID, c->id);
+        c->number = bcf_hdr_id2length(h, BCF_DT_ID, c->id);
     }
 #undef same_string	
     return c;
