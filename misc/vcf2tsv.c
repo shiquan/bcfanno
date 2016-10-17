@@ -627,13 +627,13 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 		  } else {
 		      //p += iallele;
                       for ( ;iallele > 0; ) {
-                          while (p && *p != ',')
+                          while (p < end && *p != ',')
                               p++;
                           p++;
                           --iallele;
                       }
                       assert(p < end);
-		      for ( i = 0; i<n && *p && *p != ','; ++p,++i) {
+		      for ( i = 0; i<n && p < end && *p != ','; ++p,++i) {
 			  if (*p == bcf_str_missing) {
                               kputc('.', string);
                               break;
