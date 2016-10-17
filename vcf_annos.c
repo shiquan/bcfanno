@@ -1069,7 +1069,8 @@ int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column
 static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_t *line)
 {
 
-    if ( file->cached && file->buffer[0]->rid == line->rid && file->buffer[file->cached-1]->pos >= line->pos )
+    if ( file->cached && file->buffer[0]->rid == line->rid &&
+         file->buffer[file->cached-1]->pos >= line->pos && file->buffer[0]->pos <= line->pos )
         return 0;
     else 
         file->cached = 0;

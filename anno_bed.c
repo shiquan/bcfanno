@@ -334,6 +334,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	    error("No column %s found in bed database : %s", col->hdr_key, fname);
 
 	int hdr_id = bcf_hdr_id2int(opts->hdr_out, BCF_DT_ID, col->hdr_key);
+        assert(hdr_id>-1);
 	col->number = bcf_hdr_id2length(opts->hdr_out, BCF_HL_INFO, hdr_id);
 	if ( col->number == BCF_VL_A || col->number == BCF_VL_R || col->number == BCF_VL_G)
 	    error("Only support fixed INFO number for bed database. %s", col->hdr_key);

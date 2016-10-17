@@ -278,7 +278,7 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 	    c->id = bcf_hdr_id2int(h, BCF_DT_ID, q);
 	    c->unpack |= BCF_UN_FMT;
 	    if (c->id == -1)
-		error("Tag %s not exists in header!", q);		
+		error("Tag %s not exists in header!", q);
 	} else {
 	    c->type = c->type == is_unknown ? is_info : c->type;
 	    c->setter = setter_info;
@@ -287,6 +287,7 @@ col_t *register_key (char *p, bcf_hdr_t *h)
 		error("Tag %s not exists in header!", q);
 	    c->unpack |= BCF_UN_SHR;
 	}
+        c->number = bcf_hdr_id2number(h, BCF_DT_ID, c->id);
     }
 #undef same_string	
     return c;
@@ -677,7 +678,7 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	kputc('.', &val->a);
 	return;
     }
-    if (ale == 0 && c->type == BCF_VL_A) {
+    if (ale == 0 && c->number == BCF_VL_A) {
 	kputc('.', &val->a);
 	return;
     }
@@ -720,7 +721,7 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 
 	}	
     } else {
-	int iallele = ale == -1 || c->type == BCF_VL_G || c->type == BCF_VL_FIXED ? -1 : c->type == BCF_VL_R ? ale -1 : ale;
+	int iallele = ale == -1 || c->number == BCF_VL_G || c->number == BCF_VL_FIXED ? -1 : c->number == BCF_VL_R ? ale -1 : ale;
 	process_fmt_array(iallele, &val->a, inf->len, inf->type, inf->vptr);
     }
 
