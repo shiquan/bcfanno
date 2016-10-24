@@ -152,7 +152,11 @@ int vcf_setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_co
     // if ( !(line->unpacked & BCF_UN_INFO) ) bcf_unpack(line, BCF_UN_INFO);
     // if ( !(rec->unpacked & BCF_UN_INFO) ) bcf_unpack(rec, BCF_UN_INFO);
     int flag = bcf_get_info_flag(hdr,rec,col->hdr_key,NULL,NULL);
-    bcf_update_info_flag(opts->hdr_out,line,col->hdr_key,NULL,flag);
+    assert(flag >= 0);
+    int ret = bcf_get_info_flag(opts->hdr_out, line, col->hdr_key, NULL, NULL);
+    if ( ret == -3 ) {
+        bcf_update_info_flag(opts->hdr_out,line,col->hdr_key,NULL,flag);
+    } 
     return 0;
 }
 int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpi)

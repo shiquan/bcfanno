@@ -256,10 +256,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	string.l = 0;	    
     }
 
-    // int n_hdr = 0;
-    // int m_hdr = 0;
-    // struct hdr_string *hdrs = NULL;
-    while (1) {
+    while ( 1 ) {
 	string.l =0;
 	if ( hts_getline(file->fp, KS_SEP_LINE, &string) < 0 )
 	    break;

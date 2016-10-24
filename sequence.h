@@ -91,18 +91,20 @@ const static int codon_matrix[4][4][4] = {
         { C4_Thr, C4_Thr, C4_Thr, C4_Thr, },
         { C4_Arg, C4_Ser, C4_Arg, C4_Ser, },
         { C4_Ile, C4_Ile, C4_Met, C4_Ile, },
-    },{    
+    },
+    {    
         { C4_Gln, C4_His, C4_Gln, C4_His, },
         { C4_Pro, C4_Pro, C4_Pro, C4_Pro, },
         { C4_Arg, C4_Arg, C4_Arg, C4_Arg, },
         { C4_Leu, C4_Leu, C4_Leu, C4_Leu, },
-    },{
-                                     
+    },
+    {                                     
         { C4_Glu, C4_Asp, C4_Glu, C4_Asp, },
         { C4_Ala, C4_Ala, C4_Ala, C4_Ala, },
         { C4_Gly, C4_Gly, C4_Gly, C4_Gly, },
         { C4_Val, C4_Val, C4_Val, C4_Val, },
-    },{
+    },
+    {
         { C4_Stop, C4_Tyr, C4_Stop, C4_Tyr, },
         { C4_Ser, C4_Ser, C4_Ser, C4_Ser, },
         { C4_Stop, C4_Cys, C4_Trp, C4_Cys, },

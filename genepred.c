@@ -301,20 +301,34 @@ void genepred_parser(kstring_t *string, struct genepred *line)
         
 	if ( fwd_len > exon_len ) {
 	    fwd_len -= exon_len;
-	    line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(fwd_len+1, is_strand? REG_UTR5 : REG_UTR3);
+ 	    line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(fwd_len+1, is_strand? REG_UTR5 : REG_UTR3);
 	    continue;
 	}
-         // for minus strand count from backward
-        forward_offset = is_strand ? exon_len - fwd_len : read_len + fwd_len - exon_len +1;
 
-	line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset, REG_CODING);
+        if ( is_strand ) {
+            forward_offset = exon_len - fwd_len;
+            if ( forward_offset > read_len ) { // one exon within cds included
+                line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset - read_len, REG_UTR3);
+            } else {
+                line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset, REG_CODING);
+            }
+        } else {
+            // for minus strand count from backward
+            forward_offset =  read_len + fwd_len - exon_len +1;
+            if ( forward_offset < 0 ) {
+                forward_offset += bkw_len + 1;
+                line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset, REG_UTR5);
+            } else {
+                line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset, REG_CODING);
+            }
+        }
 	fwd_len = 0;
 	++l1;
 	break;
     }
 
     // count utr blocks rightside
-    for ( ; l2 > 0 && bkw_len; --l2 ) {
+    for ( ; l2 > 0 && l2 > l1 && bkw_len; --l2 ) {
         exon_len = line->exons[BLOCK_END][l2] - line->exons[BLOCK_START][l2] + 1;
 
 	line->dna_ref_offsets[BLOCK_END][l2] = compact_loc(bkw_len, is_strand ? REG_UTR3 : REG_UTR5);
@@ -324,15 +338,29 @@ void genepred_parser(kstring_t *string, struct genepred *line)
 	    line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(bkw_len+1, is_strand ? REG_UTR3 : REG_UTR5);
 	    continue;
 	}
-        
-        backward_offset = is_strand ? read_len + bkw_len - exon_len + 1 : exon_len - bkw_len;
-
-	line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(backward_offset, REG_CODING);
+        if ( is_strand ) {
+            backward_offset = read_len + bkw_len - exon_len;
+            if ( backward_offset < 0 ) {
+                backward_offset = -backward_offset;                
+                line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(-backward_offset, REG_UTR5); 
+            } else {
+                line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(backward_offset+1, REG_CODING);                
+            }
+        } else {
+            backward_offset = exon_len - bkw_len;
+            if ( backward_offset > read_len ) {
+                backward_offset -= read_len;
+                line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(backward_offset, REG_UTR5);                
+            } else {
+                line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(backward_offset, REG_CODING);                
+            }
+        }
 	bkw_len = 0;
 	--l2;
 	break;
     }
-
+    if ( l1 >= l2 )
+        return;
     // count inter regions
     if ( is_strand ) {
 	if (is_coding && backward_offset)
