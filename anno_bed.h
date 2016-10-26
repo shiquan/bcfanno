@@ -34,6 +34,7 @@ struct beds_anno_file {
     htsFile *fp;
     tbx_t *idx;
     char *fname;
+    int no_such_chrom;
     int last_id;
     int last_start;
     int last_end;

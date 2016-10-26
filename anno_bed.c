@@ -109,13 +109,20 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 {
     assert(file->idx);
     int tid = tbx_name2id(file->idx, bcf_seqname(hdr_out, line));
-    if ( tid == -1 ) {
-	warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
-	return 1;
-    }
     // if cached this region already, just skip refill. this is different from vcfs_fill_buffer()
     if ( tid == file->last_id && file->last_start <= line->pos + 1 && file->last_end > line->pos)
 	return -1;
+
+    if ( tid == -1 ) {
+        if ( file->no_such_chrom == 0 ) {
+            warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+            file->no_such_chrom = 1;
+        }
+	return 1;
+    } else {
+        file->no_such_chrom = 0;
+    }
+
     // empty cache
     file->cached = 0;
     int i;
@@ -169,7 +176,8 @@ int beds_file_destroy(struct beds_anno_file *file)
     free(file->cols);
     for ( i = 0; i < file->max; ++i ) 
 	beds_anno_tsv_destroy(file->buffer[i]);
-    
+    if ( file->fname )
+        free(file->fname);
     if ( file->max )
 	free(file->buffer);
     return 0;
@@ -188,7 +196,8 @@ int beds_options_destroy(struct beds_options *opts)
 int beds_setter_info_string(struct beds_options *opts, bcf1_t *line, struct anno_col *col)
 {
     struct beds_anno_file *file = &opts->files[col->ifile];
-    beds_fill_buffer(file, opts->hdr_out, line);   
+    if ( beds_fill_buffer(file, opts->hdr_out, line) == 1)
+        return 1;
     char *string = generate_funcreg_string(file, col);
     if ( string == NULL )
 	return 1;
@@ -206,6 +215,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
     struct beds_anno_file *file = &opts->files[opts->n_files];
     memset(file, 0, sizeof(struct beds_anno_file));
     file->id = opts->n_files;
+    file->fname = strdup(fname);
     file->fp = hts_open(fname, "r");
     if (file->fp == NULL)
 	error("Failed to open %s : %s", fname, strerror(errno));
@@ -221,8 +231,9 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
     kstring_t string = KSTRING_INIT;
     int no_columns = 0;
     int i;
-    if ( columns == NULL ) {
+    if ( columns == NULL && file->no_such_chrom == 0) {
 	warnings("No columns string specified for %s. Will annotate all tags in this data.", fname);
+        file->no_such_chrom = 1;
 	no_columns = 1;
     } else {
 	int *splits = NULL;

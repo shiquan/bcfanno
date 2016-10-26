@@ -1,5 +1,14 @@
-#include "anno.h"
+/*  vcfanno - a core program to annotate vcf/bcf by using current stat databases
+ *
+ *  History:
+ *         v0.0.1   test version        2015/08/29
+ *         v0.0.2   test version        2016/02/28
+ *         v0.0.3   alpha version       2016/09/01
+ *         v0.0.4   beta version        2016/10/25
+ */
+
 #include "utils.h"
+#include "anno.h"
 #include "config.h"
 #include "htslib/hts.h"
 #include "htslib/tbx.h"
@@ -9,6 +18,7 @@
 #include "anno_hgvs.h"
 #include "version.h"
 
+const char *vcfanno_version = "version 0.0.4";
 // cache ANNOCORE_BUFFER_LINES lines into buffers; for each buffer pool all lines come from one chromosome,
 // if no enough lines, just put as much as possible
 #define ANNOCORE_BUFFER_LINES 1000
@@ -154,7 +164,7 @@ int parse_args(int argc, char **argv)
     }
     
     if ( quiet_mode == 0 ) {
-	LOG_print("The program was compiled at %s %s by %s.", __DATE__, __TIME__, getenv("USER"));
+	LOG_print("The program was compiled at %s %s.", __DATE__, __TIME__);
 	LOG_print("Args: %s", args.commands.s);	
     }
     

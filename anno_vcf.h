@@ -21,7 +21,9 @@ struct anno_vcf_file {
     // index for vcf file, pre-indexed by tabix
     tbx_t *tbx_idx;
     // iterator
-    hts_itr_t *itr;    
+    hts_itr_t *itr;
+    int no_such_chrom; // flag to set no this chromosome in the database
+    int last_rid;
     // char *fname;   
     int cached, max;
     bcf1_t **buffer;

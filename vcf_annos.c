@@ -847,7 +847,7 @@ int vcf_setter_format_str(struct vcfs_options *opts, bcf1_t *line, struct anno_c
 int vcfs_options_init(struct vcfs_options *opts)
 {
     memset(opts, 0, sizeof(struct vcfs_options));
-    opts->vcmp = vcmp_init();
+    opts->vcmp = vcmp_init();    
     opts->vcfs_is_inited = 1;
     return 0;    
 }
@@ -1051,6 +1051,7 @@ int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column
     file->id= opts->n_files;
     file->fname = strdup(fname);
     file->hdr = bcf_hdr_read(file->fp);
+    file->last_rid = -1;
     file->itr = NULL;
     file->buffer = NULL;
     file->cached = file->max = 0;
@@ -1072,12 +1073,17 @@ int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *column
 // find the bcf line from database of same positions and allele
 static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_t *line)
 {
-
     if ( file->cached && file->buffer[0]->rid == line->rid &&
          file->buffer[file->cached-1]->pos >= line->pos && file->buffer[0]->pos <= line->pos )
         return 0;
     else 
         file->cached = 0;
+    if ( file->last_rid != line->rid) {
+        file->no_such_chrom = 0;
+        file->last_rid = line->rid;
+    } else if ( file->no_such_chrom == 1 ) {
+        return 1;
+    }
     if ( file->itr ) {
 	hts_itr_destroy(file->itr);
 	file->itr = NULL;
@@ -1092,14 +1098,20 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
     if ( file->tbx_idx ) {
 	int tid = tbx_name2id(file->tbx_idx, bcf_seqname(hdr_out, line));
 	if ( tid == -1) {
-	    warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+            if ( file->no_such_chrom == 0 ) {
+                warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+                file->no_such_chrom = 1;
+            }
 	    return 1;
 	}
 	file->itr = tbx_itr_queryi(file->tbx_idx, tid, line->pos, end_pos +1);
     } else if ( file->bcf_idx ) {
 	int tid = bcf_hdr_name2id(file->hdr, bcf_seqname(hdr_out, line));
 	if ( tid == -1) {
-	    warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+            if ( file->no_such_chrom == 0 ) {
+                warnings("no chromosome %s found in databases %s.", bcf_seqname(hdr_out, line), file->fname);
+                file->no_such_chrom = 1;
+            }
 	    return 1;
 	}
 	file->itr = bcf_itr_queryi(file->bcf_idx, tid, line->pos, end_pos +1);	
@@ -1167,7 +1179,9 @@ bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 
     for ( i = 0; i < opts->n_files; ++i ) {
 	struct anno_vcf_file *file = &opts->files[i];
-	vcf_fill_buffer(file, opts->hdr_out, line);
+
+	if ( vcf_fill_buffer(file, opts->hdr_out, line) )
+            continue;
 	for ( j = 0; j < file->cached; ++j ) {
 	    bcf1_t *dat = file->buffer[j];
 	    // todo : for deletion, rough search
