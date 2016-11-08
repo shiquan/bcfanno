@@ -124,7 +124,7 @@ struct args {
     int skip_ref;
     int print_header;
     int split_flag;
-    int skip_reference;
+    int skip_uncover;
     ccols_t *convert;
     mcache_t *cache;
     kstring_t *mempool;
@@ -135,7 +135,7 @@ struct args {
 struct args args = {
     .skip_ref = 0,
     .print_header = 1,
-    .skip_reference = 0,
+    .skip_uncover = 0,
     .split_flag = SPLIT_DEFAULT,
     .convert = NULL,
     .cache = NULL,
@@ -456,7 +456,43 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 	//ps->n_alleles = n_alleles;
 	for (j=0; j < ps->n_alleles; ++j) { // ???
 	    
-	    if (n_alleles > 1 && args.skip_ref && j==0) continue;
+	    if (n_alleles > 1 && args.skip_ref && j==0)
+                continue;
+            if ( args.skip_uncover ) {
+                int skip = 1;
+                bcf_fmt_t *fmt = bcf_get_fmt(hdr, line, "GT");
+                if ( fmt == NULL)
+                    error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+                int sample_id = i;
+                
+#define BRANCH(type_t, missing, vector_end) do {                        \
+                    type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size); \
+                    int i;                                              \
+                    for (i=0; i<fmt->n; ++i) {                          \
+                        if ( (ptr[i]>>1) ) skip = 0;                    \
+                    }                                                   \
+                } while(0)
+                
+                switch(fmt->type) {
+                    case BCF_BT_INT8:
+                        BRANCH(int8_t, bcf_int8_missing, bcf_int8_vector_end);
+                        break;
+                        
+                    case BCF_BT_INT16:
+                        BRANCH(int16_t, bcf_int16_missing, bcf_int16_vector_end);
+                        break;
+                        
+                    case BCF_BT_INT32:
+                        BRANCH(int32_t, bcf_int32_missing, bcf_int32_vector_end);
+                        break;
+                        
+                    default:
+                        error("FIXME: type %d in bcf_format_gt?", fmt->type);
+                }
+#undef BRANCH
+                if ( skip )
+                    continue;
+            } // end check conver
 	    mcache_pa_t *pa = &ps->alvals[j];
 	    int iallele = -1;
 	    if (args.split_flag & SPLIT_ALT) iallele = j;
@@ -549,19 +585,19 @@ void setter_zygosity(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *va
 {
     bcf_fmt_t *fmt = bcf_get_fmt_id(line, c->id);
     if ( fmt == NULL )
-	error("no found TG tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+	error("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
     int sample_id = val->sample_id;
 
 }
 void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
     if (ale != -1)
-	error ("TG, TGT only used with split-allele mode.");
+	error ("GT, TGT only used with split-allele mode.");
 
     bcf_fmt_t *fmt = bcf_get_fmt_id(line, c->id);
 
     if (fmt == NULL)
-	error ("no found TG tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+	error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
 
     int sample_id = val->sample_id;
     
@@ -775,7 +811,8 @@ int usage(void)
     fprintf(stderr,"\t-f, --format   see man page for deatils.\n");
     fprintf(stderr,"\t-s, --split    split by [ALT].\n");
     fprintf(stderr,"\t-p, --print-header  print the header comment.\n");
-    fprintf(stderr,"\t-r, --skip-ref     skip format reference positions; suggest open this option.\n");
+    fprintf(stderr,"\t-r, --skip-ref      skip format reference positions; suggest open this option.\n");
+    fprintf(stderr,"\t-u, --skip-uncover  skip uncover positions.\n");
     fprintf(stderr,"Website :\n");
     fprintf(stderr,"https://github.com/shiquan/vcfanno\n");
     return 1;
@@ -788,6 +825,7 @@ int run(int argc, char**argv)
     struct option const long_opts[] = {
 	{"format", required_argument, NULL, 'f'},
 	{"skip-ref", no_argument, NULL, 'r'},
+        {"skip-uncover", no_argument, NULL, 'u'},
 	{"split", required_argument, NULL, 's'},
 	{"print-header", no_argument, NULL, 'p'},
 	{0, 0, 0, 0}
@@ -795,7 +833,7 @@ int run(int argc, char**argv)
 
     char c;
     char *format = NULL, *flag = NULL;
-    while ((c = getopt_long(argc, argv, "f:s:rph?", long_opts, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "f:s:urph?", long_opts, NULL)) >= 0) {
 	switch (c) {
 	    case 'f':
 		format = strdup(optarg);
@@ -812,7 +850,11 @@ int run(int argc, char**argv)
 	    case 'p':
 		args.print_header = 1;
 		break;
-		
+
+            case 'u':
+                args.skip_uncover = 1;
+                break;
+                
 	    case 'h':
 	    case '?':
 	    default:
