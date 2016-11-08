@@ -61,7 +61,7 @@ enum var_type check_var_type(char *block, int block_length, int start, char *ref
         if ( amino_ref == amino_alt )
             return var_is_synonymous;
         else
-            return var_is_nonsynonymous;
+            return var_is_missense;
         
     } else if ( ref_length%3 ) {
         return var_is_frameshift;
