@@ -13,7 +13,7 @@
 // coding_start should smaller than start because this function only works for cds region
 enum var_type check_var_type(char *block, int block_length, int start, char *ref, int ref_length, char *alt, int alt_length )
 {
-//    if ( block_length%3 )
+    //    if ( block_length%3 )
     //      error("transcript block is incomplete. %d.", block_length);    
     int codon_start = start/3;
     int codon_length = block_length/3;

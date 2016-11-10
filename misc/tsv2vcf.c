@@ -21,6 +21,24 @@ static int pos_is_set = 0;
 static int start_is_set = 0;
 static int end_is_set = 0;
 
+void set_start ()
+{
+    start_is_set = 1;
+}
+void set_pos ()
+{
+    pos_is_set = 1;
+}
+void set_end ()
+{
+    end_is_set = 1;
+}
+
+
+#define check_start (start_is_set == 1)
+#define check_pos (pos_is_set == 1)
+#define check_end (end_is_set == 1)
+
 struct line {
     int n;
     int *splits;
@@ -34,6 +52,7 @@ void clear_line(struct line *line)
     line->n = -1;
     line->string.l = 0;
 }
+
 struct tsv_col;
 typedef int (*tsv_setter_t)( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *, struct line *);
 
@@ -47,7 +66,9 @@ struct tsv_col {
 
 char *get_col_string(struct line *line, int col)
 {
-    assert(col >= 0);
+    if (col == -1 )
+        return NULL;
+    assert(col>=0);
     if ( col >= line->n )
         return NULL;
     return line->string.s + line->splits[col];
@@ -66,6 +87,8 @@ struct args {
     const char *output_fname;
     const char *reference_fname;
     int pos_column;
+    int start_column;
+    int end_column;
     int chr_column;
     int force;
     // char *columns;
@@ -82,8 +105,10 @@ struct args args = {
     .input_fname = 0,
     .output_fname = 0,
     .reference_fname = 0,
-    .pos_column = 0,
-    .chr_column = 0,
+    .pos_column = -1,
+    .start_column = -1,
+    .end_column = -1,
+    .chr_column = -1,
     .force = 0,
     .output_type = FT_VCF,
     .n_cols = 0,
@@ -91,7 +116,7 @@ struct args args = {
     .cols = 0,
     .fai = 0,
     .comment = KSTRING_INIT,
-    .alleles = { -1, -1, -1, -1, KSTRING_INIT },    
+    .alleles = { -1, -1, -1, -1, -1, KSTRING_INIT },    
 };
 
 int seq2num(char c)
@@ -126,7 +151,7 @@ int check_is_number(char *string)
 {
     char *ss = string;
 
-    while ( ss && *ss != '\0' ) {
+    for ( ;ss && *ss && *ss != '\0'; ss++ ) {
         if ( isspace(*ss) )
             continue;
         if ( !isdigit((int)*ss)) {
@@ -136,20 +161,32 @@ int check_is_number(char *string)
     }
     return 1;
 }
+void clear_spec(struct ref_alt_spec *spec)
+{
+    spec->string.l = 0;
+}
 // construct chrom, pos and ref, alt (optional) for bcf1_t *rec
 // 1 on failure, 0 on success
 int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr, struct line *line, bcf1_t *rec)
 {
-    const char seqs[5] = "ACGTN";    
-    spec->string.l = 0;
+    // todo : convert region only
+    if ( spec->ref_col == -1 && spec->alt_col == -1 ) {
+        warnings("no ref and alt columns specified.");
+        return 1;
+    }
+
+    const char seqs[5] = "ACGTN";
+
     char *chrom = get_col_string(line, spec->chrom_col);
+    if (chrom == NULL)
+        error("no chrom column found.");
     int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, chrom);
     if ( id == -1 ) {
         warnings("Chromosome %s not found in reference.", chrom);
         return 1;
     }
     rec->rid = id;
-
+    clear_spec(spec);
     char *start_s = get_col_string(line, spec->pos_col);
     if ( check_is_number(start_s) == 0 ) {
         rec->pos = -1;
@@ -157,9 +194,10 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
     }
     
     int start = atoi(start_s);
-    if (pos_is_set ) start --;
+    if ( pos_is_set )
+        start --;
+
     assert(start >= 0);
-    
     int end = 0;    
     if ( end_is_set ) {
         assert(spec->end_col >= 0);
@@ -167,110 +205,137 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
         if ( check_is_number(end_s) ) {
             end = atoi(end_s);           
         }
-    }
-
-    // convert region only
-    if ( spec->ref_col == -1 && spec->alt_col == -1 ) {
-        rec->pos = start;
-        if ( end ) {
-            bcf_update_info_int32(h
-        }
-        return 0;
-    }
-    char *ref  = spec->ref_col == -1 ? NULL : get_col_string(line, spec->ref_col);
-    
-    char *alt =  get_col_string(line, spec->alt_col);
-    
+    }    
+    char *alt = NULL;
+    char *ref = NULL;
+    int n;
+    char *seq = NULL;
     int is_capped = 1; // assume the indel variants are capped to left base
-    int ref_length;
+    int ref_length, alt_length;
+    int i = 0;
+    
+    if ( spec->ref_col == -1 ) {
+        // if end column is not set, assume one position, this is very risk, todo: force check the length of reference
+        ref_length = end_is_set ? end - start : 1;
+        
+        if ( spec->alt_col == -1 ) { // assume only convert regions into vcf
+            if ( end_is_set ) {
+                int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "END");
+                if ( id == -1 ) {
+                    bcf_hdr_append(hdr, "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position.\">");
+                    bcf_hdr_sync(hdr);
+                    id = bcf_hdr_id2int(hdr, BCF_DT_ID, "END");
+                    assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+                }
+                bcf_update_info_int32(hdr, rec, "END", &end, 1);
+            }
+        } else {
+            ref = faidx_fetch_seq(fai, chrom, start, start+ref_length-1, &n);
+            alt = get_col_string(line, spec->alt_col);
+            alt_length = strlen(alt);
+            for ( i = 0; i < ref_length; i++)
+                kputc(seqs[seq2num(ref[i])], &spec->string);
+            free(ref);
+            if (alt_length == 1 && *alt == '.')
+                goto update_alleles;
+            kputc(',', &spec->string);
+            for ( i = 0; i < alt_length; i++)
+                kputc(seqs[seq2num(alt[i])], &spec->string);
+        }
+        goto update_alleles;
+    } 
 
-    if (ref == NULL || *ref == '\0' || strcmp(ref, "(null)") == 0) {
+    ref = get_col_string(line, spec->ref_col);
+    if (ref == NULL || *ref == '.'  || *ref == '\0' || strcmp(ref, "(null)") == 0) {
         is_capped = 0;
         ref_length = 0;
     } else {
-        ref_length = strlen(ref);
+        ref_length = strlen(ref);                    
     }
+
     // if end position specified, check the length of reference consistent with region length
-    if ( is_capped && length != end - start )
-        error("Unconsistent reference length : %s\t%d\t%d vs. %d", chrom, start, end, length);
+    if ( is_capped && end_is_set && ref_length != end - start )
+        error("Unconsistent reference length : %s\t%d\t%d vs. %d", chrom, start, end, ref_length);
     // if nocapped, left offset 1 base in the genome corrdinate
     if ( is_capped == 0) {
         start--;
         ref_length = 1;
     }
-    int n;
-    char *seq = faidx_fetch_seq(fai, chrom, start, start+ref_length-1, &n);
-    
-    int i = 0;
-    int strand = 0; // 0 for plus, 1 for minus
-
-
+    seq = faidx_fetch_seq(fai, chrom, start, start+ref_length-1, &n);    
+    int strand = 0; // 0 for plus, 1 for minus        
     if ( ref_length == 1) {
         // assume plus strand
         if ( is_capped == 0 ) {
-            kputc(seq2num(seq[0]), &spec->string);
-            kputc(',', &spec->string);
-            kputc(seq2num(seq[0]), &spec->string);
-            
+            kputc(seqs[seq2num(seq[0])], &spec->string);
         } else {
-            if ( seq2num(name[0]) == seq2num(seq[0]) ) {
-                kputc(seqs[seq2num(name[0])], &spec->string);
-            } else if ( seq2num(name[0]) + seq2num(seq[length-i-1]) == 3 ) {
-                kputc(seqs[3-seq2num(name[0])], &spec->string);
+            if ( seq2num(ref[0]) == seq2num(seq[0]) ) {
+                kputc(seqs[seq2num(ref[0])], &spec->string);
+            } else if ( seq2num(ref[0]) + seq2num(seq[ref_length-i-1]) == 3 ) {
+                kputc(seqs[3-seq2num(ref[0])], &spec->string);
                 strand = 1;
             } else {
                 if ( args.force ) {
-                    warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
-                    kputc(seqs[seq2num(name[0])], &spec->string);
+                    warnings("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
+                    kputc(seqs[seq2num(ref[0])], &spec->string);
                 } else {
-                    error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                    error("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                 }
             }
         }
     } else {
-        for ( i = 0; i < length;  i++) {
-            if ( seq2num(name[i]) == 4 )  {
+        for ( i = 0; i < ref_length;  i++) {
+            if ( seq2num(ref[i]) == 4 )  {
                 if ( args.force ) {
-                    warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);                    
+                    warnings("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);                    
                 } else {
-                    error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                    error("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                 }
             }
-            if ( seq2num(name[i]) != seq2num(seq[i]) ) {
-                if (seq2num(name[length-i-1]) + seq2num(seq[i]) == 3) {
+            if ( seq2num(ref[i]) != seq2num(seq[i]) ) {
+                if (seq2num(ref[ref_length-i-1]) + seq2num(seq[i]) == 3) {
                     strand = 1;
                 } else {
                     if ( args.force ) {
-                        warnings("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);                        
+                        warnings("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);                        
                     } else {
-                        error("bad seq at %s:%d %s vs %s", chrom, pos+1, name, seq);
+                        error("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                     }
                 }
             }                 
         }
         if ( strand ) {
-            for ( i = 0; i < length; i++) 
-                kputc(seqs[seq2num(name[length-i-1])], &spec->string);
+            for ( i = 0; i < ref_length; i++) 
+                kputc(seqs[seq2num(ref[ref_length-i-1])], &spec->string);
         } else {
-            for ( i = 0; i < length; i++)
-                kputc(seqs[seq2num(name[i])], &spec->string);            
+            for ( i = 0; i < ref_length; i++)
+                kputc(seqs[seq2num(ref[i])], &spec->string);     
         }        
     }
-    free(seq);
-    name = get_col_string(line, spec->alt_col);
-    if ( name == NULL || (name[0] == '.' && name[1] == 0) || strcmp(name, "(null)") == 0) {
-        kputs(",.", &spec->string);
-        return;
+
+    alt = get_col_string(line, spec->alt_col);
+    if ( alt == NULL || (alt[0] == '.' && alt[1] == 0) || strcmp(alt, "(null)") == 0) {
+        // kputs(",.", &spec->string);
+        goto update_alleles;
     }
-    length = strlen(name);
+    alt_length = strlen(alt);
     kputc(',', &spec->string);
+    if ( is_capped == 0)
+        kputc(seqs[seq2num(seq[0])], &spec->string);
+
     if ( strand ) {
-        for ( i = 0; i < length; ++i )
-            kputc(seqs[seq2num(name[length-i-1])], &spec->string);
+        for ( i = 0; i < alt_length; ++i )
+            kputc(seqs[seq2num(alt[alt_length-i-1])], &spec->string);
     } else {
-        for ( i = 0; i < length; ++i )
-            kputc(seqs[seq2num(name[i])], &spec->string);
+        for ( i = 0; i < alt_length; ++i )
+            kputc(seqs[seq2num(alt[i])], &spec->string);
     }
+
+  update_alleles:
+    if (seq)
+        free(seq);
+    // debug_print("%s\n", spec->string.s);
+    bcf_update_alleles_str(hdr, rec, spec->string.s);
+    return 0;
 }
 
 int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
@@ -396,14 +461,12 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
     if ( strcasecmp("pos", name ) == 0 ) {
         col->setter = setter_pos;
         col->key = strdup("POS");
-        pos_is_set = 1;
         return 0;
     }
 
     if ( strcasecmp("start", name ) == 0 ) {
         col->setter = setter_start;
         col->key = strdup("START");
-        start_is_set = 1;
         return 0;
     }
 
@@ -417,7 +480,6 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
         }
         col->type = bcf_hdr_id2type(hdr, BCF_HL_INFO, col->hdr_id);
         col->key = strdup("END");
-        end_is_set = 1;
         return 0;
     }
     
@@ -482,9 +544,12 @@ int parse_args(int argc, char **argv)
     const char *out_type = 0;
     const char *pos_column = 0;
     const char *chr_column = 0;
+    const char *start_column = 0;
+    const char *end_column = 0;
     for (i = 1; i < argc; ) {
         const char *a = argv[i++];
         const char **var = 0;
+
         if ((strcmp(a, "-header") == 0 || strcmp(a, "-h") == 0) && args.header_fname == 0) 
             var = &args.header_fname;
         else if ( strcmp(a, "-O") == 0 && out_type == 0 )
@@ -493,11 +558,15 @@ int parse_args(int argc, char **argv)
             var = &args.output_fname;
         else if ( strcmp(a, "-r") == 0 && args.reference_fname == 0)
             var = &args.reference_fname;
-        else if ( strcmp(a, "-pos") == 0 && args.pos_column == 0)
+        else if ( strcmp(a, "-pos") == 0 && args.pos_column == -1)
             var = &pos_column;
-        else if ( strcmp(a, "-chr") == 0 && args.chr_column == 0)
+        else if ( strcmp(a, "-chr") == 0 && args.chr_column == -1)
             var = &chr_column;
-        
+        else if ( strcmp(a, "-start") == 0 && args.start_column == -1)
+            var = &start_column;
+        else if ( strcmp(a, "-end") == 0 && args.end_column == -1)
+            var = &end_column;
+       
         if ( var != 0 ) {
             if ( i == argc)
                 error("Missing argument after %s", a);
@@ -546,11 +615,41 @@ int parse_args(int argc, char **argv)
                 error("The output type %d not recognised.", args.output_type);
         }
     }
-    if ( pos_column )
+    if ( pos_column ) {
         args.pos_column = atoi(pos_column);
-    if ( chr_column )
+        set_pos();
+    }
+    if ( chr_column ) 
         args.chr_column = atoi(chr_column);
+        
+    if ( start_column ) {
+        args.start_column = atoi(start_column);
+        set_start();
+    }
+
+    if ( end_column ) {
+        args.end_column = atoi(end_column);
+        set_end();
+    }
+
+    if ( args.chr_column == -1)
+        error("No chrom column set, please use -chr specify it.");
     
+    if ( check_end )
+        args.end_column = atoi(end_column);
+    if ( pos_is_set == 0 && start_is_set == 0)
+        error("No position column is set.");
+    if ( start_is_set == 1 && end_is_set == 0)
+        warnings("End column is not set, treat start position zero based.");
+    if ( pos_is_set == 1 && start_is_set == 1) {
+        warnings("Redundancy columns, pos column and start column both set. Skip pos column..");
+        pos_is_set = 0;        
+    }
+    if ( pos_is_set == 1 && end_is_set == 1)  {
+        warnings("error Format; pos and end position both set; assuming pos is 1 based, but standard bed format required 0 based start position. Skip end position ..");
+        end_is_set = 0;
+    }
+   
     return 0;
 }
 
@@ -589,7 +688,6 @@ int init_columns(bcf_hdr_t *hdr)
     } while(1);
     free(str.s);
     hts_close(fp_input);
-    
     if ( head.l == 0 )
         error("No title found in file, %s.", args.input_fname);
     int i;
@@ -613,23 +711,28 @@ int init_columns(bcf_hdr_t *hdr)
             args.m_cols += 8;
             args.cols = (struct tsv_col *)realloc(args.cols, args.m_cols *sizeof(struct tsv_col));
         }
-        if ( args.chr_column > 0) {
-            if (args.chr_column == i + 1) {
-                tsv_register(hdr, "CHR", &args.cols[args.n_cols]);
-                goto col_increase;
-            } else if (strcasecmp(head.s+splits[i], "#chr") == 0 || strcasecmp(head.s+splits[i], "#chrom") == 0) {
-                continue;
-            }
+        if (args.chr_column == i + 1) {
+            args.alleles.chrom_col = i;
+            tsv_register(hdr, "CHR", &args.cols[args.n_cols]);
+            goto col_increase;
+        } 
+        
+        if (args.pos_column == i + 1) {
+            args.alleles.pos_col = i;
+            tsv_register(hdr, "POS", &args.cols[args.n_cols]);
+            goto col_increase;
         }
 
-        if ( args.pos_column > 0) {
-            if (args.pos_column == i + 1) {
-                tsv_register(hdr, "POS", &args.cols[args.n_cols]);
-                goto col_increase;
-            } else if ( strcasecmp(head.s+splits[i], "pos") == 0 || strcasecmp(head.s+splits[i], "start") == 0 ||
-                        strcasecmp(head.s+splits[i], "end") == 0 ) {
-                continue;
-            }
+        if (args.start_column == i+1) {
+            args.alleles.pos_col = i;
+            tsv_register(hdr, "start", &args.cols[args.n_cols]);
+            goto col_increase;            
+        }
+        
+        if (args.end_column == i+1) {
+            args.alleles.end_col = i;
+            tsv_register(hdr, "end", &args.cols[args.n_cols]);
+            goto col_increase;            
         }
 
         if ( tsv_register(hdr, head.s+splits[i], &args.cols[args.n_cols]) )
@@ -646,21 +749,7 @@ int init_columns(bcf_hdr_t *hdr)
     if ( args.alleles.alt_col == -1 ) {
         warnings("No alt column.");        
     }
-    if ( pos_is_set == 0 && start_is_set == 0)
-        error("No position column is set.");
-    if ( start_is_set == 1 && end_is_set == 0)
-        warnings("End column is not set, treat start position zero based.");
-    if ( pos_is_set == 1 && start_is_set == 1) {
-        warnings("Redundancy columns, pos column and start column both set. Skip pos column..");
-        pos_is_set = 0;        
-    }
-    if ( pos_is_set == 1 && end_is_set == 1)  {
-        warnings("error Format; pos and end position both set; assuming pos is 1 based, but standard bed format required 0 based start position. Skip end position ..");
-        end_is_set == 0;
-    }
-
-        
-    
+            
     free(head.s);
     free(splits);
     return 0;
@@ -692,25 +781,24 @@ int convert_tsv_vcf()
         if ( parse_line(&line) == 0)
             continue;
         bcf_clear(rec);
+        construct_basic_inf(args.fai, &args.alleles, hdr, &line, rec);
         n = 0;
-        for ( i = 0; i < args.n_cols; ++i ) {
+
+        for ( i = 0; i < args.n_cols; ++i )
             n += args.cols[i].setter(hdr, &args.cols[i], rec, &line);
-        }
-        construct_alleles(args.fai, &args.alleles, &line, bcf_seqname(hdr, rec), rec->pos);
-        vcf_setter_alleles(hdr, rec, args.alleles.string.s);
+        
+        clear_line(&line);
         if (rec->rid == 0 && rec->pos == 0)
             continue;
         if ( n )
             bcf_write(fp_output, hdr, rec);
-        clear_line(&line);
     }
+
     if ( hts_close(fp_output))
         error("Failed to close %s", args.output_fname);
     bcf_destroy(rec);
-    free(line.string.s);
     bcf_hdr_destroy(hdr);
     hts_close(fp_input);
-
     return 0;    
 }
 
