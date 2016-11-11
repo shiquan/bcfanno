@@ -258,7 +258,7 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
         error("Unconsistent reference length : %s\t%d\t%d vs. %d", chrom, start, end, ref_length);
     // if nocapped, left offset 1 base in the genome corrdinate
     if ( is_capped == 0) {
-        start--;
+        --start;
         ref_length = 1;
     }
     seq = faidx_fetch_seq(fai, chrom, start, start+ref_length-1, &n);    
@@ -334,6 +334,7 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
     if (seq)
         free(seq);
     // debug_print("%s\n", spec->string.s);
+    rec->pos = start;
     bcf_update_alleles_str(hdr, rec, spec->string.s);
     return 0;
 }
@@ -348,30 +349,30 @@ int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
 
     return 0;
 }
-int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
-{
-    char *name = get_col_string(line, col->col);
-    if (name == NULL || (int)name[0] == '.')
-        return 0;
-    if (name[0] == '.')
-        return 0;
-    int pos = atoi(name);
-    if (pos < 0)
-        return 0;
-    rec->pos = pos-1;
-    return 0;
-}
-int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line)
-{
-    char *name = get_col_string(line, col->col);
-    if (name == NULL || (int)name[0] == '.')
-        return 0;
-    int pos = atoi(name);
-    if (pos < 0)
-        return 0;
-    rec->pos = pos;
-    return 0;
-}
+/* int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line) */
+/* { */
+/*     char *name = get_col_string(line, col->col); */
+/*     if (name == NULL || (int)name[0] == '.') */
+/*         return 0; */
+/*     if (name[0] == '.') */
+/*         return 0; */
+/*     int pos = atoi(name); */
+/*     if (pos < 0) */
+/*         return 0; */
+/*     rec->pos = pos-1; */
+/*     return 0; */
+/* } */
+/* int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line) */
+/* { */
+/*     char *name = get_col_string(line, col->col); */
+/*     if (name == NULL || (int)name[0] == '.') */
+/*         return 0; */
+/*     int pos = atoi(name); */
+/*     if (pos < 0) */
+/*         return 0; */
+/*     rec->pos = pos; */
+/*     return 0; */
+/* } */
 
 int vcf_setter_alleles( bcf_hdr_t *hdr, bcf1_t *rec,  char *allele_string)
 {
@@ -458,17 +459,17 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
         return 0;
     }
 
-    if ( strcasecmp("pos", name ) == 0 ) {
-        col->setter = setter_pos;
-        col->key = strdup("POS");
-        return 0;
-    }
+    /* if ( strcasecmp("pos", name ) == 0 ) { */
+    /*     col->setter = setter_pos; */
+    /*     col->key = strdup("POS"); */
+    /*     return 0; */
+    /* } */
 
-    if ( strcasecmp("start", name ) == 0 ) {
-        col->setter = setter_start;
-        col->key = strdup("START");
-        return 0;
-    }
+    /* if ( strcasecmp("start", name ) == 0 ) { */
+    /*     col->setter = setter_start; */
+    /*     col->key = strdup("START"); */
+    /*     return 0; */
+    /* } */
 
     if ( strcasecmp("end", name) == 0 ) {
         // append END tag in the header, this is mandontary
@@ -525,6 +526,8 @@ int usage(char *prog)
     fprintf(stderr, "        -header, -h     header file\n");
     fprintf(stderr, "        -r              reference file\n");
     fprintf(stderr, "        -pos            position column, if set will skip pos,start,end column in the title\n");
+    fprintf(stderr, "        -start          start position column, inconsistance with -pos\n");
+    fprintf(stderr, "        -end            end position column, only set if need add a END tag in the INFO\n");
     fprintf(stderr, "        -chr            chr column, if set will skip first column in the title\n");
     fprintf(stderr, "        -force          if reference seq and fasta file are inconsistent, just give a warning\n");
     fprintf(stderr, "\n");
@@ -639,8 +642,8 @@ int parse_args(int argc, char **argv)
         args.end_column = atoi(end_column);
     if ( pos_is_set == 0 && start_is_set == 0)
         error("No position column is set.");
-    if ( start_is_set == 1 && end_is_set == 0)
-        warnings("End column is not set, treat start position zero based.");
+    /* if ( start_is_set == 1 && end_is_set == 0) */
+    /*     warnings("End column is not set, treat start position zero based."); */
     if ( pos_is_set == 1 && start_is_set == 1) {
         warnings("Redundancy columns, pos column and start column both set. Skip pos column..");
         pos_is_set = 0;        
@@ -719,14 +722,14 @@ int init_columns(bcf_hdr_t *hdr)
         
         if (args.pos_column == i + 1) {
             args.alleles.pos_col = i;
-            tsv_register(hdr, "POS", &args.cols[args.n_cols]);
-            goto col_increase;
+            // tsv_register(hdr, "POS", &args.cols[args.n_cols]);
+            continue;
         }
 
         if (args.start_column == i+1) {
             args.alleles.pos_col = i;
-            tsv_register(hdr, "start", &args.cols[args.n_cols]);
-            goto col_increase;            
+            // tsv_register(hdr, "start", &args.cols[args.n_cols]);
+            continue;
         }
         
         if (args.end_column == i+1) {
