@@ -7,74 +7,60 @@
 #include <string.h>
 #include <errno.h>
 #include <htslib/vcf.h>
-#include <htslib/kstring.h>
-#include <htslib/synced_bcf_reader.h>
-#include <htslib/khash_str2int.h>
 #include <dlfcn.h>
+#include "anno.h"
 
-#ifndef ANNOT_LINE_FLAG
-#define ANNOT_LINE_FLAG
-/*
- * try to convert any data from SQL into annot_line struct and annotated by core_annotate()
- */
-struct annot_line {
-    char **cols;
-    int ncols, mcols;
-    int nals, mals;
-    char **als;
-    kstring_t line;
-    int rid, start, end;
+struct header_cols {
+    const char *key;
+    int col; // column number in the process() returned
+    const char *hdr_line;
 };
-typedef struct annot_line annot_line_t;
-#endif
 
-/** 
- * Plugin API:
- * ----------
- *   const char *about(void)
- *       - short description used by vcfanno --list config.json
- *
- *   int test(void)
- *      - check if host is reachable
- *
- *   int init(int argc, char **argv, bcf_hdr_t *in_hdr, bcf_hdr_t *out_hdr)
- *      - called once at startup, allows to initialize local variables.
- *      Return 1 to suppress normal VCF/BCF header output, -1 on critical
- *      errors, 0 otherwise.
- *
- *   annot_line_t *process(const char *keys)
- *      - called for each online record, return NULL for no output
- *
- *   void destroy(void)
- *      - called after all lines have been processed to clean up 
- */
+// process function only return a point to the results structure. Do NOT free it anyway.
+// To free this structure, just refer to final() at the last.
+struct process_results {
+    int num_fields;
+    int n_row, m_row;
+    char **data;
+};
 
-/* Add tag information line to the out header structure
- *   An const array contained header information should be created in the dynamic library before init.
- *   Program will go crash if header INFO is inconsistency with info structure.
- */ 
-typedef int (*dl_init_func)(int, char**, bcf_hdr_t *, bcf_hdr_t *); 
-
+// init function 
+// input: columns, column number
+// output: column struct
+// return state
+typedef void* (*dl_init_func)(char*, int *); 
+// about function
+// return short description
 typedef char * (*dl_about_func)(void);
+// test function
+// only test the plugion works
 typedef int (*dl_test_func)(void);
-typedef annot_line_t * (*dl_process_func)(annot_line_t *anno);
-typedef void (*dl_destroy_func)(void);
+// process function
+// return information on this position
+typedef void *(*dl_process_func)(char *chrom, int start, int end);
+// final function
+// close and release memory
+typedef int (*dl_final_func)(void);
 
-struct plugin_functions {
+struct plugin_funcs {
     dl_init_func init;
     dl_about_func about;
     dl_process_func process;
-    dl_destroy_func destroy;
+    dl_final_func final;
 };
 
-/* struct plugin_handler { */
-/*     struct plugin_functions plugin; */
-/*     int nplugin_paths; */
-/*     char **plugin_paths; */
-/* }; */
+struct plugin_spec {
+    int ncols;
+    struct anno_col *cols;
+};
 
-extern void *dlopen_plugin(const char *fname);
-extern int load_plugin(const char *fname, int exit_on_error, struct plugin_functions *plugin);
+struct plugin_specs {
+    int n, m;
+    struct plugin_spec *specs;
+};
 
+extern int plugins_init(const char *name, struct plugin_spec *spec);
+extern bcf1_t* plugins_process(bcf_hdr_t *hdr, bcf1_t *line);
+extern void close_plugins();
 
 #endif

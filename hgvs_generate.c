@@ -106,7 +106,7 @@ faidx_t *load_refseq_file(const char *fn)
 {
     return fai_load(fn);
 }
-uint32_t bcf_calend(bcf1_t *line)
+int32_t bcf_calend(bcf1_t *line)
 {
     return line->pos + line->rlen;
 }

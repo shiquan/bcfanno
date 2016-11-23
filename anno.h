@@ -49,21 +49,27 @@ struct anno_col;
 typedef int (*setter_vcf)(struct vcfs_options *, bcf1_t *, struct anno_col *, void *);
 typedef int (*setter_hgvs)(struct refgene_options *, bcf1_t *, struct anno_col *);
 typedef int (*setter_bed)(struct beds_options *, bcf1_t *, struct anno_col *);
-
+typedef int (*setter_pl)(bcf1_t *, struct anno_col*, void*);
 typedef union {
     setter_vcf vcf;
     setter_bed bed;
     setter_hgvs hgvs;
+    setter_pl pl;
 } setter_func;
 
 struct anno_col {
-    int ifile; // file idx
-    int icol; // col idx for tab seperated file, for BCF and VCF file icol is unused
-    int replace; // default is REPLACE_MISSING, for REPLACE_EXISTSING there are some bugs in htslib to support
-    int number;  // number: one of BCF_VL_* types
+    // file or api idx
+    int ifile;
+    // col idx for tab seperated file or APIs data, for BCF and VCF file icol is unused
+    int icol;
+    // default is REPLACE_MISSING, for REPLACE_EXISTSING not full support yet
+    int replace;
+    // number: one of BCF_VL_* types
+    int number;
+    // key string of tag in the hdr
     char *hdr_key;
+    // setter function
     setter_func setter;
-    //int (*setter)(struct vcfs_options *, bcf1_t *, struct anno_col *, void*);
 };
 
 typedef void (* rel_func)(void*);
