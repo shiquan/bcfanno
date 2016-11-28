@@ -52,6 +52,7 @@ struct plugin_funcs {
 struct plugin_spec {
     int ncols;
     struct anno_col *cols;
+    struct plugin_funcs funcs;
 };
 
 struct plugin_specs {
