@@ -8,9 +8,24 @@ struct plugin_specs specs = {
     .m = 0,
     .specs = NULL,
 };
-static int pl_info_update(struct anno_col *col, bcf1_t *line, void *data)
+
+static int pl_info_update_int(struct anno_col *col, bcf1_t *line, void *data)
 {
-    
+}
+static int pl_info_update_string(struct anno_col *col, bcf1_t *line, void *data)
+{
+}
+static int pl_info_update(struct anno_col *col, bcf1_t *line, void *_data)
+{
+    struct process_results *data = (struct process_results*)_data;
+    int i;
+    for (i =0; i < data->n_row; ++i) {
+        // if return empty, skip
+        if ( data->data[i][col->id] == NULL)
+            continue;
+        
+        
+    }
     return 0;
 }
 

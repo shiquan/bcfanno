@@ -6,7 +6,10 @@ VCFANNO was designed to annotate VCF/BCF files by using local and online databas
 
 Before you try to use VCFANNO, please make sure you know how to find the document of [VCF/BCF format](https://samtools.github.io/hts-specs/VCFv4.2.pdf).
 
+**Design**
 
+The VCF file are currently most used to store genomic variants and other related information. For other The INFO column of VCF/BCF file could specify all possible information related with variants in one position, and 
+The core VCFANNO [htslib](http://htslib.org/)
 
 **Install programs**
 
