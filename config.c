@@ -1,4 +1,6 @@
 // prase configure file in JSON format
+// todo: stable improvement
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +77,9 @@ static int parse_comment_line(kstring_t *string)
     while (se && (*se == ' ' || *se == '\t'))
         se--;
 
+    if ( ss == se )
+        return 0;
+    
     if ( ss != string->s || se - ss + 1 != string->l ) {    
         string->l = se-ss+1;
         memmove(string->s, ss, string->l);
@@ -114,27 +119,17 @@ static char *skip_comments(const char *json_fname)
     kstring_t string = KSTRING_INIT;
     kstring_t temp = KSTRING_INIT;
 
-    while ( hts_getline(fp, '\n', &temp) > 0 ) {
-        
-        if ( parse_comment_line(&temp) == 0)
-            continue;
-
-        kputs(temp.s, &string);
-        kputc('\n', &string);
+    while ( hts_getline(fp, '\n', &temp) > 0 ) {        
+        if ( parse_comment_line(&temp) ) {
+            kputs(temp.s, &string);
+            kputc('\n', &string);
+        }
         temp.l = 0;
     }
+    hts_close(fp);
     if ( temp.m )
         free(temp.s);
-    /* int i, j; */
-/*     char *json = string.s; */
-/*     for ( i = 0, j = 0; i < string.l && j < string.l; ++i, ++j ) { */
-/*         if ( json[i] == '/' && i < string.l -1 && json[i+1]=='/' ) { */
-/* 	    for ( j = i + 2; j < string.l && json[j] != '\n'; ++j); */
-/*         } */
-/* 	json[i] = json[j]; */
-/*     } */
-/*     json[i] = '\0'; */
-/*     string.l = i; */
+
  #ifdef DEBUG_MODE 
     debug_print("%s", string.s); 
  #endif 
@@ -312,10 +307,9 @@ int vcfanno_load_config(struct vcfanno_config *config, const char * config_fname
     kson_t *json = NULL;
     json = kson_parse(string);
     free(string);
-    if ( load_config_core(config, json) == 1 )
-	return 1;
+    int ret = load_config_core(config, json);
     kson_destroy(json);
-    return 0;
+    return ret;
 }
 
 int vcfanno_config_debug(struct vcfanno_config *config)

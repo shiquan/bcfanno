@@ -4,7 +4,7 @@ DEBUG_PROG= vcfanno_debug
 all: $(PROG)
 
 debug: $(DEBUG_PROG)
-# Adjust $(HTSDIR) to point to your top-level htslib directory
+
 HTSDIR = htslib-1.3
 include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
@@ -13,12 +13,6 @@ CC       = gcc
 CFLAGS   = -Wall -Wc++-compat -O3
 DEBUG_CFLAGS   = -g -Wall -Wc++-compat -O0
 DFLAGS   =
-#OBJS     = main.o vcfindex.o tabix.o \
-#           vcfstats.o vcfisec.o vcfmerge.o vcfquery.o vcffilter.o filter.o vcfsom.o \
-#           vcfnorm.o vcfgtcheck.o vcfview.o vcfannotate.o vcfroh.o vcfconcat.o \
-#           vcfcall.o mcall.o vcmp.o gvcf.o reheader.o convert.o vcfconvert.o tsv2vcf.o \
-#           vcfcnv.o HMM.o vcfplugin.o consensus.o ploidy.o version.o \
-#           ccall.o em.o prob1.o kmin.o # the original samtools calling
 INCLUDES = -I. -I$(HTSDIR)/
 
 
@@ -79,7 +73,7 @@ vcfanno: $(HTSLIB) version.h vcf2tsv vcf_rename_tags
 	$(CC) $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -pthread -o $@
 
 vcfanno_debug: $(HTSLIB) version.h 
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) anno_core.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs_generate.c vcmp.c config.c kson.c $(HTSLIB) -lz -pthread -o $@
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ $(HTSLIB) anno_core.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs_generate.c vcmp.c config.c kson.c
 
 test: $(HTSLIB) version.h hgvs_generate vcfadd bedadd
 

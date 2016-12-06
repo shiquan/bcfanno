@@ -867,6 +867,7 @@ int vcf_file_destroy(struct anno_vcf_file *file)
 	free(file->cols[i].hdr_key);
     if ( file->ncols )
 	free(file->cols);
+    free(file->buffer);
     return 0;
 }
 int vcfs_options_destroy(struct vcfs_options *opts)
@@ -913,11 +914,11 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    col->replace = REPLACE_EXISTING;
 	    ss++;
 	}
-	if ( ss == NULL || *ss == '\0' || *ss == ' ' ) {
+	if ( ss == NULL || *ss == '\0' || *ss == ' ' || strlen(ss) == 0 ) {
 	    warnings("Empty tag.");
 	    continue;
 	}
-	if ( strcasecmp("CHROM", ss) == 0 || strcasecmp("POS", ss) == 0 || strcasecmp("FEF", ss) == 0 ||
+	if ( strcasecmp("CHROM", ss) == 0 || strcasecmp("POS", ss) == 0 || strcasecmp("REF", ss) == 0 ||
 	     strcasecmp("ALT", ss) == 0 || strcasecmp("FILTER", ss) == 0 || strcasecmp("QUAL", ss) == 0 ) {
 	    warnings("Skip %s", ss);
 	    continue;
@@ -1008,7 +1009,9 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	col->ifile = file->id;
 	file->ncols++;	
     }
-    free(splits);    
+    free(splits);
+    if ( temp.m )
+        free(temp.s);
     if ( string.m )
 	free(string.s);    
     if ( file->ncols == 0 )
@@ -1136,8 +1139,10 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 	}
 	if ( file->tbx_idx ) {
 	    kstring_t tmps = KSTRING_INIT;		
-	    if ( tbx_itr_next(file->fp, file->tbx_idx, file->itr, &tmps) < 0) 
+	    if ( tbx_itr_next(file->fp, file->tbx_idx, file->itr, &tmps) < 0) {
+                if (tmps.m) free(tmps.s);
 		break;
+            }
 	    vcf_parse1(&tmps, file->hdr, file->buffer[file->cached]);
 	    free(tmps.s);	    
 	} else if ( file->bcf_idx ) {
@@ -1147,7 +1152,12 @@ static int vcf_fill_buffer(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, bcf1_
 	    error("no index");
 	}
 	file->cached++;
-    } 
+    }
+
+    if ( file->itr ) {
+        hts_itr_destroy(file->itr);
+        file->itr = NULL;
+    }        
     return file->cached ? 0 : 1;      
 }
 // check if allele matches
@@ -1179,8 +1189,7 @@ bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 
     for ( i = 0; i < opts->n_files; ++i ) {
 	struct anno_vcf_file *file = &opts->files[i];
-
-	if ( vcf_fill_buffer(file, opts->hdr_out, line) )
+        if ( vcf_fill_buffer(file, opts->hdr_out, line) )
             continue;
 	for ( j = 0; j < file->cached; ++j ) {
 	    bcf1_t *dat = file->buffer[j];
@@ -1247,7 +1256,7 @@ struct args args= {
 void reader_fill_buffer()
 {
     for (args.n_buffers = 0; args.n_buffers < BUFFER_LINE; args.n_buffers++) {
-        if ( bcf_read(args.fp, args.hdr, &args.buffer[i]) ) {
+        if ( bcf_read(args.fp, args.hdr, &args.buffer[args.n_buffers]) ) {
             break;
         }
     }
@@ -1316,13 +1325,13 @@ int main(int argc, char **argv)
 	error("Failed to open %s : %s.", args.input_fname, strerror(errno));
     htsFormat type = *hts_get_format(fp);
     if ( type.format != vcf && type.format != bcf )
-	error("Unsupported input format. %s", input_fname);
+	error("Unsupported input format. %s", args.input_fname);
     
     bcf_hdr_t *hdr = bcf_hdr_read(fp);
     if ( hdr == NULL )
 	error("Failed to parse header.");	
     bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);    
-    htsFile *fout = output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(output_fname, hts_bcf_wmode(out_type));
+    htsFile *fout = args.output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.output_fname, hts_bcf_wmode(out_type));
     struct vcfs_options opts = { .vcfs_is_inited = 0,};
     vcfs_options_init(&opts);
     opts.hdr_out = hdr_out;
@@ -1330,13 +1339,16 @@ int main(int argc, char **argv)
     for ( i = 0; i < con->vcfs.n_vcfs; ++i ) {
 	vcfs_database_add(&opts, con->vcfs.files[i].fname, con->vcfs.files[i].columns);
     }
-
+    vcfanno_config_destroy(con);
     bcf_hdr_write(fout, hdr_out);
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {
-	anno_vcfs_core(&opts, line);
+        // bcf_unpack(line,BCF_UN_SHR);
+        if ( bcf_get_variant_types(line) != VCF_REF )
+            anno_vcfs_core(&opts, line);
 	bcf_write1(fout, hdr_out, line);
     }
+    
     bcf_destroy(line);
     bcf_hdr_destroy(hdr);
     bcf_hdr_destroy(hdr_out);

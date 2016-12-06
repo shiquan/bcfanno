@@ -11,7 +11,9 @@
 #include "htslib/vcf.h"
 #include "htslib/bgzf.h"
 #include "htslib/kstring.h"
+#include "htslib/khash.h"
 #include "htslib/kseq.h"
+#include "table2hash.h"
 
 #ifndef KSTRING_INIT
 #define KSTRING_INIT { 0, 0, 0 }
@@ -177,9 +179,10 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
 
     const char seqs[5] = "ACGTN";
 
-    char *chrom = get_col_string(line, spec->chrom_col);
+    char *chrom = get_col_string(line, spec->chrom_col);    
     if (chrom == NULL)
         error("no chrom column found.");
+    chrom = table_convert_name(chrom);
     int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, chrom);
     if ( id == -1 ) {
         warnings("Chromosome %s not found in reference.", chrom);
@@ -530,6 +533,7 @@ int usage(char *prog)
     fprintf(stderr, "        -end            end position column, only set if need add a END tag in the INFO\n");
     fprintf(stderr, "        -chr            chr column, if set will skip first column in the title\n");
     fprintf(stderr, "        -force          if reference seq and fasta file are inconsistent, just give a warning\n");
+    fprintf(stderr, "        -rename         chromosome rename file\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
     return 1;
@@ -549,6 +553,7 @@ int parse_args(int argc, char **argv)
     const char *chr_column = 0;
     const char *start_column = 0;
     const char *end_column = 0;
+    const char *rename_file = 0;
     for (i = 1; i < argc; ) {
         const char *a = argv[i++];
         const char **var = 0;
@@ -569,7 +574,9 @@ int parse_args(int argc, char **argv)
             var = &start_column;
         else if ( strcmp(a, "-end") == 0 && args.end_column == -1)
             var = &end_column;
-       
+        else if ( strcmp(a, "-rename") == 0 && rename_file == 0 )
+            var = &rename_file;
+        
         if ( var != 0 ) {
             if ( i == argc)
                 error("Missing argument after %s", a);
@@ -652,7 +659,10 @@ int parse_args(int argc, char **argv)
         warnings("error Format; pos and end position both set; assuming pos is 1 based, but standard bed format required 0 based start position. Skip end position ..");
         end_is_set = 0;
     }
-   
+
+    if ( rename_file && table_read(rename_file) == 0)
+        table_set_flag();
+    
     return 0;
 }
 
@@ -814,6 +824,7 @@ int release_memory()
     free(args.cols);
     fai_destroy(args.fai);
     free(args.comment.s);
+    table_release();      
     return 0;
 }
 
