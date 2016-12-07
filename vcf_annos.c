@@ -1225,7 +1225,7 @@ static const char *hts_bcf_wmode(int file_type)
     return "w";                                 // uncompressed VCF
 }
 #define BUFFER_LINE 1000
-#include "reg_lite.h"
+// #include "reg_lite.h"
 
 struct args {
     const char *json_fname;
@@ -1236,7 +1236,7 @@ struct args {
     bcf_hdr_t *hdr;
     bcf_hdr_t *hdr_out;
     htsFile *fout;
-    struct reg_spec *reg;
+    // struct reg_spec *reg;
     int n_buffers;
     bcf1_t buffer[BUFFER_LINE];    
 };
