@@ -6,6 +6,15 @@
 #include <assert.h>
 #include <time.h>
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_GRAY    "\x1b[37m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 #define check_double_free(p) do {\
         void **_pp = (void**)&(p);                                      \
         if (_pp==NULL || *_pp == NULL) {				\
@@ -52,7 +61,7 @@
 
 #define error(line, ...) do						\
     {									\
-	fprintf(stderr, "[error] [func: %s, line: %d] " line "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+	fprintf(stderr, ANSI_COLOR_RED "[error] [func: %s, line: %d] " ANSI_COLOR_RESET ANSI_COLOR_MAGENTA line ANSI_COLOR_RESET "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
 	errno = 0;							\
 	exit(EXIT_FAILURE);						\
     }while(0)
