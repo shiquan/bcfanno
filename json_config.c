@@ -39,10 +39,6 @@ static struct stack stack = {0, 0, 0};
 static int is_paired = 1;
 static int is_key = 0;
 
-static char *error_report[] = {
-    "",
-    "",
-};
 static int complement_error(kstring_t *string)
 {
     assert ( stack.l > 0 );
