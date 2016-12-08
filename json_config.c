@@ -107,7 +107,7 @@ static int parse_comment_line(kstring_t *string)
         return 1;
     
     ss = string->s;
-    se = string->s + string->l - 2;
+    se = string->s + string->l - 1;
     int mark = 0;
 
     for ( ;; ) {
