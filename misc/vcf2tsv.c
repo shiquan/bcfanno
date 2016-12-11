@@ -458,8 +458,13 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 	    
 	    if (n_alleles > 1 && args.skip_ref && j==0)
                 continue;
-            if ( args.skip_uncover ) {
-                int skip = 1;
+            if ( args.skip_uncover || args.skip_ref ) {
+                int skip_uncover = 0, skip_ref = 0;
+                if ( args.skip_uncover )
+                    skip_uncover = 1;
+                if ( args.skip_ref )
+                    skip_ref = 1;
+                
                 bcf_fmt_t *fmt = bcf_get_fmt(hdr, line, "GT");
                 if ( fmt == NULL)
                     error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
@@ -469,7 +474,8 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
                     type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size); \
                     int i;                                              \
                     for (i=0; i<fmt->n; ++i) {                          \
-                        if ( (ptr[i]>>1) ) skip = 0;                    \
+                        if ( (ptr[i]>>1) ) skip_uncover = 0;                    \
+                        if ( (ptr[i]>>1) > 1) skip_ref = 0;\
                     }                                                   \
                 } while(0)
                 
@@ -490,7 +496,7 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
                         error("FIXME: type %d in bcf_format_gt?", fmt->type);
                 }
 #undef BRANCH
-                if ( skip )
+                if ( skip_uncover || skip_ref )
                     continue;
             } // end check conver
 	    mcache_pa_t *pa = &ps->alvals[j];
