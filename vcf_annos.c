@@ -189,8 +189,8 @@ int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 
         opts->tmpi2[i] = opts->tmpi[ map[i] ];
     }
-    bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi2,ndst);
-    return 0;
+    return bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi2,ndst);
+
 }
 int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -218,8 +218,7 @@ int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
             return 0;
     }
 
-    bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
-    return 0;
+    return bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
 }
 int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -242,8 +241,7 @@ int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col
         if ( ret>0 && opts->tmpi2[0]!=bcf_int32_missing ) return 0;
     }
 
-    bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
-    return 0;
+    return bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
 }
 int setter_ARinfo_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpf)
 {
@@ -277,8 +275,7 @@ int setter_ARinfo_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col 
 
         opts->tmpf2[i] = opts->tmpf[ map[i] ];
     }
-    bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf2,ndst);
-    return 0;
+    return bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf2,ndst);
 }
 int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -308,8 +305,8 @@ int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *c
             return 0;
     }
 
-    bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
-    return 0;
+    return bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
+
 }
 int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -332,8 +329,7 @@ int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_co
         if ( ret>0 && !bcf_float_is_missing(opts->tmpf2[0]) ) return 0;
     }
 
-    bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
-    return 0;
+    return bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
 }
 
 int copy_string_field(char *src, int isrc, int src_len, kstring_t *dst, int idst)
@@ -425,8 +421,7 @@ int setter_ARinfo_string(struct vcfs_options *opts, bcf1_t *line, struct anno_co
         int ret = copy_string_field(opts->tmps,map[i],lsrc,&opts->tmpks,i);
         assert( ret==0 );
     }
-    bcf_update_info_string(opts->hdr_out,line,col->hdr_key,opts->tmpks.s);
-    return 0;
+    return bcf_update_info_string(opts->hdr_out,line,col->hdr_key,opts->tmpks.s);
 }
 int setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -446,8 +441,7 @@ int setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
             return 0;
     }
 
-    bcf_update_info_string(opts->hdr_out,line,col->hdr_key,opts->tmps);
-    return 0;
+    return bcf_update_info_string(opts->hdr_out,line,col->hdr_key,opts->tmps);
 }
 int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -468,8 +462,7 @@ int vcf_setter_info_str(struct vcfs_options *opts, bcf1_t *line, struct anno_col
         if ( ret>0 && (opts->tmps2[0]!='.' || opts->tmps2[1]!=0) ) return 0;
     }
 
-    bcf_update_info_string(opts->hdr_out,line,col->hdr_key,opts->tmps);
-    return 0;
+    return bcf_update_info_string(opts->hdr_out,line,col->hdr_key,opts->tmps);
 }
 int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -1178,7 +1171,7 @@ int match_allele(bcf1_t *line, bcf1_t *dat)
     // if no matchs
     return 1;
 }
-bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
+int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 {
     // just skip the next steps if vcfs databases not inited
     if ( opts->vcfs_is_inited == 0 )
@@ -1205,11 +1198,12 @@ bcf1_t *anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
             
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
-		col->setter.vcf(opts, line, col, dat);
+		if (col->setter.vcf(opts, line, col, dat) )
+                    return 1;
 	    }
 	}
     }
-    return line;
+    return 0;
 }
 #ifdef _VCF_ANNOS_MAIN
 
@@ -1344,8 +1338,12 @@ int main(int argc, char **argv)
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {
         // bcf_unpack(line,BCF_UN_SHR);
-        if ( bcf_get_variant_types(line) != VCF_REF )
-            anno_vcfs_core(&opts, line);
+        if ( bcf_get_variant_types(line) != VCF_REF ) {
+            if ( anno_vcfs_core(&opts, line) == 1) {
+                fprintf(stderr, "Failed to update bcf line, %s : %d\n", bcf_seqname(hdr, line), line->pos+1);
+                return 1;
+            }
+        }
 	bcf_write1(fout, hdr_out, line);
     }
     
