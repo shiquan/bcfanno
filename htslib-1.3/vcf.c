@@ -2847,7 +2847,7 @@ int bcf_update_info(const bcf_hdr_t *hdr, bcf1_t *line, const char *key, const v
         {
             // assert( !inf->vptr_free );  // fix the caller or improve here: this has been modified before
             if ( inf->vptr_free == 1) {
-                fprintf(stderr, "[%s]fix the caller or improve here: this has been modified before." ,__func__);
+                fprintf(stderr, "[%s] fix the caller or improve here: this has been modified before." ,__func__);
                 return 1;
             }                
             bcf_unpack_info_core1((uint8_t*)str.s, inf);

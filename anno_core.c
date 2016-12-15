@@ -1,10 +1,5 @@
 /*  vcfanno - a core program to annotate vcf/bcf by using current stat databases
  *
- *  History:
- *         v0.0.1   test version        2015/08/29
- *         v0.0.2   test version        2016/02/28
- *         v0.0.3   alpha version       2016/09/01
- *         v0.0.4   beta version        2016/10/25
  */
 
 #include "utils.h"
@@ -271,26 +266,28 @@ int parse_args(int argc, char **argv)
     bcf_hdr_write(args.fp_out, args.hdr_out);
     return 0;
 }
-bcf1_t *anno_core(bcf1_t *line)
+int anno_core(bcf1_t *line)
 {
     // do nothing for reference positions
     if ( bcf_get_variant_types(line) == VCF_REF )
-	return line;
+	return 0;
 
     // annotate hgvs name
-    anno_refgene_core(&args.hgvs_opts, line);
-
+    if ( anno_refgene_core(&args.hgvs_opts, line) )
+        return 1;
     // stat type module
     
     // annotate vcf files
-    anno_vcfs_core(&args.vcf_opts, line);
+    if ( anno_vcfs_core(&args.vcf_opts, line) )
+        return 1;
 
     // annotate bed format datasets
-    anno_beds_core(&args.bed_opts, line);
+    if ( anno_beds_core(&args.bed_opts, line) )
+        return 1;
 
     // filter set module
     
-    return line;
+    return 0;
 }
 void export_reports()
 {
@@ -309,7 +306,10 @@ int main(int argc, char **argv)
 	if (line->rid == -1)
 	    continue;
 	// annotate vcf line function
-	anno_core(line);
+	if ( anno_core(line) ) {
+            fprintf(stderr, "Failed to update bcf line, %s : %d\n", bcf_seqname(args.hdr, line), line->pos+1);
+            return 1;
+        }
 	bcf_write1(args.fp_out, args.hdr_out, line);
     }
     // debug_print("final");

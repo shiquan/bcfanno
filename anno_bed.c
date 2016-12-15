@@ -143,9 +143,15 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 
 	if ( tbx_itr_next(file->fp, file->idx, itr, &file->buffer[file->cached]->string) < 0)
 	    break;
-	struct beds_anno_tsv *tsv = file->buffer[file->cached++];
+	struct beds_anno_tsv *tsv = file->buffer[file->cached];
 	convert_string_tsv(tsv);
-	
+        // Skip if variant located outside of region.
+        
+        if (line->pos < tsv->start || line->pos >= tsv->end)
+            continue;
+        if (tsv->end - tsv->start == 1 && line->pos != tsv->start)
+            continue;
+        file->cached++;
 	if ( file->last_end == -1 ) {
 	    file->last_end = tsv->end;
 	    file->last_start = tsv->start;
@@ -154,7 +160,8 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 	if ( file->last_end < tsv->end )
 	    file->last_end = tsv->end;
 	if ( file->last_start > tsv->start )
-	    file->last_start = tsv->start;	
+	    file->last_start = tsv->start;
+        
     }
     // if buffer is filled return 0, else return 1
     return file->cached ? 0 : 1;    
@@ -197,13 +204,12 @@ int beds_setter_info_string(struct beds_options *opts, bcf1_t *line, struct anno
 {
     struct beds_anno_file *file = &opts->files[col->ifile];
     if ( beds_fill_buffer(file, opts->hdr_out, line) == 1)
-        return 1;
+        return 0;
     char *string = generate_funcreg_string(file, col);
     if ( string == NULL )
-	return 1;
+	return 0;
     // only support string for bed function regions
-    bcf_update_info_string(opts->hdr_out, line, col->hdr_key, string);
-    return 0;
+    return bcf_update_info_string(opts->hdr_out, line, col->hdr_key, string);
 }
 
 int beds_database_add(struct beds_options *opts, const char *fname, char *columns)
@@ -355,7 +361,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
     return 0;
 }
 
-bcf1_t *anno_beds_core(struct beds_options *opts, bcf1_t *line)
+int anno_beds_core(struct beds_options *opts, bcf1_t *line)
 {
     if ( opts->beds_is_inited == 0 )
 	return line;
@@ -365,10 +371,13 @@ bcf1_t *anno_beds_core(struct beds_options *opts, bcf1_t *line)
 	struct beds_anno_file *file = &opts->files[i];
 	for ( j = 0; j < file->n_cols; ++j ) {
 	    struct anno_col *col = &file->cols[j];
-	    col->setter.bed(opts, line, col);
+	    if ( col->setter.bed(opts, line, col) ) {
+                fprintf(stderr, "[%s] database : %s; key : %s.\n", __func__, file->fname, col->hdr_key);
+                return 1;
+            }
 	}
     }
-    return line;
+    return 0;
 }
 
 

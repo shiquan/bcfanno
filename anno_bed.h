@@ -59,7 +59,7 @@ struct beds_options {
 // extern int setter_func_region(struct beds_options *opts, bcf1_t *line
 extern int beds_options_init(struct beds_options *opts);
 extern int beds_options_destroy(struct beds_options *opts);
-extern bcf1_t *anno_beds_core(struct beds_options *opts, bcf1_t *line);
+extern int anno_beds_core(struct beds_options *opts, bcf1_t *line);
 extern int beds_database_add(struct beds_options *opts, const char *fname, char *columns);
 
 #endif
