@@ -273,17 +273,15 @@ int anno_core(bcf1_t *line)
 	return 0;
 
     // annotate hgvs name
-    if ( anno_refgene_core(&args.hgvs_opts, line) )
-        return 1;
+    anno_refgene_core(&args.hgvs_opts, line);
     // stat type module
     
     // annotate vcf files
-    if ( anno_vcfs_core(&args.vcf_opts, line) )
-        return 1;
+    anno_vcfs_core(&args.vcf_opts, line);
+
 
     // annotate bed format datasets
-    if ( anno_beds_core(&args.bed_opts, line) )
-        return 1;
+    anno_beds_core(&args.bed_opts, line);
 
     // filter set module
     
