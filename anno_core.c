@@ -280,8 +280,6 @@ int anno_core(bcf1_t *line)
     // annotate vcf files
     anno_vcfs_core(&args.vcf_opts, line);
  
-
-
     // annotate bed format datasets
     anno_beds_core(&args.bed_opts, line);
     
