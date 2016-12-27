@@ -378,7 +378,7 @@ void genepred_parser(kstring_t *string, struct genepred *line)
 	}
     } else {
 	if (is_coding && forward_offset) 
-	    read_len = forward_offset;
+	    read_len = forward_offset-1;
 	
 	int l;
 	for ( l = l1; l <= l2; l++ ) {
