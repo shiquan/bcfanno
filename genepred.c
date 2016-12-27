@@ -125,12 +125,16 @@ static int genepred_parse_core(kstring_t *string, struct genepred *line)
     BRANCH(line->strand, type->strand, check_strand);
     // trans start
     BRANCH(line->txstart, type->txstart, atoi);
+    line->txstart++;
+    
     // trans end
     BRANCH(line->txend, type->txend, atoi);
     if (line->txend == 0 )
         return 1;
     // cds start, for mRNA cds start should greater than txstart, for ncRNA cdsstart should equal to txend
     BRANCH(line->cdsstart, type->cdsstart, atoi);
+    line->cdsstart++;
+    
     // cds end, for ncRNA cdsend == cdsstart == txend
     BRANCH(line->cdsend, type->cdsend, atoi);    
     // exon number
@@ -160,14 +164,14 @@ static int genepred_parse_core(kstring_t *string, struct genepred *line)
     for ( i = 0; i < line->exoncount; ++i ) {
 	// start
 	ss1 = ss;
-	while (*ss1 && *ss1 != ',')
+	while (ss1 && *ss1 != ',')
             ss1++;
 	ss1[0] = '\0';
 	line->exons[BLOCK_START][i] = atoi(ss) +1; // convert 0based start to 1 based
 	ss = ++ss1; // skip ','
 	// end
 	se1 = se;
-	while (*se && *se1 != ',')
+	while (se1 && *se1 != ',')
             se1++;
 	se1[0] = '\0';
 	line->exons[BLOCK_END][i] = atoi(se);	
@@ -364,7 +368,7 @@ void genepred_parser(kstring_t *string, struct genepred *line)
     // count inter regions
     if ( is_strand ) {
 	if (is_coding && backward_offset)
-	    read_len = backward_offset -1;       
+	    read_len = backward_offset;       
 	int l;
 	for ( l = l2; l >= l1;  l-- ) {
             exon_len = line->exons[BLOCK_END][l] - line->exons[BLOCK_START][l] + 1;
@@ -374,7 +378,7 @@ void genepred_parser(kstring_t *string, struct genepred *line)
 	}
     } else {
 	if (is_coding && forward_offset) 
-	    read_len = forward_offset -1;
+	    read_len = forward_offset;
 	
 	int l;
 	for ( l = l1; l <= l2; l++ ) {
@@ -423,14 +427,16 @@ void generate_dbref_database(struct genepred *line)
     	kputw((line->dna_ref_offsets[BLOCK_END][i]>>TYPEBITS), &temp[1]);
         int exon_id = line->strand == '+' ? i + 1 : line->exoncount -i;
 	// format: CHROM,START,END,STRAND, GENE, TRANSCRIPT, EXON, START_LOC, END_LOC
-        fprintf(stdout, "%s\t%d\t%d\t%c\t%s\t%s\tEX%d\t%s\t%s\n",
+        fprintf(stdout, "%s\t%d\t%d\t%c\t%s\t%s\tEX%d\t%d\t%d\t%s\t%s\n",
                 line->chrom,  // chromosome
-                read_start(line->exons, i), // start, 0 based
+                read_start(line->exons, i)-1, // start, 0 based
                 read_end(line->exons,i),
                 line->strand,
                 line->name2,
                 line->name1,
                 exon_id,
+                read_start(line->loc, i),
+                read_end(line->loc, i),
                 temp[0].s,
                 temp[1].s);
         temp[0].l = temp[1].l = 0;
