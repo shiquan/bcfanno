@@ -108,6 +108,7 @@ struct _multi_cols_cache {
 
 /* declared setter functions */
 void setter_gt(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
+void setter_tgt(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_sample(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_pos(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_ref(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
@@ -232,8 +233,14 @@ col_t *register_key (char *p, bcf_hdr_t *h)
     c->key = strdup(p);
     c->id = -1;
 #define same_string(a, b) (!strcmp(a, b))
-    if (same_string(q, "GT") || same_string(q, "TGT")) {
+    if ( same_string(q, "GT") ) {
 	c->setter = setter_gt;
+	c->type = c->type == is_unknown || c->type == is_format ? is_gt : c->type;
+	c->unpack |= BCF_UN_FMT;
+	c->id = bcf_hdr_id2int(h, BCF_DT_ID, "GT");
+    }
+    else if ( same_string(q, "TGT") ) {
+        c->setter = setter_tgt;
 	c->type = c->type == is_unknown || c->type == is_format ? is_gt : c->type;
 	c->unpack |= BCF_UN_FMT;
 	c->id = bcf_hdr_id2int(h, BCF_DT_ID, "GT");
@@ -595,6 +602,46 @@ void setter_zygosity(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *va
     int sample_id = val->sample_id;
 
 }
+void setter_tgt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
+{
+    if (ale != -1)
+	error ("GT, TGT only used with split-allele mode.");
+
+    bcf_fmt_t *fmt = bcf_get_fmt_id(line, c->id);
+
+    if (fmt == NULL)
+	error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+
+    int sample_id = val->sample_id;
+
+#define BRANCH(type_t, missing, vector_end) do {		\
+	type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size);\
+	int i;\
+	for (i=0; i<fmt->n; ++i) {\
+	    if ( i ) kputc("/|"[ptr[i]&1], &val->a);\
+	    if ( !(ptr[i]>>1) ) kputc('.', &val->a); \
+	    else kputs(line->d.allele[(ptr[i]>>1)-1], &val->a);	\
+	}\
+} while(0)
+
+      switch(fmt->type) {
+	  case BCF_BT_INT8:
+	      BRANCH(int8_t, bcf_int8_missing, bcf_int8_vector_end);
+	      break;
+
+	  case BCF_BT_INT16:
+	      BRANCH(int16_t, bcf_int16_missing, bcf_int16_vector_end);
+	      break;
+
+	  case BCF_BT_INT32:
+	      BRANCH(int32_t, bcf_int32_missing, bcf_int32_vector_end);
+	      break;
+
+	  default:
+	      error("FIXME: type %d in bcf_format_gt?", fmt->type);
+      }
+#undef BRANCH
+}
 void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
     if (ale != -1)
@@ -606,14 +653,14 @@ void setter_gt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
 
     int sample_id = val->sample_id;
-    
+
 #define BRANCH(type_t, missing, vector_end) do {		\
 	type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size);\
 	int i;\
 	for (i=0; i<fmt->n; ++i) {\
 	    if ( i ) kputc("/|"[ptr[i]&1], &val->a);\
 	    if ( !(ptr[i]>>1) ) kputc('.', &val->a); \
-	    else kputs(line->d.allele[(ptr[i]>>1)-1], &val->a);	\
+	    else kputw((ptr[i]>>1)-1, &val->a);	\
 	}\
 } while(0)
 

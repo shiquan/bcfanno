@@ -303,7 +303,7 @@ void genepred_parser(kstring_t *string, struct genepred *line)
 
 	line->dna_ref_offsets[BLOCK_START][l1] = compact_loc(fwd_len, is_strand ? REG_UTR5 : REG_UTR3);
         
-	if ( fwd_len > exon_len ) {
+	if ( fwd_len >= exon_len ) {
 	    fwd_len -= exon_len;
  	    line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(fwd_len+1, is_strand? REG_UTR5 : REG_UTR3);
 	    continue;
@@ -320,7 +320,8 @@ void genepred_parser(kstring_t *string, struct genepred *line)
             // for minus strand count from backward
             forward_offset =  read_len + fwd_len - exon_len +1;
             if ( forward_offset < 0 ) {
-                forward_offset += bkw_len + 1;
+                // forward_offset += bkw_len + 1;
+                forward_offset += bkw_len;
                 line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset, REG_UTR5);
             } else {
                 line->dna_ref_offsets[BLOCK_END][l1] = compact_loc(forward_offset, REG_CODING);
@@ -337,7 +338,7 @@ void genepred_parser(kstring_t *string, struct genepred *line)
 
 	line->dna_ref_offsets[BLOCK_END][l2] = compact_loc(bkw_len, is_strand ? REG_UTR3 : REG_UTR5);
 
-	if (bkw_len > exon_len) {
+	if (bkw_len >= exon_len) {
 	    bkw_len -= exon_len;
 	    line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(bkw_len+1, is_strand ? REG_UTR3 : REG_UTR5);
 	    continue;
@@ -346,7 +347,7 @@ void genepred_parser(kstring_t *string, struct genepred *line)
             backward_offset = read_len + bkw_len - exon_len;
             if ( backward_offset < 0 ) {
                 backward_offset = -backward_offset;                
-                line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(-backward_offset, REG_UTR5); 
+                line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(backward_offset, REG_UTR5); 
             } else {
                 line->dna_ref_offsets[BLOCK_START][l2] = compact_loc(backward_offset+1, REG_CODING);                
             }
@@ -420,7 +421,7 @@ void generate_dbref_database(struct genepred *line)
     		    kputs("n.", temp1);
     		    break;
     		default:
-    		    error("Unknown type : %d", t);
+    		    error("Unknown type : ex%d %d %d", i+1, j, t);
     	    }
     	}
     	kputw((line->dna_ref_offsets[BLOCK_START][i]>>TYPEBITS), &temp[0]);
