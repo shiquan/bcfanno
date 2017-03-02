@@ -465,48 +465,51 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 	    
 	    if (n_alleles > 1 && args.skip_ref && j==0)
                 continue;
-            if ( args.skip_uncover || args.skip_ref ) {
-                int skip_uncover = 0, skip_ref = 0;
-                if ( args.skip_uncover )
-                    skip_uncover = 1;
-                if ( args.skip_ref )
-                    skip_ref = 1;
-                
-                bcf_fmt_t *fmt = bcf_get_fmt(hdr, line, "GT");
-                if ( fmt == NULL)
-                    error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
-                int sample_id = i;
+            // if ( args.skip_uncover || args.skip_ref ) {
+            int skip_uncover = 0, skip_ref = 0;
+            // Check if this allele absent in this sample. For multi samples, some sample may have different genotypes.
+            int no_such_allele = 1;
+            if ( args.skip_uncover )
+                skip_uncover = 1;
+            if ( args.skip_ref )
+                skip_ref = 1;
+            
+            bcf_fmt_t *fmt = bcf_get_fmt(hdr, line, "GT");
+            if ( fmt == NULL)
+                error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+            int sample_id = i;
                 
 #define BRANCH(type_t, missing, vector_end) do {                        \
-                    type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size); \
-                    int i;                                              \
-                    for (i=0; i<fmt->n; ++i) {                          \
-                        if ( (ptr[i]>>1) ) skip_uncover = 0;                    \
-                        if ( (ptr[i]>>1) > 1) skip_ref = 0;\
-                    }                                                   \
-                } while(0)
+                type_t *ptr = (type_t*)(fmt->p + sample_id*fmt->size);  \
+                int i;                                                  \
+                for (i=0; i<fmt->n; ++i) {                              \
+                    if ( (ptr[i]>>1) ) skip_uncover = 0;                \
+                    if ( (ptr[i]>>1) > 1) skip_ref = 0;                 \
+                    if ( (ptr[i]>>1)-1 == j ) no_such_allele = 0;   \
+                }\
+            } while(0)
                 
-                switch(fmt->type) {
-                    case BCF_BT_INT8:
-                        BRANCH(int8_t, bcf_int8_missing, bcf_int8_vector_end);
-                        break;
+            switch(fmt->type) {
+                case BCF_BT_INT8:
+                    BRANCH(int8_t, bcf_int8_missing, bcf_int8_vector_end);
+                    break;
+                    
+                case BCF_BT_INT16:
+                    BRANCH(int16_t, bcf_int16_missing, bcf_int16_vector_end);
+                    break;
+                    
+                case BCF_BT_INT32:
+                    BRANCH(int32_t, bcf_int32_missing, bcf_int32_vector_end);
+                    break;
                         
-                    case BCF_BT_INT16:
-                        BRANCH(int16_t, bcf_int16_missing, bcf_int16_vector_end);
-                        break;
-                        
-                    case BCF_BT_INT32:
-                        BRANCH(int32_t, bcf_int32_missing, bcf_int32_vector_end);
-                        break;
-                        
-                    default:
-                        error("FIXME: type %d in bcf_format_gt?", fmt->type);
-                }
+                default:
+                    error("FIXME: type %d in bcf_format_gt?", fmt->type);
+            }
 #undef BRANCH
-                if ( skip_uncover || skip_ref )
-                    continue;
-            } // end check conver
-	    mcache_pa_t *pa = &ps->alvals[j];
+            if ( skip_uncover || skip_ref || no_such_allele)
+                continue;
+            // } // end check conver
+            mcache_pa_t *pa = &ps->alvals[j];
 	    int iallele = -1;
 	    if (args.split_flag & SPLIT_ALT) iallele = j;
 	    for (k = 0; k < pa->n_cols; ++k) {		
@@ -521,7 +524,7 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 		//debug_print("%s", val->a.s);
 	    } // end cols
 	    kputc('\n', args.mempool);
-	} // end alleles
+        } // end alleles
     }  // end samples
     return 0;
 }
@@ -688,7 +691,7 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 
 #define BRANCH(type_t, is_missing, is_vector_end, string)  do  {	\
 	type_t *p = (type_t*)data;					\
-	if (iallele == -1) {						\
+	if (iallele < 0) {						\
 	    int i;							\
 	    for (i=0; i<n; ++i) {					\
 		if (p[i] == is_vector_end) break;			\
@@ -708,8 +711,8 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 		  char *p = (char*)data;
                   char *end = p + n;
 		  int i;
-		  if (iallele == -1) {
-		      for (i=0; i<n && *p; ++i,++p) {
+		  if (iallele < 0) {
+                      for ( ; p < end; ++p) {
 			  if (*p == bcf_str_missing) kputc('.', string);
 			  else kputc(*p, string);
 		      }
@@ -828,7 +831,7 @@ void setter_info(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
         if ( c->number == BCF_VL_R )
             iallele = ale;
         else if ( c->number == BCF_VL_A)
-            iallele = ale -1;
+            iallele = ale == -1 ? -1 : ale -1;
 	process_fmt_array(iallele, &val->a, inf->len, inf->type, inf->vptr);
     }
 
