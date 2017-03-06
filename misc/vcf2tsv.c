@@ -126,6 +126,7 @@ struct args {
     int print_header;
     int split_flag;
     int skip_uncover;
+    int no_gt;
     ccols_t *convert;
     mcache_t *cache;
     kstring_t *mempool;
@@ -137,6 +138,7 @@ struct args args = {
     .skip_ref = 0,
     .print_header = 1,
     .skip_uncover = 0,
+    .no_gt = 0,
     .split_flag = SPLIT_DEFAULT,
     .convert = NULL,
     .cache = NULL,
@@ -455,7 +457,7 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
     int n_alleles = args.split_flag & SPLIT_ALT ? line->n_allele : 1;
     set_matrix_cache(cache, n_alleles);
 
-    int i, j,k;
+    int i, j, k;
 
     for (i=0; i<cache->m_samples; ++i) { 
 	// iterate samples
@@ -525,6 +527,39 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 	    } // end cols
 	    kputc('\n', args.mempool);
         } // end alleles
+    }  // end samples
+    return 0;
+}
+
+int convert_line_no_gt(bcf_hdr_t *hdr, bcf1_t *line)
+{
+    if (line == NULL)
+	error ("null line.");
+    bcf_unpack(line, args.convert->max_unpack);
+
+    mcache_t *cache = args.cache;
+
+    int n_alleles = 1;
+    set_matrix_cache(cache, n_alleles);
+
+    int i, k;
+
+    for (i=0; i<cache->m_samples; ++i) { 
+	// iterate samples
+	mcache_ps_t *ps = &cache->mcols[i];
+	//ps->n_alleles = n_alleles;
+        mcache_pa_t *pa = &ps->alvals[0];
+        for (k = 0; k < pa->n_cols; ++k) {		
+            col_t *col = args.convert->cols[k];
+            mval_t *val = &pa->mvals[k];		
+            val->type = col->type;
+            val->sample_id = i;		
+            col->setter(hdr, line, col, -1, val);
+            if ( k )
+                kputc('\t', args.mempool);
+            kputs(val->a.s, args.mempool);
+        } // end cols
+        kputc('\n', args.mempool);
     }  // end samples
     return 0;
 }
@@ -602,7 +637,7 @@ void setter_zygosity(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *va
     bcf_fmt_t *fmt = bcf_get_fmt_id(line, c->id);
     if ( fmt == NULL )
 	error("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
-    int sample_id = val->sample_id;
+    // int sample_id = val->sample_id;
 
 }
 void setter_tgt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
@@ -864,11 +899,12 @@ int usage(void)
     fprintf(stderr,"Usage:\n");
     fprintf(stderr,"\tvcf2tsv -f string [Options] in.vcf.gz\n");
     fprintf(stderr,"Options:\n");
-    fprintf(stderr,"\t-f, --format   see man page for deatils.\n");
-    fprintf(stderr,"\t-s, --split    split by [ALT].\n");
-    fprintf(stderr,"\t-p, --print-header  print the header comment.\n");
-    fprintf(stderr,"\t-r, --skip-ref      skip format reference positions; suggest open this option.\n");
-    fprintf(stderr,"\t-u, --skip-uncover  skip uncover positions.\n");
+    fprintf(stderr,"\t-f, --format        See man page for deatils.\n");
+    fprintf(stderr,"\t-s, --split         Split by [ALT].\n");
+    fprintf(stderr,"\t-p, --print-header  Print the header comment.\n");
+    fprintf(stderr,"\t-r, --skip-ref      Skip format reference positions; suggest open this option.\n");
+    fprintf(stderr,"\t-u, --skip-uncover  Skip uncover positions.\n");
+    fprintf(stderr,"\t-G, --no-GT         No check GT tag. For convert INFO only.\n");
     fprintf(stderr,"Website :\n");
     fprintf(stderr,"https://github.com/shiquan/vcfanno\n");
     return 1;
@@ -884,12 +920,13 @@ int run(int argc, char**argv)
         {"skip-uncover", no_argument, NULL, 'u'},
 	{"split", required_argument, NULL, 's'},
 	{"print-header", no_argument, NULL, 'p'},
+        {"no-GT", no_argument, NULL, 'G'},
 	{0, 0, 0, 0}
     };
 
     char c;
     char *format = NULL, *flag = NULL;
-    while ((c = getopt_long(argc, argv, "f:s:urph?", long_opts, NULL)) >= 0) {
+    while ((c = getopt_long(argc, argv, "f:s:Gurph?", long_opts, NULL)) >= 0) {
 	switch (c) {
 	    case 'f':
 		format = strdup(optarg);
@@ -909,6 +946,10 @@ int run(int argc, char**argv)
 
             case 'u':
                 args.skip_uncover = 1;
+                break;
+
+            case 'G':
+                args.no_gt = 1;
                 break;
                 
 	    case 'h':
@@ -940,7 +981,7 @@ int run(int argc, char**argv)
     bcf_hdr_t *header = sr->readers[0].header;
     assert(header);
 
-    if (flag) {
+    if ( flag ) {
 	args.split_flag = init_split_flag(flag);
 	free(flag);
     }
@@ -952,20 +993,27 @@ int run(int argc, char**argv)
     args.mempool->m = args.mempool->l = 0;
     args.mempool->s = 0;
     args.cache = mcache_init(nsamples);
-    if (args.print_header)
+    if ( args.print_header )
 	convert_header();
 
     while ( bcf_sr_next_line(sr) ) {
 	bcf1_t *line = bcf_sr_get_line(sr, 0);
-	if (line->rid == -1)
-	    continue;
-	if ( args.skip_ref == 1 && bcf_get_variant_types(line) == VCF_REF )
-	    continue;
-	convert_line(header, line);
-	if (args.mempool->l) printf("%s",args.mempool->s);
+
+        if (line->rid == -1)
+            continue;
+        if ( args.no_gt == 1 ) {
+            convert_line_no_gt(header, line);
+        } else {
+            if ( args.skip_ref == 1 && bcf_get_variant_types(line) == VCF_REF )
+                continue;
+            convert_line(header, line);
+        }
+	if ( args.mempool->l )
+            printf("%s",args.mempool->s);
 	args.mempool->l = 0;
     }
-    if (args.mempool->l) printf("%s",args.mempool->s);
+    if ( args.mempool->l )
+        printf("%s",args.mempool->s);
     release_args();
     bcf_sr_destroy(sr);
     return 0;
