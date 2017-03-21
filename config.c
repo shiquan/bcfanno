@@ -58,85 +58,6 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
     free(config);    
 }
 
-/* // return 0 for empty line */
-/* static int parse_comment_line(kstring_t *string) */
-/* { */
-/*     if ( string->l == 0 ) */
-/*         return 0; */
-    
-/*     char *ss = string->s; */
-/*     char *se = string->s + string->l -1; */
-
-/*     while (ss && (*ss == ' ' || *ss == '\t')) */
-/*         ss++; */
-    
-/*     if ( ss > se || *ss == '#') { */
-/*         string->l = 0; */
-/*         return 0; */
-/*     } */
-    
-/*     while (se && (*se == ' ' || *se == '\t')) */
-/*         se--; */
-
-/*     if ( ss == se ) */
-/*         return 0; */
-    
-/*     if ( ss != string->s || se - ss + 1 != string->l ) {     */
-/*         string->l = se-ss+1; */
-/*         memmove(string->s, ss, string->l); */
-/*         string->s[string->l] = '\0'; */
-/*     } */
-
-/*     if ( string->l == 1) */
-/*         return 1; */
-/*     ss = string->s; */
-/*     se = string->s + string->l -2; */
-/*     int mark = 0; */
-/*     for ( ;; ) { */
-/*         if (ss == se) */
-/*             break; */
-/*         if (*ss == '/') { */
-/*             if ( mark == 1 ) { */
-/*                 string->l = ss - string->s -1; */
-/*                 string->s[string->l] = '\0'; */
-/*                 return string->l ? 1 : 0; */
-/*             } else { */
-/*                 mark = 1; */
-/*             } */
-/*         } else { */
-/*             mark = 0; */
-/*         } */
-/*         ss++; */
-/*     } */
-/*     return string->l ? 1 : 0; */
-/* } */
-/* static char *skip_comments(const char *json_fname) */
-/* { */
-/*     htsFile *fp; */
-/*     fp = hts_open(json_fname, "rb"); */
-/*     if ( fp == NULL )  */
-/* 	error("Failed to open %s.", json_fname); */
-    
-/*     kstring_t string = KSTRING_INIT; */
-/*     kstring_t temp = KSTRING_INIT; */
-
-/*     while ( hts_getline(fp, '\n', &temp) > 0 ) {         */
-/*         if ( parse_comment_line(&temp) ) { */
-/*             kputs(temp.s, &string); */
-/*             kputc('\n', &string); */
-/*         } */
-/*         temp.l = 0; */
-/*     } */
-/*     hts_close(fp); */
-/*     if ( temp.m ) */
-/*         free(temp.s); */
-
-/*  #ifdef DEBUG_MODE  */
-/*     debug_print("%s", string.s);  */
-/*  #endif  */
-/* /\*     return json; *\/ */
-/*     return string.s; */
-/* } */
 
 static int load_config_core(struct vcfanno_config *config, kson_t *json)
 {
@@ -187,8 +108,8 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 		else
 		    warnings("Unknown key : %s. skip ..", node1->key);		
 	    }
-	    if ( refgene_config->columns == NULL || refgene_config->columns[0] == '\0' )
-		error("No columns specified in HGVS configure.");
+	    /* if ( refgene_config->columns == NULL || refgene_config->columns[0] == '\0' ) */
+	    /*     error("No columns specified in HGVS configure."); */
 	    if ( refgene_config->genepred_fname == NULL || refgene_config->genepred_fname[0] == '\0' )
 		error("No genepred databases specified in HGVS configure.");
             if ( refgene_config->refseq_fname == NULL || refgene_config->refseq_fname[0] == '\0' )
@@ -324,7 +245,7 @@ int vcfanno_config_debug(struct vcfanno_config *config)
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
 	LOG_print("[refgene] gene_data : %s", refgene->genepred_fname);	
-	LOG_print("[refgene] columns : %s", refgene->columns);
+	// LOG_print("[refgene] columns : %s", refgene->columns);
 	if ( refgene->refseq_fname )
 	    LOG_print("[refgene] refseq : %s", refgene->refseq_fname);
 	if ( refgene->trans_list_fname )
