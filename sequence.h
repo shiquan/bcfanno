@@ -20,43 +20,13 @@
 #define seqarr    "ACGTN"
 #define revseqarr "TGCAN"
 
-#define SEQ_COMP(a, b) (a + b == 3)
+#define SEQ_COMP(a,b) (a + b == 3)
 
-static inline uint8_t seq2code4(uint8_t seq)
-{
-    static const uint8_t seq2num_table[256] = {
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 0, 4, 1, 4, 4, 4, 2, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-        4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-    };
-    return seq2num_table[seq];
-}
+typedef char * (*func_dup_seq)(const char *, unsigned long );
 
-static inline char *rev_seqs(const char *dna_seqs, unsigned long n)
-{
-    if ( n == 0 )
-        return NULL;
-    int i;
-    char *rev = (char*)calloc(n+1, sizeof(char));    
-    for ( i = 0; i < n; ++i) 
-        rev[i] = revseqarr[seq2code4(dna_seqs[n-i-1])];
-    rev[n] = '\0';
-    return rev;
-}
+extern int seq2code4(int seq);
 
+extern char *rev_seqs(const char *dna_seqs, unsigned long n);
 
 #define C4_Stop 0
 #define C4_Phe  1
@@ -91,20 +61,18 @@ const static int codon_matrix[4][4][4] = {
         { C4_Thr, C4_Thr, C4_Thr, C4_Thr, },
         { C4_Arg, C4_Ser, C4_Arg, C4_Ser, },
         { C4_Ile, C4_Ile, C4_Met, C4_Ile, },
-    },
-    {    
+    },{    
         { C4_Gln, C4_His, C4_Gln, C4_His, },
         { C4_Pro, C4_Pro, C4_Pro, C4_Pro, },
         { C4_Arg, C4_Arg, C4_Arg, C4_Arg, },
         { C4_Leu, C4_Leu, C4_Leu, C4_Leu, },
-    },
-    {                                     
+    },{
+                                     
         { C4_Glu, C4_Asp, C4_Glu, C4_Asp, },
         { C4_Ala, C4_Ala, C4_Ala, C4_Ala, },
         { C4_Gly, C4_Gly, C4_Gly, C4_Gly, },
         { C4_Val, C4_Val, C4_Val, C4_Val, },
-    },
-    {
+    },{
         { C4_Stop, C4_Tyr, C4_Stop, C4_Tyr, },
         { C4_Ser, C4_Ser, C4_Ser, C4_Ser, },
         { C4_Stop, C4_Cys, C4_Trp, C4_Cys, },
@@ -128,9 +96,9 @@ enum var_type {
     var_is_utr3,
     var_is_synonymous,
     var_is_missense,
+    var_is_nonsense, // stop gain
     var_is_inframe_insertion,
     var_is_inframe_deletion,
-    var_is_stop_gained,
     var_is_frameshift,
     var_is_stop_lost,
     var_is_stop_retained,
@@ -138,11 +106,12 @@ enum var_type {
     var_is_splice_donor,
     var_is_splice_acceptor,
     var_is_complex,
+    var_is_no_call,
 };
 
 static inline const char *var_type_string(enum var_type type)
 {
-    static const char* vartypes[20] = {
+    static const char* vartypes[21] = {
         "unknown",
         "reference",
         "intron",
@@ -151,17 +120,17 @@ static inline const char *var_type_string(enum var_type type)
         "utr3",
         "synonymous",
         "missense",
-        "inframe insertion",
-        "inframe deletion",
-        "stop gained",
+        "nonsense",
+        "inframe_insertion",
+        "inframe_deletion",
         "frameshift",
-        "stop lost",
-        "stop retained",
-        "splice site",
-        "splice donor",
-        "splice acceptor",
+        "stop_lost",
+        "stop_retained",
+        "splice_site",
+        "splice_donor",
+        "splice_acceptor",
         "complex",
-        NULL,
+        "no call",
         NULL,
     };
     assert(type >= 0);
@@ -173,6 +142,19 @@ static inline int check_is_stop(char *codon)
     return codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])] == C4_Stop;
 }
 
+static inline void compl_seq(char *seq, int l)
+{
+    int i;
+    for ( i = 0; i < l/2; i++ ) {
+        char c = revseqarr[seq2code4(seq[i])];
+        seq[i] = revseqarr[seq2code4(seq[l-i-1])];
+        seq[l-i-1] = c;
+    }
+    if ( l & 1 ) {
+        seq[l/2] = revseqarr[seq2code4(seq[l/2])];
+    }
+}
+extern int check_stop_codon(char *seq, char *p_end);
 extern enum var_type check_var_type(char *block, int block_length, int start, char *ref, int ref_length, char *alt, int alt_length );
 
 

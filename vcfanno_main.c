@@ -10,10 +10,13 @@
 #include "htslib/vcf.h"
 #include "anno_bed.h"
 #include "anno_vcf.h"
-#include "anno_hgvs.h"
+//#include "anno_hgvs.h"
 #include "version.h"
+#include "hgvs.h"
+#include "hgvs_vcf.h"
+#include "genepred.h"
 
-const char *vcfanno_version = "version 0.0.4";
+const char *vcfanno_version = "version 0.0.5";
 // cache ANNOCORE_BUFFER_LINES lines into buffers; for each buffer pool all lines come from one chromosome,
 // if no enough lines, just put as much as possible
 #define ANNOCORE_BUFFER_LINES 1000
@@ -70,7 +73,7 @@ struct args {
     // of tags in the comment regions
     struct beds_options bed_opts;
     struct vcfs_options vcf_opts;
-    struct refgene_options hgvs_opts;
+    // struct refgene_options hgvs_opts;
 };
 
 struct args args = {
@@ -105,7 +108,7 @@ void args_destroy(){
     // debug_print("close beds");
     beds_options_destroy(&args.bed_opts);
     // debug_print("close hgvs");
-    refgene_options_destroy(&args.hgvs_opts);
+    // refgene_options_destroy(&args.hgvs_opts);
 }
 
 static int quiet_mode = 0;
@@ -218,12 +221,12 @@ int parse_args(int argc, char **argv)
 
     args.bed_opts.beds_is_inited = 0;
     args.vcf_opts.vcfs_is_inited = 0;
-    args.hgvs_opts.refgene_is_inited = 0;
+    // args.hgvs_opts.refgene_is_inited = 0;
     // set genepred format
     set_format_genepred();
     beds_options_init( &args.bed_opts );
     vcfs_options_init( &args.vcf_opts );
-    refgene_options_init( &args.hgvs_opts );
+    // refgene_options_init( &args.hgvs_opts );
 
     // read bcf header from input bcf/vcf
     args.hdr = bcf_hdr_read(args.fp_input);
@@ -234,25 +237,39 @@ int parse_args(int argc, char **argv)
     // alias hdr_out
     args.vcf_opts.hdr_out = args.hdr_out;
     args.bed_opts.hdr_out = args.hdr_out;
-    args.hgvs_opts.hdr_out = args.hdr_out;
+    // args.hgvs_opts.hdr_out = args.hdr_out;
     
     if ( con->refgene.refgene_is_set == 1) {
-	struct refgene_options *opts = &args.hgvs_opts;
-	opts->hdr_out = args.hdr_out;
-	// parse columns of refgene
-	if ( refgene_columns_parse(opts, con->refgene.columns) == 1) {
-	    warnings("Init refgene columns failed; skip..");
-	    // refgene_is_init == 0 
-	} else {
-	    // set genepred database, this is mandatory
-	    refgene_set_refgene_fname(opts, con->refgene.genepred_fname);
-	    // set refseq file in fasta format
-	    refgene_set_refseq_fname(opts, con->refgene.refseq_fname);
-	    // set transcripts list
-	    refgene_set_trans_fname(opts, con->refgene.trans_list_fname);
-	    // set gene list
-	    refgene_set_genes_fname(opts, con->refgene.gene_list_fname);
-	}
+	// struct refgene_options *opts = &args.hgvs_opts;
+	// opts->hdr_out = args.hdr_out;
+	/* // parse columns of refgene */
+	/* if ( refgene_columns_parse(opts, con->refgene.columns) == 1) { */
+	/*     warnings("Init refgene columns failed; skip.."); */
+	/*     // refgene_is_init == 0  */
+	/* } else { */
+	/*     // set genepred database, this is mandatory */
+	/*     refgene_set_refgene_fname(opts, con->refgene.genepred_fname); */
+	/*     // set refseq file in fasta format */
+	/*     refgene_set_refseq_fname(opts, con->refgene.refseq_fname); */
+	/*     // set transcripts list */
+	/*     refgene_set_trans_fname(opts, con->refgene.trans_list_fname); */
+	/*     // set gene list */
+	/*     refgene_set_genes_fname(opts, con->refgene.gene_list_fname); */
+	/* } */
+        if ( init_hgvs_anno(con->refgene.genepred_fname, con->refgene.refseq_fname, args.hdr_out) )
+            return 1;
+
+        if ( con->refgene.trans_list_fname != NULL ) {
+            if ( set_transcripts_list( con->refgene.trans_list_fname ) ) {
+                warnings("Failed to load transcripts list : %s", con->refgene.trans_list_fname);
+            }
+        }
+
+        if ( con->refgene.gene_list_fname != NULL ) {
+            if ( set_transcripts_list( con->refgene.gene_list_fname ) ) {
+                warnings("Failed to load genes list : %s", con->refgene.gene_list_fname);
+            }
+        }
     }    
 
     for ( i = 0; i < con->vcfs.n_vcfs; ++i ) {
@@ -273,8 +290,9 @@ int anno_core(bcf1_t *line)
 	return 0;
 
     // annotate hgvs name
-    anno_refgene_core(&args.hgvs_opts, line);
-
+    // anno_refgene_core(&args.hgvs_opts, line);
+    setter_hgvs_vcf(args.hdr_out, line);
+    
     // stat type module
     
     // annotate vcf files

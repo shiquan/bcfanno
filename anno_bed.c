@@ -364,7 +364,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 int anno_beds_core(struct beds_options *opts, bcf1_t *line)
 {
     if ( opts->beds_is_inited == 0 )
-	return line;
+	return 0;
     assert(opts->hdr_out);
     int i, j;
     for ( i = 0; i < opts->n_files; ++i ) {

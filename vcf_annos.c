@@ -1175,7 +1175,8 @@ int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 {
     // just skip the next steps if vcfs databases not inited
     if ( opts->vcfs_is_inited == 0 )
-	return line;
+	return 0;
+    
     assert(opts->hdr_out);    
     int i, j;
     int k;    
