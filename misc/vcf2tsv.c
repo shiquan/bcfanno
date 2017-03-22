@@ -451,10 +451,11 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
     if (line == NULL)
 	error ("null line.");
     bcf_unpack(line, args.convert->max_unpack);
-
+    
     mcache_t *cache = args.cache;
     // ccols_t *cols = args.convert;
-    int n_alleles = args.split_flag & SPLIT_ALT ? line->n_allele : 1;
+    // int n_alleles = args.split_flag & SPLIT_ALT ? line->n_allele : 1;
+    int n_alleles = line->n_allele;
     set_matrix_cache(cache, n_alleles);
 
     int i, j, k;
@@ -463,10 +464,12 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 	// iterate samples
 	mcache_ps_t *ps = &cache->mcols[i];
 	//ps->n_alleles = n_alleles;
+
+        // Foreach allele
 	for (j=0; j < ps->n_alleles; ++j) { // ???
 	    
-	    if (n_alleles > 1 && args.skip_ref && j==0)
-                continue;
+	    // if (n_alleles > 1 && args.skip_ref && j==0)
+            // continue;
             // if ( args.skip_uncover || args.skip_ref ) {
             int skip_uncover = 0, skip_ref = 0;
             // Check if this allele absent in this sample. For multi samples, some sample may have different genotypes.
@@ -475,7 +478,7 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
                 skip_uncover = 1;
             if ( args.skip_ref )
                 skip_ref = 1;
-            
+            // int i_allele = 0;
             bcf_fmt_t *fmt = bcf_get_fmt(hdr, line, "GT");
             if ( fmt == NULL)
                 error ("no found GT tag in line : %s,%d", hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
@@ -487,7 +490,7 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
                 for (i=0; i<fmt->n; ++i) {                              \
                     if ( (ptr[i]>>1) ) skip_uncover = 0;                \
                     if ( (ptr[i]>>1) > 1) skip_ref = 0;                 \
-                    if ( (ptr[i]>>1)-1 == j ) no_such_allele = 0;   \
+                    if ( (ptr[i]>>1) -1 == j) no_such_allele = 0;\
                 }\
             } while(0)
                 
@@ -508,12 +511,13 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
                     error("FIXME: type %d in bcf_format_gt?", fmt->type);
             }
 #undef BRANCH
-            if ( skip_uncover || skip_ref || no_such_allele)
+            if ( skip_uncover || skip_ref)
                 continue;
             // } // end check conver
             mcache_pa_t *pa = &ps->alvals[j];
 	    int iallele = -1;
-	    if (args.split_flag & SPLIT_ALT) iallele = j;
+	    if (args.split_flag & SPLIT_ALT)
+                iallele = j;
 	    for (k = 0; k < pa->n_cols; ++k) {		
 		col_t *col = args.convert->cols[k];
 		mval_t *val = &pa->mvals[k];		
