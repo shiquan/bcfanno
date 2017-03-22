@@ -530,6 +530,10 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 		//debug_print("%s", val->a.s);
 	    } // end cols
 	    kputc('\n', args.mempool);
+
+
+            if ( !(args.split_flag & SPLIT_ALT))
+                break;
         } // end alleles
     }  // end samples
     return 0;
