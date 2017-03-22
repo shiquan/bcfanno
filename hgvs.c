@@ -712,11 +712,11 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         codon[3] = '\0';
         type->ori_amino = codon2aminoid(codon);
         if ( ref_length == 1 ) {
-            codon[cod] = *alt;
+            codon[cod] = *alt_seq;
         } else {
             int i;
             for ( i = cod; i < 3; ++i ) {
-                codon[i] = alt[i-cod];
+                codon[i] = alt_seq[i-cod];
             }                           
         }
         
