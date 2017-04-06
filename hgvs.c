@@ -45,7 +45,8 @@ void hgvs_spec_destroy()
 {
     genepred_spec_destroy(spec.data);
     hgvs_des_clear(&spec.des);
-    free(spec.exp);
+    if ( spec.exp != NULL )
+        free(spec.exp);
 }
 int init_hgvs_spec(const char *fname, const char *fasta)
 {
@@ -55,12 +56,13 @@ int init_hgvs_spec(const char *fname, const char *fasta)
         return 1;
     if ( genepred_load_fasta(spec.data, fasta) )
         return 1;
-    spec.exp = (regex_t*)malloc(sizeof(regex_t));
-    int rv;
-    rv = regcomp(spec.exp, "(.*):[gcn][.](.*)", REG_EXTENDED);
-    if ( rv != 0 ) {
-        error("regcomp failed with %d.", rv);
-    }    
+    spec.exp = NULL;
+    /* spec.exp = (regex_t*)malloc(sizeof(regex_t)); */
+    /* int rv; */
+    /* rv = regcomp(spec.exp, "(.*):[gcn][.](.*)", REG_EXTENDED); */
+    /* if ( rv != 0 ) { */
+    /*     error("regcomp failed with %d.", rv); */
+    /* }     */
     return 0;
 }
 
@@ -244,6 +246,14 @@ static int parse_var(char *ss, char *se, int strand, int *ref_length, char **ref
 // This code is fragile, improve me.
 int check_hgvs_name(const char *name)
 {
+    if ( spec.exp == NULL ) {
+        spec.exp = (regex_t*)malloc(sizeof(regex_t));
+        int rv;
+        rv = regcomp(spec.exp, "(.*):[gcn][.](.*)", REG_EXTENDED);
+        if ( rv != 0 ) {
+            error("regcomp failed with %d.", rv);
+        }
+    }
     // Only allow match once.
     regmatch_t matches[1]; 
     if ( regexec(spec.exp, name, 1, matches, 0) ) {
