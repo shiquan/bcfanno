@@ -39,6 +39,10 @@ static struct stack stack = {0, 0, 0};
 static int is_paired = 1;
 static int is_key = 0;
 
+static int stack_destroy()
+{
+    free(stack.nodes);
+}
 static int complement_error(kstring_t *string)
 {
     assert ( stack.l > 0 );
@@ -308,6 +312,7 @@ static int check_complement(kstring_t *string)
                 break;
         }        
     }
+    stack_destroy();
     return 0;
 }
 char *json_config_open(const char *fname)
