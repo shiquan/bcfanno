@@ -503,6 +503,7 @@ int genepred_read_line(struct genepred_spec *spec, struct genepred_line *line)
         parse_line(&string, line);
         if ( check_gene_trans(spec, line) == 0 )
             continue;
+        free(string.s);
         return 0;
     }
     return 1;

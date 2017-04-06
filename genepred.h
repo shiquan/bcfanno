@@ -109,7 +109,7 @@ extern void set_format_refflat();
 
 extern struct genepred_line *genepred_line_create();
 extern void genepred_line_destroy(void *line);
-
+extern int genepred_read_line(struct genepred_spec *spec, struct genepred_line *line);
 struct genepred_spec *genepred_spec_init();
 void genepred_spec_destroy(struct genepred_spec *spec);
 extern int parse_line(kstring_t *string, struct genepred_line *line);

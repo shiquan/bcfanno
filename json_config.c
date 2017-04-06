@@ -42,6 +42,7 @@ static int is_key = 0;
 static int stack_destroy()
 {
     free(stack.nodes);
+    return 0;
 }
 static int complement_error(kstring_t *string)
 {

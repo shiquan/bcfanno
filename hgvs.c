@@ -35,11 +35,12 @@ void hgvs_des_clear(struct hgvs_des *des)
     free(des->a);
     if ( des->chrom != NULL )
         free(des->chrom);
-    if ( des->ref != NULL)
+    if ( des->ref != NULL && des->ref_length > 0)
         free(des->ref);
-    if ( des->alt != NULL)
+    if ( des->alt != NULL && des->alt_length > 0) 
         free(des->alt);
     memset(des, 0, sizeof(struct hgvs_des));
+    
 }
 void hgvs_spec_destroy()
 {
