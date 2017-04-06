@@ -129,6 +129,7 @@ struct hgvs_des {
     struct hgvs_core *a;
 };
 
+extern void hgvs_des_clear(struct hgvs_des *des);
 extern int init_hgvs_spec(const char *fname, const char *fasta);
 extern int set_transcripts_list(const char *fname);
 extern int set_genes_list(const char *fname);
@@ -137,7 +138,6 @@ extern void hgvs_spec_destroy();
 // Parse the description name. 
 extern int setter_description(const char *name, int _pos, char *ref, char *alt);
 extern int parse_hgvs_name(const char *name);
-
 extern struct hgvs_des *fill_hgvs_name();
 
 #endif
