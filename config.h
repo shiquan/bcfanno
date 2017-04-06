@@ -11,7 +11,7 @@ struct refgene_config {
     char *refseq_fname;
     char *trans_list_fname;
     char *gene_list_fname;
-    char *columns;
+//    char *columns;
 };
 
 struct file_config {

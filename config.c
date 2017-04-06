@@ -23,7 +23,7 @@ struct vcfanno_config temp_config_init = {
     .reference_version = 0,
     .vcfs = { 0, 0 },
     .beds = { 0, 0 },
-    .refgene = { 0, 0, 0, 0, 0, 0 },
+    .refgene = { 0, 0, 0, 0, 0},
 };
 
 struct vcfanno_config *vcfanno_config_init()
@@ -55,6 +55,16 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
     }
     if ( i )
 	free(config->beds.files);
+
+    if ( config->refgene.genepred_fname )
+        free(config->refgene.genepred_fname);
+    if ( config->refgene.refseq_fname )
+        free(config->refgene.refseq_fname);
+    if ( config->refgene.trans_list_fname )
+        free(config->refgene.trans_list_fname);
+    if ( config->refgene.gene_list_fname )
+        free(config->refgene.gene_list_fname);
+
     free(config);    
 }
 
@@ -103,8 +113,6 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 		    refgene_config->trans_list_fname = BRANCH_INIT(node1);
 		else if ( strcmp(node1->key, "genes_list") == 0 )
 		    refgene_config->gene_list_fname = BRANCH_INIT(node1);
-		else if ( strcmp(node1->key, "columns") == 0 || strcmp(node1->key, "column") == 0)
-		    refgene_config->columns = BRANCH_INIT(node1);
 		else
 		    warnings("Unknown key : %s. skip ..", node1->key);		
 	    }
