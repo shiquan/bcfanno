@@ -109,6 +109,7 @@ void args_destroy(){
     beds_options_destroy(&args.bed_opts);
     // debug_print("close hgvs");
     // refgene_options_destroy(&args.hgvs_opts);
+    close_hgvs_anno();
 }
 
 static int quiet_mode = 0;
