@@ -279,8 +279,10 @@ int parse_args(int argc, char **argv)
     for ( i = 0; i < con->beds.n_beds; ++i ) {
 	beds_database_add(&args.bed_opts, con->beds.files[i].fname, con->beds.files[i].columns);
     }    
-    // write header to output
+    // write header to output    
     bcf_hdr_write(args.fp_out, args.hdr_out);
+
+    vcfanno_config_destroy(con);
     return 0;
 }
 int anno_core(bcf1_t *line)

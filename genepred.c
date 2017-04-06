@@ -707,7 +707,9 @@ struct genepred_line *genepred_retrieve_region(struct genepred_spec *spec, char 
         if ( temp )
             temp->next = line;
         temp = line;
-    }
+        string.l = 0;
+    }    
+    free(string.s);
     tbx_itr_destroy(itr);
     return head;
 }
