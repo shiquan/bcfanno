@@ -163,6 +163,7 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 	    file->last_start = tsv->start;
         
     }
+    hts_itr_destroy(itr);
     // if buffer is filled return 0, else return 1
     return file->cached ? 0 : 1;    
 }
@@ -209,7 +210,10 @@ int beds_setter_info_string(struct beds_options *opts, bcf1_t *line, struct anno
     if ( string == NULL )
 	return 0;
     // only support string for bed function regions
-    return bcf_update_info_string(opts->hdr_out, line, col->hdr_key, string);
+    int ret;
+    ret = bcf_update_info_string(opts->hdr_out, line, col->hdr_key, string);
+    free(string);
+    return ret;
 }
 
 int beds_database_add(struct beds_options *opts, const char *fname, char *columns)
@@ -341,6 +345,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 		struct anno_col *col = &file->cols[i];
 		col->icol = k;
 	    }
+            free(splits);
 	}
     }
     for ( i = 0; i < file->n_cols; ++i ) {
