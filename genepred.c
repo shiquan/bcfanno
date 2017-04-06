@@ -91,6 +91,9 @@ void genepred_spec_destroy(struct genepred_spec *spec)
 {
     if ( spec->idx )
         tbx_destroy(spec->idx);
+    if ( spec->fai )
+        fai_destroy(spec->fai);
+    
     if ( spec->genes )
         destroy_list(spec->genes);
     if ( spec->trans )

@@ -212,6 +212,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         // char *exin_string = retrieve_exin_des(des);
         char *vartype_string = retrieve_vartype_des(des);
 
+        hgvs_des_clear(des);
         if ( gene_string == NULL ) {
             kputs(".", &gene);
             kputs(".", &transcript);
@@ -228,7 +229,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             free(trans_string);
             free(hgvs_string);
             free(vartype_string);
-        }
+        }        
     }
     if ( i > 1 && is_empty == 0) {
         bcf_update_info_string(hdr, line, "Gene", gene.s);

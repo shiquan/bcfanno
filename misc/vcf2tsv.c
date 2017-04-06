@@ -910,7 +910,7 @@ int usage(void)
     fprintf(stderr,"\t-f, --format        See man page for deatils.\n");
     fprintf(stderr,"\t-s, --split         Split by [ALT].\n");
     fprintf(stderr,"\t-p, --print-header  Print the header comment.\n");
-    fprintf(stderr,"\t-r, --skip-ref      Skip format reference positions; suggest open this option.\n");
+    fprintf(stderr,"\t-r, --skip-ref      Skip reference positions, when GT is \"0/0\"]`.\n");
     fprintf(stderr,"\t-u, --skip-uncover  Skip uncover positions.\n");
     fprintf(stderr,"\t-G, --no-GT         No check GT tag. For convert INFO only.\n");
     fprintf(stderr,"Website :\n");

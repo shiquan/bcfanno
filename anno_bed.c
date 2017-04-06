@@ -42,7 +42,7 @@ void anno_stack_destroy(struct anno_stack *stack)
 char * get_col_tsv(struct beds_anno_tsv *tsv, int icol)
 {
     if (icol > tsv->nfields) {
-	warnings("outof columns");
+	warnings("out of columns");
 	return NULL;
     }
     return tsv->string.s + tsv->fields[icol];
@@ -270,7 +270,8 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	    // debug_print("%s, %d", col->hdr_key, file->n_cols);
 	    file->n_cols++;	    
 	}
-	string.l = 0;	    
+	string.l = 0;
+        free(splits);
     }
 
     while (1) {

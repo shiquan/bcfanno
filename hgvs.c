@@ -35,9 +35,9 @@ void hgvs_des_clear(struct hgvs_des *des)
     free(des->a);
     if ( des->chrom != NULL )
         free(des->chrom);
-    if ( des->ref_length > 0)
+    if ( des->ref != NULL)
         free(des->ref);
-    if ( des->alt_length > 0)
+    if ( des->alt != NULL)
         free(des->alt);
     memset(des, 0, sizeof(struct hgvs_des));
 }
@@ -179,7 +179,7 @@ static int is_nucletide(char *ss)
 // Here only support several universal HGVS styles.
 // simple convert style:  [ACGT]n>[ACGT]n
 // deletion style:       del[ACGT]n
-// insertion style:      ins[ACGT]n
+// Insertion Style:      Ins[Acgt]N
 // duplicate style:      dup[ACGT]n
 // Do NOT support other complex styles, like inv, con, etc.
 static int parse_var(char *ss, char *se, int strand, int *ref_length, char **ref, int *alt_length, char **alt, enum hgvs_variant_type *type)
