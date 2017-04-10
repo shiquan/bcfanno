@@ -38,9 +38,8 @@ void hgvs_des_clear(struct hgvs_des *des)
     if ( des->ref != NULL && des->ref_length > 0)
         free(des->ref);
     if ( des->alt != NULL && des->alt_length > 0) 
-        free(des->alt);
-    memset(des, 0, sizeof(struct hgvs_des));
-    
+        free(des->alt);    
+    memset(des, 0, sizeof(struct hgvs_des));    
 }
 void hgvs_spec_destroy()
 {
@@ -351,6 +350,7 @@ int setter_description(const char *name, int _pos, char *ref, char *alt)
     if (ae == a && re == r) {
         des->type = var_type_snp;
         des->start = pos;
+        des->end = pos;
         des->ref_length =  1;
         des->ref = strndup(r, 1);
         des->alt_length = 1;
@@ -679,7 +679,6 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         goto no_amino_code;
     }
 
-
     // amino_code:
     // Check if cds regions.
     cds_pos = pos - line->utr5_length;
@@ -711,7 +710,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 if ( seq2code4(ori_seq[cod+i]) == seq2code4(alt_seq[i]) ) {
                     type->vartype = var_is_no_call;
                 } else {
-                    warnings("Inconsistance nucletide. %s:%d, %c vs %c.", des->chrom, des->start,ori_seq[cod+i], ref_seq[i]);
+                    warnings("Inconsistance nucletide. %s:%d, %c vs %c.", des->chrom, des->start+i,ori_seq[cod+i], ref_seq[i]);
+                    break;
                 }
             }
         }
@@ -802,6 +802,14 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
         if ( exon_id1 != exon_id2 ) {
             type->func = func_region_large;
         }
+        if ( line->strand == '-') {
+            int temp = name->pos;
+            name->pos = name->end_pos;
+            name->end_pos = temp;
+            temp = name->offset;
+            name->offset = name->end_offset;
+            name->end_offset = temp;
+        }        
     }
 
     name->name1 = strdup(line->name1);

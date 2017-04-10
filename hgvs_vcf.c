@@ -140,7 +140,7 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
         }
         if ( des->start != des->end ) {
             kputc('_', &string);
-            ksprintf(&string, "%d", name->loc);
+            ksprintf(&string, "%d", name->end_loc);
             if ( name->offset > 0 ) {
                 ksprintf(&string, "+%d", name->offset);
             } else if ( name->offset < 0) {

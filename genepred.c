@@ -184,8 +184,9 @@ void clear_genepred_line(struct genepred_line *line)
         if ( line->loc_parsed ) {
             free(line->loc[0]);
             free(line->loc[1]);
-        }
+        }        
     }
+    line->loc_parsed = 0;
     memset(*pp, 0, sizeof(struct genepred_line));
 }
 void genepred_line_destroy(void *line)
@@ -501,7 +502,7 @@ int genepred_read_line(struct genepred_spec *spec, struct genepred_line *line)
         if ( read_line(spec, &string) )
             break;
         parse_line(&string, line);
-        if ( check_gene_trans(spec, line) == 0 )
+        if ( check_gene_trans(spec, line) == 1 )
             continue;
         free(string.s);
         return 0;
