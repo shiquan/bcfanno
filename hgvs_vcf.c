@@ -140,11 +140,16 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
         }
         if ( des->start != des->end ) {
             kputc('_', &string);
+            if ( type->func == func_region_utr5 ) {
+                kputc('-', &string);
+            } else if ( type->func == func_region_utr3 ) {
+                kputc('*', &string);
+            }
             ksprintf(&string, "%d", name->end_loc);
-            if ( name->offset > 0 ) {
-                ksprintf(&string, "+%d", name->offset);
-            } else if ( name->offset < 0) {
-                ksprintf(&string, "%d", name->offset);
+            if ( name->end_offset > 0 ) {
+                ksprintf(&string, "+%d", name->end_offset);
+            } else if ( name->end_offset < 0) {
+                ksprintf(&string, "%d", name->end_offset);
             }            
         }
 
