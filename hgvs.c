@@ -278,6 +278,8 @@ int setter_description(const char *name, int _pos, char *ref, char *alt)
 {
     struct hgvs_des *des = &spec.des;
     hgvs_des_clear(des);
+
+    //func_dup_seq func = strand == '+' ? strndup : rev_seqs;
     
     const char *a = alt;
     const char *r = ref;
@@ -791,6 +793,8 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
     if ( line->loc_parsed == 0 )
         parse_line_locs(line);
 
+    // in case dual strands transcript RNAs, record strand for each transcript
+    name->strand = line->strand;
     int exon_id1 = 0;
     int exon_id2 = 0;
     if ( find_locate(line, &name->pos, &name->offset, start, &exon_id1) )

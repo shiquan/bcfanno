@@ -152,13 +152,33 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
                 ksprintf(&string, "%d", name->end_offset);
             }            
         }
-
+        
         if ( des->ref_length == 0 ) {
-            ksprintf(&string, "ins%s", des->alt);
+            if ( name->strand == '+' || name->offset != 0) {
+                ksprintf(&string, "ins%s", des->alt);
+            } else {
+                char *rev = rev_seqs(des->alt, des->alt_length);
+                ksprintf(&string, "ins%s", rev);
+                free(rev);
+            }
         } else if ( des->alt_length == 0 ) {
-            ksprintf(&string, "del%s", des->ref);
+            if ( name->strand == '+' || name->offset != 0 ) {
+                ksprintf(&string, "del%s", des->ref);
+            } else {
+                char *rev = rev_seqs(des->ref, des->ref_length);
+                ksprintf(&string, "del%s", rev);
+                free(rev);                
+            }
         } else {
-            ksprintf(&string, "%s>%s", des->ref, des->alt);
+            if ( name->strand == '+' || name->offset != 0) {
+                ksprintf(&string, "%s>%s", des->ref, des->alt);
+            } else {
+                char *ref = rev_seqs(des->ref, des->ref_length);
+                char *alt = rev_seqs(des->alt, des->alt_length);
+                ksprintf(&string, "%s>%s", ref, alt);
+                free(ref);
+                free(alt);
+            }
         }
         if ( type->loc_amino > 0 && des->type == var_type_snp ) {
                 if ( type->ori_amino != type->mut_amino ) {
