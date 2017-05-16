@@ -700,8 +700,10 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
                 if ( *ss == '.')
                     break;
             }
-
-            if ( strlen(name) == i && strncasecmp(node.name1, name, i ) == 0 ) {
+            if ( strlen(name) != i -1 )
+                continue;
+            
+            if (strncasecmp(node.name1, name, i ) == 0 ) {
                 struct genepred_line *temp1 = genepred_line_copy(&node);
                 if ( head == NULL )
                     head = temp1;
