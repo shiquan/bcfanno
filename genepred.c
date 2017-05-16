@@ -6,6 +6,7 @@
 #include "file.h"
 #include "htslib/tbx.h"
 #include "htslib/khash.h"
+#include "htslib/hfile.h"
 #include "htslib/kstring.h"
 #include "htslib/kseq.h"
 #include "htslib/bgzf.h"
@@ -14,6 +15,15 @@
 
 KHASH_MAP_INIT_STR(list, char*)
 typedef kh_list_t list_hash_t;
+
+int file_seek(htsFile *fp, long offset, int where)
+{
+    if ( fp->is_bin ) {
+        return bgzf_seek(fp->fp.bgzf, offset, where);
+    } else {        
+        return hseek(fp->fp.hfile, offset, where);
+    }
+}
 
 struct list *init_list(const char *fn)
 {
@@ -499,14 +509,18 @@ int genepred_read_line(struct genepred_spec *spec, struct genepred_line *line)
     kstring_t string = KSTRING_INIT;
     
     for ( ;; ) {
-        if ( read_line(spec, &string) )
+        if ( read_line(spec, &string) == 1)
             break;
         parse_line(&string, line);
         if ( check_gene_trans(spec, line) == 1 )
             continue;
-        free(string.s);
+        if ( string.m ) 
+            free(string.s), string.l = 0, string.m = 0;
         return 0;
     }
+    if ( string.m ) 
+        free(string.s), string.l = 0, string.m = 0;
+
     return 1;
 }
 struct genepred_line *genepred_line_copy(struct genepred_line *line)
@@ -836,6 +850,8 @@ void retrieve_bed()
             if ( genepred_read_line(args.spec, &node) == 0 ) {
                 parse_line_locs(&node);
                 generate_dbref_database(&node);
+            } else {
+                break;
             }
         }
         clear_genepred_line(&node);
