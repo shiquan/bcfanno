@@ -16,6 +16,29 @@
 KHASH_MAP_INIT_STR(list, char*)
 typedef kh_list_t list_hash_t;
 
+#ifdef HTS1.3
+
+struct stream_lite {
+    int begin, end;
+    int is_eof:2, bufsize:30;
+    uint64_t seek_pos;
+    BGZF* f;
+    unsigned char *buf;
+};
+
+int file_seek(htsFile *fp, long offset, int where)
+{
+    if ( fp->is_bin ) {
+        return bgzf_seek(fp->fp.bgzf, offset, where);
+    } else {
+        ks_rewind((struct stream_lite*)fp->fp.voidp);
+        ((struct stream_lite*)fp->fp.voidp)->seek_pos = offset;
+        return bgzf_seek(((struct stream_lite*)fp->fp.voidp)->f, offset, where);
+    }
+}
+
+#else
+
 int file_seek(htsFile *fp, long offset, int where)
 {
     if ( fp->is_bgzf ) {
@@ -24,6 +47,8 @@ int file_seek(htsFile *fp, long offset, int where)
         return hseek(fp->fp.hfile, offset, where);
     }
 }
+
+#endif
 
 struct list *init_list(const char *fn)
 {
