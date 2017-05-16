@@ -18,7 +18,7 @@ typedef kh_list_t list_hash_t;
 
 int file_seek(htsFile *fp, long offset, int where)
 {
-    if ( fp->is_bin ) {
+    if ( fp->is_bgzf ) {
         return bgzf_seek(fp->fp.bgzf, offset, where);
     } else {        
         return hseek(fp->fp.hfile, offset, where);
