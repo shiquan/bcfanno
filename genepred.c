@@ -700,7 +700,7 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
                 if ( *ss == '.')
                     break;
             }
-            if ( strlen(name) != i -1 )
+            if ( strlen(name) > i )
                 continue;
             
             if (strncasecmp(node.name1, name, i ) == 0 ) {
