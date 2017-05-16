@@ -694,21 +694,14 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
 
         if ( check_version == 0 ) {
             char *ss;
-            int i, j;
+            int i;
             ss = node.name1;
             for ( i = 0; ss; ++ss, ++i) {
                 if ( *ss == '.')
                     break;
             }
-            ss = name;
-            for ( j = 0; ss; ++ss, ++j) {
-                if ( *ss == '.')
-                    break;
-            }
-            if ( i != j )
-                continue;
-            
-            if ( strncasecmp(node.name1, name, i ) == 0 ) {
+
+            if ( strlen(name) >= i && name[i] == '.' && strncasecmp(node.name1, name, i ) == 0 ) {
                 struct genepred_line *temp1 = genepred_line_copy(&node);
                 if ( head == NULL )
                     head = temp1;
