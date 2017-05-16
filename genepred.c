@@ -699,19 +699,21 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
             for ( i = 0; ss; ++ss, ++i) {
                 if ( *ss == '.')
                     break;
+                if (name[i] != *ss)
+                    break;
             }
-            if ( strlen(name) > i )
+            if ( *ss != '.' || name[i] != '\0' )
                 continue;
             
-            if (strncasecmp(node.name1, name, i ) == 0 ) {
-                struct genepred_line *temp1 = genepred_line_copy(&node);
-                if ( head == NULL )
-                    head = temp1;
-                if ( temp ) {
-                    temp->next = temp1;
-                }
-                temp = temp1;
+            // if (strncasecmp(node.name1, name, i ) == 0 ) {
+            struct genepred_line *temp1 = genepred_line_copy(&node);
+            if ( head == NULL )
+                head = temp1;
+            if ( temp ) {
+                temp->next = temp1;
             }
+            temp = temp1;
+                // }
         } else if ( strcasecmp(node.name1, name) == 0 ) {            
             struct genepred_line *temp1 = genepred_line_copy(&node);
             if ( head == NULL )
