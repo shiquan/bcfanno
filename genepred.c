@@ -16,7 +16,7 @@
 KHASH_MAP_INIT_STR(list, char*)
 typedef kh_list_t list_hash_t;
 
-#ifdef HTS1.3
+#ifdef HTS3
 
 struct stream_lite {
     int begin, end;
