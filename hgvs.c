@@ -578,8 +578,10 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     }
 
     struct hgvs_des *des = &spec.des;
-    // Check the exon or intron id.
+    // Exon or intron id.
     int i;
+    // CDS id.
+    int h;
     int cds_pos;
     type->vartype = var_is_unknown;
 
@@ -590,33 +592,47 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
 } while(0)
 
     if ( line->strand == '+' ) {
-        for ( i = 0; i < line->exon_count; ++i ) {
+        for ( i = 0, h = 0; i < line->exon_count; ++i ) {
             if ( pos >= line->exons[BLOCK_START][i] && pos <= line->exons[BLOCK_END][i] ) {
                 if ( pos < line->exons[BLOCK_START][i] + SPLIT_RANGE || pos > line->exons[BLOCK_END][i] - SPLIT_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
+
+                if ( line->exons[BLOCK_END][i] > line->utr5_length &&
+                     pos > line->utr5_length &&
+                     pos <= line->reference_length - line->utr3_length)
+                    h++;
+                
                 break;
             }
         }
         if ( offset > 0 ) {
             type->count = i + 1;
+            type->count2 = 0;
         } else {
             type->count = i;
+            type->count2 = h;
         }
     } else {
-        for ( i = 0; i < line->exon_count; ++i ) {
+        for ( i = 0, h = 0; i < line->exon_count; ++i ) {
             int j = line->exon_count - i - 1;
             if ( pos >= line->exons[BLOCK_END][j] && pos <= line->exons[BLOCK_START][j] ) {
                 if ( pos < line->exons[BLOCK_END][j] + SPLIT_RANGE || pos > line->exons[BLOCK_START][j] - SPLIT_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
+                if ( line->exons[BLOCK_START][i] > line->utr5_length &&
+                     pos > line->utr5_length &&
+                     pos <= line->reference_length - line->utr3_length)
+                    h++;
                 break;
             }                
         }
         if ( offset > 0 ) {
             type->count = i + 1;
+            type->count2 = 0;
         } else {
             type->count = i;
+            type->count2 = h;
         }        
     }
     
@@ -793,6 +809,9 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
     if ( line->loc_parsed == 0 )
         parse_line_locs(line);
 
+    // generate amino acid length
+    name->aa_length = line->cdsstart == line->cdsend ? 0 : (line->reference_length - line->utr5_length - line->utr3_length)/3;
+        
     // in case dual strands transcript RNAs, record strand for each transcript
     name->strand = line->strand;
     int exon_id1 = 0;

@@ -6,36 +6,12 @@
 #include "htslib/bgzf.h"
 #include "sort_list.h"
 
-// 
-// The dna reference offset for DNA coding and noncoding transcript consist of two parts. the offset value
-// and the function region construct a 32-bits value.
-// coding/nocoding coordinate
-// 32                        4321
-// |_________________________||||
-// ONLY one-bit below is accept per value
-// 
-// offset 1:  is_noncoding
-// offset 2:  is_coding
-// offset 3:  is_utr5
-// offset 4:  is_utr3
-// 
-
-/* #define REG_NONCODING  1 */
-/* #define REG_CODING     2 */
-/* #define REG_UTR5       4 */
-/* #define REG_UTR3       8 */
-/* #define REG_MASK       0xF */
-/* #define TYPEBITS       4 */
-
-/* #define read_type(a) ((a) & REG_MASK) */
-/* #define read_loc(a)  ((a) >> TYPEBITS) */
-/* #define compact_loc(a, t) ((a)<<TYPEBITS | ((t) & REG_MASK)) */
-
 #define BLOCK_START 0
 #define BLOCK_END   1
 
 #define read_start(a, l) (a[BLOCK_START][l])
 #define read_end(a, l) (a[BLOCK_END][l])
+#define get_length_exon(a, l) (a[BLOCK_END][l] - a[BLOCK_START][l] + 1)
 
 struct genepred_line {
     struct genepred_line *next;
@@ -66,6 +42,7 @@ struct genepred_line {
     // [start, end]
     int *exons[2];
     int loc_parsed;
+
     // Offsets location on gene.
     // int *dna_ref_offsets[2];
     // Transcript locations of each block, coding transcripts consist of UTRs and CDS,

@@ -421,7 +421,7 @@ int parse_line_locs(struct genepred_line *line)
         // line->dna_ref_offsets[i] = calloc(line->exon_count, sizeof(int));
         line->loc[i] = calloc(line->exon_count, sizeof(int));
     }
-
+            
     // First loop. Purpose of this loop is trying to calculate the forward and backward length.
     // Meanwhile, the related location of the transcripts block edges will also be calculated.
     for ( i = 0; i < line->exon_count; ++i ) {

@@ -25,6 +25,8 @@ struct var_func_type {
     enum var_type vartype;
     // Exon or intron count. Start from 1.
     int count;
+    // CDS count, for noncoding transcript always be 0.
+    int count2;
     // Location of amino first influenced. Sometime a indel may change the amino sequence after severl condons.
     int loc_amino;
     // Original amino acid and mutated amino acid. Check amino type only if variants happed in cds region.
@@ -35,28 +37,26 @@ struct var_func_type {
 };
 
 struct hgvs_name {
-    char *name1; // transcripts name, locus name
-    char *name2; // gene name or null 
+    // transcripts name, locus name
+    char *name1;
 
-    // The gene position format is same with genepred dna reference offset consist of two parts: the offset value
-   // and the function region construct a 32-bits value.
-    // coding/nocoding coordinate
-    // 32                        4321
-    // |_________________________||||
-    // ONLY one-bit below is accept per value
-    // 
-    // offset 1:  is_noncoding
-    // offset 2:  is_coding
-    // offset 3:  is_utr5
-    // offset 4:  is_utr3
+    // gene name or null
+    char *name2;
+    
+    // Amino acid length, for noncoding transcript should always be 0.
+    int aa_length;    
+
+    // position on gene coordinate, not account the function regions.
     int pos;
     int end_pos;
+
     // location for function region.
     int loc;
     int end_loc;
     
     int offset;
     int end_offset;
+    
     // If strand is '-', convert sequence to complement strand. Default is '+'.
     char strand;
 };
@@ -105,7 +105,9 @@ struct hgvs_des {
     // DONOT use any other value in this struct then 
     enum hgvs_variant_type type;
     char *chrom;
-    int32_t start; // position on genome
+    
+    // position on genome
+    int32_t start;
     // for var_type_snp end == start, for var_type_dels end > start, for var_type_ins end = start +1, 
     // for delvar_type_ins end > start 
     int32_t end;
@@ -119,6 +121,7 @@ struct hgvs_des {
     // length(var_type_ins), for delvar_type_ins alt_length == length(var_type_ins) 
     int alt_length;
     char *alt;
+   
     // the copy number only valid if variants type is var_type_copy, for most case, my algrithm only check
     // mark var_type_dels or var_type_ins in the first step, and check the near sequences from refseq 
    // databases and if there is copy number changed (more or less), the variants will update to var_type_copy 

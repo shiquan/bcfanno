@@ -10,8 +10,8 @@ include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
 
 CC       = gcc
-CFLAGS   = -Wall -O3
-DEBUG_CFLAGS   = -g -Wall -O0
+CFLAGS   = -Wall -O3 -DHTS3
+DEBUG_CFLAGS   = -g -Wall -O0 -DHTS3
 DFLAGS   =
 INCLUDES = -I. -I$(HTSDIR)/
 
