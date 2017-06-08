@@ -55,6 +55,11 @@ const static char *codon_names[] = {
     "Arg", "Ile", "Met", "Thr", "Asn", "Lys", "Val", "Ala", "Asp", "Glu", "Gly",
 };
 
+const static char *codon_short_names[] = {
+    "X", "F", "L", "S", "Y", "C", "W", "P", "H", "Q",
+    "R", "I", "M", "T", "N", "K", "V", "A", "D", "E", "G",
+};
+
 const static int codon_matrix[4][4][4] = {
     {
         { C4_Lys, C4_Asn, C4_Lys, C4_Asn, },
