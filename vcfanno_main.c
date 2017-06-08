@@ -297,8 +297,12 @@ int anno_core(bcf1_t *line)
  
     // annotate bed format datasets
     anno_beds_core(&args.bed_opts, line);
-    
+
+    // annotate transcript related bed format datasets
+    // anno_trans_core();
+
     // filter set module
+    // summary
     
     return 0;
 }
@@ -312,6 +316,7 @@ int main(int argc, char **argv)
     if ( parse_args(--argc, ++argv) == 1 )
 	return 1;
 
+    // todo: multi threads support
     // read input vcf file by line
     bcf1_t *line = bcf_init();
     while ( bcf_read(args.fp_input, args.hdr, line) == 0) {
