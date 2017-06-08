@@ -770,7 +770,6 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         
         // Deletion
 
-
         // Delins
     }
 

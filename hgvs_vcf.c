@@ -467,11 +467,12 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         bcf_update_info_string(hdr, line, "Transcript", transcript.s);
         bcf_update_info_string(hdr, line, "HGVSnom", hgvs_nom.s);
         bcf_update_info_string(hdr, line, "VarType", vartype.s);
-        if ( ivs_nom.l )
+        if ( ivs_nom.l ) {
             bcf_update_info_string(hdr, line, "IVSnom", ivs_nom.s);
-        if ( old_nom.l )
+        }
+        if ( old_nom.l ) {
             bcf_update_info_string(hdr, line, "Oldnom", old_nom.s);
-        
+        }
         bcf_update_info_string(hdr, line, "AAlength", aa_length.s);
         bcf_update_info_string(hdr, line, "ExonIntron", exon_id.s);
     }
