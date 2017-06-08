@@ -163,8 +163,9 @@ int parse_args(int argc, char **argv)
     }
     
     if ( quiet_mode == 0 ) {
-	LOG_print("The program was compiled at %s %s.", __DATE__, __TIME__);
-	LOG_print("Args: %s", args.commands.s);	
+        LOG_print("Version: %s + htslib-%s", VCFANNO_VERSION, hts_version());
+        LOG_print("Homepage: https://github.com/shiquan/vcfanno");
+	LOG_print("Args: %s", args.commands.s);
     }
     
     if ( args.fname_json == 0 ) {
@@ -241,22 +242,7 @@ int parse_args(int argc, char **argv)
     // args.hgvs_opts.hdr_out = args.hdr_out;
     
     if ( con->refgene.refgene_is_set == 1) {
-	// struct refgene_options *opts = &args.hgvs_opts;
-	// opts->hdr_out = args.hdr_out;
-	/* // parse columns of refgene */
-	/* if ( refgene_columns_parse(opts, con->refgene.columns) == 1) { */
-	/*     warnings("Init refgene columns failed; skip.."); */
-	/*     // refgene_is_init == 0  */
-	/* } else { */
-	/*     // set genepred database, this is mandatory */
-	/*     refgene_set_refgene_fname(opts, con->refgene.genepred_fname); */
-	/*     // set refseq file in fasta format */
-	/*     refgene_set_refseq_fname(opts, con->refgene.refseq_fname); */
-	/*     // set transcripts list */
-	/*     refgene_set_trans_fname(opts, con->refgene.trans_list_fname); */
-	/*     // set gene list */
-	/*     refgene_set_genes_fname(opts, con->refgene.gene_list_fname); */
-	/* } */
+
         if ( init_hgvs_anno(con->refgene.genepred_fname, con->refgene.refseq_fname, args.hdr_out) )
             return 1;
 
@@ -279,7 +265,15 @@ int parse_args(int argc, char **argv)
 
     for ( i = 0; i < con->beds.n_beds; ++i ) {
 	beds_database_add(&args.bed_opts, con->beds.files[i].fname, con->beds.files[i].columns);
-    }    
+    }
+
+    kstring_t str = { 0, 0, 0};
+    ksprintf(&str, "##vcfannoVersion=%s+htslib-%s\n", VCFANNO_VERSION, hts_version());
+    bcf_hdr_append(args.hdr_out, str.s);
+    str.l = 0;
+    ksprintf(&str, "##vcfannoCommand=%s\n", args.commands.s);
+    bcf_hdr_append(args.hdr_out, str.s);
+    free(str.s);
     // write header to output    
     bcf_hdr_write(args.fp_out, args.hdr_out);
 
@@ -292,7 +286,7 @@ int anno_core(bcf1_t *line)
     if ( bcf_get_variant_types(line) == VCF_REF )
 	return 0;
 
-    // annotate hgvs name
+    // Annotate hgvs name
     // anno_refgene_core(&args.hgvs_opts, line);
     setter_hgvs_vcf(args.hdr_out, line);
     
