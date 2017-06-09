@@ -21,7 +21,7 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
 
 
-**Protocol**
+**Protocol:**
 
 1. Download dbnsfp from homepage, and unzipped it.
 
@@ -33,27 +33,45 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    `ls`
 
-   `#belowed datasets should be found at this directory`
+   `# belowed datasets should be found at this directory`
 
-   ​
+   ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_files.png)
 
-2. Download the related README file and open it.
+2. Download the related README file and generate header file manually, all the description information could be find from README file.
 
    (1) Open this site in your browser: *https://drive.google.com/file/d/0B60wROKy6OqcSWJfRk80Q1pNU1E/view*
 
    (2) Copy or save related information into one local text file. (Please notice that the reason we keep this README file is to generate the header file for our VCF/BCF database, so just read this file and see what information you really care about.)
 
-   (3) Generate the header file for our VCF/BCF database. Please make sure you know the format of VCF header clearly. If no, please refer to *http://samtools.github.io/hts-specs/VCFv4.3.pdf* for the technical knowledge and copy my predefined demo header () for your sake.
+   (3) Generate the header file for our VCF/BCF database. Please make sure you know the format of VCF header clearly. If no, please refer to *http://samtools.github.io/hts-specs/VCFv4.3.pdf* for the technical knowledge and copy my pre-defined demo header (*https://github.com/shiquan/vcfanno/blob/master/documents/demo_header.vcf*) for your sake.
 
-   (4) 
+   (4)  Convert each chromosome dataset into BCF files. 
 
-3. Generate header file manually, all the description information could be find from README file.
+   ​	a. check the format of each chromosome dataset
 
-4. Generate BCF file with header.txt and plain text datasets.
+   ​	b. convert	
 
-5. Test database with vcfanno.
+       Usage : tsv2vcf -header|-h header.txt -r reference.fa [-force -pos column -O z -o out.vcf.gz] in.tsv.gz
+           -header, -h     header file
+           -r              reference file
+           -pos            position column, if set will skip pos,start,end column in the title
+           -start          start position column, inconsistance with -pos
+           -end            end position column, only set if need add a END tag in the INFO
+           -chr            chr column, if set will skip first column in the title
+           -force          if reference seq and fasta file are inconsistent, just give a warning
+           -rename         chromosome rename file
 
-6. Debug.
+   ​
+
+   (5)  `bcftools concat` all the chromosomes BCF files into one big BCF, and index it.
+
+   ​
+
+3. Generate BCF file with header.txt and plain text datasets.
+
+4. Test database with vcfanno.
+
+5. Debug.
 
 
 
