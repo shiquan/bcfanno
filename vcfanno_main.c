@@ -290,7 +290,7 @@ int anno_core(bcf1_t *line)
     // anno_refgene_core(&args.hgvs_opts, line);
     setter_hgvs_vcf(args.hdr_out, line);
     
-    // stat type module
+    // todo: stat type module, ti,tv etc
     
     // annotate vcf files
     anno_vcfs_core(&args.vcf_opts, line);
@@ -330,7 +330,7 @@ int main(int argc, char **argv)
         }
 	bcf_write1(args.fp_out, args.hdr_out, line);
     }
-    // debug_print("final");
+
     LOG_print("Annotate finished. Close.");
     bcf_destroy(line);
     export_reports();

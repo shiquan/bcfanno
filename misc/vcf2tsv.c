@@ -45,6 +45,7 @@ enum col_type {
     is_pos,
     is_id,
     is_filter,
+    is_qual,
     is_ref,
     is_alt,
     is_info,
@@ -119,6 +120,7 @@ void setter_filter(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_bed(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_format(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
 void setter_info(bcf_hdr_t *, bcf1_t *, col_t *, int , mval_t*);
+void setter_qual(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val);
 
 // options and handlers
 struct args {
@@ -255,6 +257,10 @@ col_t *register_key (char *p, bcf_hdr_t *h)
     else if (same_string(q, "CHROM")) {
 	c->setter = setter_chrom;
 	c->type = is_chrom;	
+    }
+    else if (same_string(q, "QUAL")) {
+        c->setter = setter_qual;
+        c->type = is_qual;
     }
     else if (same_string(q, "POS")) {
 	c->setter = setter_pos;
@@ -407,6 +413,7 @@ int convert_header()
 	    case is_alt:
 	    case is_id:
 	    case is_filter:
+            case is_qual:
 	    case is_info:
 	    case is_gt:
 	    case is_format:
