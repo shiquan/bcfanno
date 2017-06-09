@@ -1,0 +1,4 @@
+##fileformat=VCFv4.2
+##contig=<ID=chr1>
+##INFO=<ID=AF,Number=A,Type=Flag,Description="Allele frequency for each alternative alleles.">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
