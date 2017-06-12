@@ -70,6 +70,12 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    ​
 
+   The convert command could be:
+
+   `tsv2vcf -chr 1 -pos 2 -h dbnsfp_header.txt -r Homo_sapiens.GRCh38.dna.toplevel.fa dbNSFP3.4c_variant.chr1 | bcftools view -O b -o chr1.bcf`
+
+   ​
+
    (4)  `bcftools concat` all the chromosomes BCF files into one big BCF, and index it.
 
    ​
