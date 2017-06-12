@@ -10,10 +10,6 @@ Before you try to use VCFANNO, please make sure you know how to find the documen
 
 **The design of vcfanno**
 
-------------------
-
-
-
 The VCF file are currently most used to store genomic variants and other related information. For other The INFO column of VCF/BCF file could specify all possible information related with variants in one position, and 
 The core VCFANNO [htslib](http://htslib.org/)
 
@@ -23,7 +19,7 @@ The core VCFANNO [htslib](http://htslib.org/)
 
 **How to build the programs**
 
-------------------------
+
 
 
 
@@ -31,13 +27,11 @@ The core VCFANNO [htslib](http://htslib.org/)
 
 **Write configure file.**
 
---------------------
+
 
 
 
 **Generate databases for annotation.**
-
-----------
 
 
 
@@ -67,15 +61,11 @@ The core VCFANNO [htslib](http://htslib.org/)
 
 **Convert annotated vcf file to other formats.**
 
-------------
-
 
 
 
 
 **Interpret the annotations.**
-
-----------
 
 
 
