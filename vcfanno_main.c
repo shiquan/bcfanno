@@ -280,6 +280,25 @@ int parse_args(int argc, char **argv)
     vcfanno_config_destroy(con);
     return 0;
 }
+
+struct varstat {
+    uint64_t all_vars;
+    uint64_t snps;
+    uint64_t indels;
+    uint64_t ti;
+    uint64_t tv;
+    uint64_t het_x;
+    uint64_t var_x;
+} varstat = {
+    .all_vars = 0,
+    .snps = 0,
+    .indels = 0,
+    .ti = 0,
+    .tv = 0,
+    .het_x = 0,
+    .var_x = 0,
+};
+
 int anno_core(bcf1_t *line)
 {
     // do nothing for reference positions

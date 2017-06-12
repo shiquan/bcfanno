@@ -11,13 +11,49 @@ Before you try to use VCFANNO, please make sure you know how to find the documen
 The VCF file are currently most used to store genomic variants and other related information. For other The INFO column of VCF/BCF file could specify all possible information related with variants in one position, and 
 The core VCFANNO [htslib](http://htslib.org/)
 
-**Install programs**
+**Install programs.**
 
-**Write configure file**
 
-**Download databases**
 
-**Convert databases filetype**
+**Write configure file.**
 
-**Convert result to tsv/excel**
+
+
+**Generate databases for annotation.**
+
+(1) Gene region databases.
+
+(2) Allele frequency databases.
+
+* G1000
+* ExAC
+* GomAD
+* Local databases.
+
+(3) Prediction databases.
+
+* [dbNSFP](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP.md)
+* Condel
+
+(4) Genotype and phenotype databases.
+
+(5) Transcript related databases.
+
+(6) SQL databases.
+
+
+
+**Convert annotated vcf file to other formats.**
+
+
+
+**Interpret the annotations.**
+
+
+
+**Bug report or suggestions**.
+
+
+
+**Reference**
 

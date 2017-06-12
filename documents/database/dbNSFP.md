@@ -47,7 +47,7 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    ​	a. check the format of each chromosome dataset
 
-   ​
+   ![check the first line of each dataset](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_header.png)
 
    ​	b. convert	
 
