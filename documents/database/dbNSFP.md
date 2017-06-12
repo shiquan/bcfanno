@@ -54,15 +54,7 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    * Convert tablet to VCF.
 
-       Usage : tsv2vcf -header|-h header.txt -r reference.fa [-force -pos column -O z -o out.vcf.gz] in.tsv.gz
-           -header, -h     header file
-           -r              reference file
-           -pos            position column, if set will skip pos,start,end column in the title
-           -start          start position column, inconsistance with -pos
-           -end            end position column, only set if need add a END tag in the INFO
-           -chr            chr column, if set will skip first column in the title
-           -force          if reference seq and fasta file are inconsistent, just give a warning
-           -rename         chromosome rename file
+   ​
 
    **Note :**  the *-r* parameter is mandatory, because program will check each reference base in the datasets, if there are some inconsistance for genetic bases between dbNSFP (or other databases) and human genome reference, you must figure out how it comes and fix it by using right reference or change the dataset manually (I do *not* explicitly recommend change any database manually unless you know what exactly you do and bugs report to the author is suggested).
 
