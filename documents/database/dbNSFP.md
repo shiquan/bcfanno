@@ -18,6 +18,7 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 2. **bcftools**  (could be download from *http://www.htslib.org/*)
 3. **tsv2vcf**    (a part of vcfanno package, you will find this program after make package.)
 4. any perfered text editor
+5. (optional) **vcf_rename_tags**
 
 
 
@@ -76,14 +77,20 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    (4)  `bcftools concat` all the chromosomes BCF files into one big BCF, and index it.
 
-   ​
+   `bcftools concat chr1.bcf chr2.bcf chr3.bcf chr4.bcf chr5.bcf chr6.bcf chr7.bcf chr8.bcf chr9.bcf chr10.bcf chr11.bcf chr12.bcf chr13.bcf chr14.bcf chr15.bcf chr16.bcf chr17.bcf chr18.bcf chr19.bcf chr20.bcf chr21.bcf chr22.bcf chrX.bcf chrY.bcf chrM.bcf -O b -o dbNSFPv3.4c.bcf`
+
+   `bcftools index dbNSFPv3.4c.bcf ` 
+
+   (5)  If you need rename chromosomes, use vcf_rename_tags rename the chromosome names.
+
+   `vcf_rename_tags -list contig.txt dbNSFPv3.4c.bcf -O b -o dbNSFPv3.4c.renames.bcf`
+
+   *Note:* contig.txt could be found at 
 
 3. Test database with vcfanno.
 
-   ​
-
-4. Debug.
-
+   * Edit your configure file and add new database.
+   * Debug.
 
 
 
