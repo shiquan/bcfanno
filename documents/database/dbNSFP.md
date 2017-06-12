@@ -16,9 +16,9 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
 1. Free internet connection to access the homepage. For users from mainland of China, updated datasets could be found at *ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/*.
 2. **bcftools**  (could be download from *http://www.htslib.org/*)
-3. **tsv2vcf**    (a part of vcfanno package, you will find this program after make package.)
+3. **tsv2vcf**    (a sub program of vcfanno package, you will find this program after make package.)
 4. any perfered text editor
-5. (optional) **vcf_rename_tags**
+5. (optional) **vcf_rename_tags** (a sub program of vcfanno package)
 
 
 
@@ -81,15 +81,32 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    `bcftools index dbNSFPv3.4c.bcf ` 
 
-   (5)  If you need rename chromosomes, use vcf_rename_tags rename the chromosome names.
+   (5)  If you need rename chromosomes, like if you download UCSC reference and the chromosome name is different in dbNSFP, use vcf_rename_tags rename the chromosome names.
 
    `vcf_rename_tags -list contig.txt dbNSFPv3.4c.bcf -O b -o dbNSFPv3.4c.renames.bcf`
 
-   *Note:* contig.txt could be found at 
+   `bcftools index dbNSFPv3.4c.renames.bcf`
+
+   *Note:* contig.txt could be found at https://github.com/shiquan/vcfanno/blob/master/documents/database/contig.txt
+
+   ​
 
 3. Test database with vcfanno.
 
    * Edit your configure file and add new database.
+
+     "vcfs": [
+
+     ​	{
+
+     "columns":"SIFT_score,Polyphen2_HDIV_score,Polyphen2_HVAR_score,LRT_score,LRT_pred,MutationTaster_score,MutationTaster_pred,MutationAssessor_pred,FATHMM_pred,PROVEAN_pred,CADD_raw,fathmm-MKL_coding_score,MetaSVM_score,MetaLR_score,GERP++_RS,SiPhy_29way_logOdds",
+
+     "file":"*<u>path to bcf database</u>*",
+
+     ​	},
+
+     ]
+
    * Debug.
 
 
@@ -97,7 +114,11 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
 ***FAQ***
 
-1. ​
+1. How to convert dbscsnv database?
+
+   Follow above protocol to download dbscsnv database and build the description file and convert the database by using same programs then.
+
+   ​
 
 
 
