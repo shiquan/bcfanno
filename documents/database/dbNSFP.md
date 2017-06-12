@@ -66,6 +66,10 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    ​
 
+   ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/tsv2vcf_con.png)
+
+   ​
+
    (4)  `bcftools concat` all the chromosomes BCF files into one big BCF, and index it.
 
    ​
