@@ -68,8 +68,6 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/tsv2vcf_con.png)
 
-   ​
-
    The convert command could be:
 
    `tsv2vcf -chr 1 -pos 2 -h dbnsfp_header.txt -r Homo_sapiens.GRCh38.dna.toplevel.fa dbNSFP3.4c_variant.chr1 | bcftools view -O b -o chr1.bcf`
