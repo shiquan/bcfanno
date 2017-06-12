@@ -54,7 +54,7 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    * Convert tablet to VCF.
 
-   ​
+   ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/tsv2vcf.png)
 
    **Note :**  the *-r* parameter is mandatory, because program will check each reference base in the datasets, if there are some inconsistance for genetic bases between dbNSFP (or other databases) and human genome reference, you must figure out how it comes and fix it by using right reference or change the dataset manually (I do *not* explicitly recommend change any database manually unless you know what exactly you do and bugs report to the author is suggested).
 
