@@ -13,7 +13,7 @@ CC       = gcc
 CFLAGS   = -Wall -O3 -DHTS3
 DEBUG_CFLAGS   = -g -Wall -O0 -DHTS3
 DFLAGS   =
-INCLUDES = -I. -I$(HTSDIR)/
+INCLUDES = -I src/ -I. -I$(HTSDIR)/
 
 
 all:$(PROG)
@@ -64,7 +64,7 @@ vcf2tsv: $(HTSLIB) version.h
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
 
 tsv2vcf: $(HTSLIB) version.h
-	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/tsv2vcf.c $(HTSLIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/tsv2vcf.c src/table2hash.c $(HTSLIB)
 
 vcf_rename_tags: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)

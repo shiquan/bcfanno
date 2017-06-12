@@ -169,8 +169,8 @@ int parse_args(int argc, char **argv)
     }
     
     if ( args.fname_json == 0 ) {
-	fprintf(stderr, "[error] No configure file is specified. Please define -c or --config argument first.\n");
-	fprintf(stderr, "[notice] Please DONOT puts this error message into emails or forum. This issue could be easily fixed by reading our manual carefully.\n");
+	fprintf(stderr, "[error] No configure file is specified. Use -h for help message.\n");
+	fprintf(stderr, "[notice] %s.\n", BE_SMART_STRING);
 	return 1;
     }
 
