@@ -38,11 +38,17 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_files.png)
 
+   ​
+
 2. Download the related README file and generate INFO descriptions file manually, all the description information could be find from README file.
+
+   ​
 
    (1) Open README file (this file could be found at dbNSFP package).
 
-   (2) Generate the INFO descriptions for our VCF/BCF database. Please make sure you know the format of VCF header clearly. If no, please refer to *http://samtools.github.io/hts-specs/VCFv4.3.pdf* for the technical knowledge and copy my pre-defined demo INFO description file (*https://github.com/shiquan/vcfanno/blob/master/documents/demo_header.vcf*) for your sake.
+   ​
+
+   (2) Generate the INFO descriptions for our VCF/BCF database. Please make sure you know the format of VCF header clearly. If no, please refer to *http://samtools.github.io/hts-specs/VCFv4.3.pdf* for the technical knowledge and copy my pre-defined demo INFO description file (*https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_header.txt*) for your sake.
 
    ​
 
@@ -66,7 +72,11 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
 3. Test database with vcfanno.
 
+   ​
+
 4. Debug.
+
+
 
 
 
