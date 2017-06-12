@@ -52,7 +52,7 @@ The core VCFANNO [htslib](http://htslib.org/)
 
 (3) Prediction databases.
 
-* [How to generate dbNSFP database.](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP.md)
+* [How to generate dbNSFP and dbscsnv databases.](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP.md)
 * Condel
 
 (4) Genotype and phenotype databases.

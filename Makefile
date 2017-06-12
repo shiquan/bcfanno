@@ -1,4 +1,4 @@
-PROG=       vcfanno
+PROG=       vcfanno vcf2tsv tsv2vcf vcf_rename_tags
 DEBUG_PROG= vcfanno_debug
 
 all: $(PROG)
@@ -55,10 +55,10 @@ force:
 #	$(CC) -D_HGVS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ sequence.c genepred.c hgvs_generate.c $(HTSLIB)
 
 vcfadd: $(HTSLIB) 
-	$(CC) -D_VCF_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ vcf_annos.c json_config.c config.c kson.c vcmp.c $(HTSLIB)
+	$(CC) -D_VCF_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/vcf_annos.c src/json_config.c src/config.c src/kson.c src/vcmp.c $(HTSLIB)
 
 bedadd: $(HTSLIB) 
-	$(CC) -D_BED_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ anno_bed.c json_config.c config.c kson.c $(HTSLIB)
+	$(CC) -D_BED_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/anno_bed.c src/json_config.c src/config.c src/kson.c $(HTSLIB)
 
 vcf2tsv: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
@@ -70,10 +70,10 @@ vcf_rename_tags: $(HTSLIB) version.h
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
 vcfanno: $(HTSLIB) version.h 
-	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ vcfanno_main.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs.c hgvs_vcf.c number.c vcmp.c json_config.c config.c kson.c file.c sort_list.c $(HTSLIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/vcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c $(HTSLIB)
 
 vcfanno_debug: $(HTSLIB) version.h
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ vcfanno_main.c vcf_annos.c anno_bed.c sequence.c genepred.c hgvs.c hgvs_vcf.c number.c vcmp.c json_config.c config.c kson.c file.c sort_list.c $(HTSLIB)
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/vcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c $(HTSLIB)
 
 test: $(HTSLIB) version.h vcfadd bedadd
 
