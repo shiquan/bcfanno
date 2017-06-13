@@ -205,12 +205,12 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
             }
         }
         if ( type->loc_amino > 0 && des->type == var_type_snp ) {
-                if ( type->ori_amino != type->mut_amino ) {
-                    ksprintf(&string, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino],
-                             codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
-            } else {
-                kputs("(p.=)", &string);
-            }
+            //if ( type->ori_amino != type->mut_amino ) {
+            ksprintf(&string, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino],
+                     codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+                //} else {
+                //kputs("(p.=)", &string);
+                //}
         }
     }
     return string.s;

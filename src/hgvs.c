@@ -592,48 +592,53 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
 } while(0)
 
     if ( line->strand == '+' ) {
-        for ( i = 0, h = 0; i < line->exon_count; ++i ) {
-            if ( pos >= line->exons[BLOCK_START][i] && pos <= line->exons[BLOCK_END][i] ) {
-                if ( pos < line->exons[BLOCK_START][i] + SPLIT_RANGE || pos > line->exons[BLOCK_END][i] - SPLIT_RANGE) {
+        for ( i = 0, h = 0; i < line->exon_count; ) {
+            if ( line->loc[BLOCK_END][i] > line->utr5_length &&
+                 pos > line->utr5_length &&
+                 pos <= line->reference_length - line->utr3_length)
+                h++;
+
+            if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i] ) {
+                if ( pos < line->loc[BLOCK_START][i] + SPLIT_RANGE || pos > line->loc[BLOCK_END][i] - SPLIT_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
 
-                if ( line->exons[BLOCK_END][i] > line->utr5_length &&
-                     pos > line->utr5_length &&
-                     pos <= line->reference_length - line->utr3_length)
-                    h++;
-                
                 break;
             }
+            ++i;
         }
-        if ( offset > 0 ) {
-            type->count = i + 1;
-            type->count2 = 0;
-        } else {
-            type->count = i;
+        
+        if ( offset == 0 ) {
+            type->count = i+1;
             type->count2 = h;
+        } else {
+            type->count = offset < 0 ? i : i + 1;
+            type->count2 = 0;
         }
     } else {
-        for ( i = 0, h = 0; i < line->exon_count; ++i ) {
+        for ( i = 0, h = 0; i < line->exon_count; ) {
             int j = line->exon_count - i - 1;
-            if ( pos >= line->exons[BLOCK_END][j] && pos <= line->exons[BLOCK_START][j] ) {
-                if ( pos < line->exons[BLOCK_END][j] + SPLIT_RANGE || pos > line->exons[BLOCK_START][j] - SPLIT_RANGE) {
+            if ( line->loc[BLOCK_START][j] > line->utr5_length &&
+                 pos > line->utr5_length &&
+                 pos <= line->reference_length - line->utr3_length)
+                h++;
+
+            if ( pos >= line->loc[BLOCK_END][j] && pos <= line->loc[BLOCK_START][j] ) {
+                if ( pos < line->loc[BLOCK_END][j] + SPLIT_RANGE || pos > line->loc[BLOCK_START][j] - SPLIT_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
-                if ( line->exons[BLOCK_START][i] > line->utr5_length &&
-                     pos > line->utr5_length &&
-                     pos <= line->reference_length - line->utr3_length)
-                    h++;
                 break;
-            }                
+            }
+            ++i;
         }
-        if ( offset > 0 ) {
-            type->count = i + 1;
-            type->count2 = 0;
-        } else {
-            type->count = i;
+            
+        if ( offset == 0 ) {
+            type->count = i+1;
             type->count2 = h;
-        }        
+        } else {
+            type->count = offset < 0 ? i : i + 1;
+            type->count2 = 0;
+        }
     }
     
     if ( offset != 0 ) {        
