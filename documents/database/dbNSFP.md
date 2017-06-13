@@ -118,7 +118,7 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
    Follow above protocol to download dbscsnv database and build the description file and convert the database by using same programs then.
 
-2.  If I use hg19 (GRCh37), which dbNSFP version should I download?
+2. If I use hg19 (GRCh37), which dbNSFP version should I download?
 
    My suggestion is dbNSFP **v2.9.1**, but you can always download the most updated version and convert the inconsistent reference bases manually.
 
