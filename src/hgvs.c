@@ -652,6 +652,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     
     // Check if noncoding transcript.
     if ( line->cdsstart == line->cdsend ) {
+        // no cds count for noncoding transcript
+        type->count2 = 0;
         if ( line->strand == '+') {
             for ( i = 0; i < line->exon_count; ++i ) {
                 if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i]) {

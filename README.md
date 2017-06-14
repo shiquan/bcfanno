@@ -75,5 +75,9 @@ The core VCFANNO [htslib](http://htslib.org/)
 
 
 
+**The story behind bcfanno.**
+
+
+
 **Reference**
 
