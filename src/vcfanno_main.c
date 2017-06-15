@@ -276,7 +276,7 @@ int parse_args(int argc, char **argv)
     free(str.s);
     // write header to output    
     bcf_hdr_write(args.fp_out, args.hdr_out);
-
+    
     vcfanno_config_destroy(con);
     return 0;
 }
@@ -349,8 +349,8 @@ int main(int argc, char **argv)
         }
 	bcf_write1(args.fp_out, args.hdr_out, line);
     }
-
-    LOG_print("Annotate finished. Close.");
+    if ( quiet_mode == 0 )
+        LOG_print("Annotate finished. Close.");
     bcf_destroy(line);
     export_reports();
     args_destroy();
