@@ -18,6 +18,26 @@ struct hgvs_spec {
     regex_t *exp;
 } spec;
 
+struct splice_sites_definition {
+    int splice_sites5_upstream;
+    int splice_sites5_downstream;
+    int splice_sites3_upstream;
+    int splice_sites3_downstream;
+} ss = {
+    .splice_sites5_downstream = 3,
+    .splice_sites5_upstream = 3,
+    .splice_sites3_upstream = 3,
+    .splice_sites3_downstream = 3,
+};
+
+void splice_sites_definition_update(int downstream5, int upstream5, int downstream3, int upstream3)
+{
+    ss.splice_sites5_downstream = downstream5;
+    ss.splice_sites5_upstream = upstream5;
+    ss.splice_sites3_downstream = downstream3;
+    ss.splice_sites3_upstream = upstream3;
+}
+
 void hgvs_core_clear(struct hgvs_core *core)
 {
     if ( core->name.name1 != NULL)
@@ -599,7 +619,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 h++;
 
             if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i] ) {
-                if ( pos < line->loc[BLOCK_START][i] + SPLIT_RANGE || pos > line->loc[BLOCK_END][i] - SPLIT_RANGE) {
+                if ( pos <= line->loc[BLOCK_START][i] + SPLIT_RANGE || pos >= line->loc[BLOCK_END][i] - SPLIT_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
 
@@ -607,7 +627,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             }
             ++i;
         }
-        
+
         if ( offset == 0 ) {
             type->count = i+1;
             type->count2 = h;
@@ -624,9 +644,9 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 h++;
 
             if ( pos >= line->loc[BLOCK_END][j] && pos <= line->loc[BLOCK_START][j] ) {
-                if ( pos < line->loc[BLOCK_END][j] + SPLIT_RANGE || pos > line->loc[BLOCK_START][j] - SPLIT_RANGE) {
+                if ( pos <= line->loc[BLOCK_END][j] + SPLIT_RANGE || pos >= line->loc[BLOCK_START][j] - SPLIT_RANGE) {
                     type->vartype = var_is_splice_site;
-                }
+                }                
                 break;
             }
             ++i;
@@ -640,6 +660,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             type->count2 = 0;
         }
     }
+    // check if variantion located in the splice sites around the edge of utr and cds regions
     
     if ( offset != 0 ) {        
         if ( offset < SPLIT_RANGE && offset > -SPLIT_RANGE ) {
@@ -648,7 +669,12 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             type->vartype = var_is_intron;
         }
         goto no_amino_code;
+    } else if ( pos > line->utr5_length - SPLIT_RANGE && pos < line->utr5_length + SPLIT_RANGE ) {
+        type->vartype = var_is_splice_site;
+    } else if ( line->reference_length - pos > line->utr3_length - SPLIT_RANGE && line->reference_length -pos < line->utr3_length + SPLIT_RANGE ) {
+        type->vartype = var_is_splice_site;
     }
+    
     
     // Check if noncoding transcript.
     if ( line->cdsstart == line->cdsend ) {
@@ -657,7 +683,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         if ( line->strand == '+') {
             for ( i = 0; i < line->exon_count; ++i ) {
                 if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i]) {
-                    if ( pos < line->loc[BLOCK_START][i] + SPLIT_RANGE || pos > line->loc[BLOCK_END][i] - SPLIT_RANGE ) {
+                    if ( pos <= line->loc[BLOCK_START][i] + SPLIT_RANGE || pos >= line->loc[BLOCK_END][i] - SPLIT_RANGE ) {
                         type->vartype = var_is_splice_site;
                     } else {
                         type->vartype = var_is_noncoding;
@@ -668,7 +694,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         } else {
             for ( i = 0; i < line->exon_count; ++i ) {
                 if ( pos <= line->loc[BLOCK_START][i] && pos >= line->loc[BLOCK_END][i]) {
-                    if ( pos < line->loc[BLOCK_END][i] + SPLIT_RANGE || pos > line->loc[BLOCK_START][i] -SPLIT_RANGE ) {
+                    if ( pos <= line->loc[BLOCK_END][i] + SPLIT_RANGE || pos >= line->loc[BLOCK_START][i] -SPLIT_RANGE ) {
                         type->vartype = var_is_splice_site;
                     } else {
                         type->vartype = var_is_noncoding;
@@ -765,11 +791,14 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             }
         } else {
             if ( type->ori_amino == 0 ) {
-                type->vartype = var_is_stop_lost;
+                //type->vartype = var_is_stop_lost;
+                BRANCH(var_is_stop_lost);
             } else if ( type->mut_amino == 0 ) {
-                type->vartype = var_is_nonsense;
+                //type->vartype = var_is_nonsense;
+                BRANCH(var_is_nonsense);
             } else {
-                type->vartype = var_is_missense;
+                //type->vartype = var_is_missense;
+                BRANCH(var_is_missense);
             }
         }                
     } else {
