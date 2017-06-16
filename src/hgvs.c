@@ -1,3 +1,5 @@
+// TODO: frameshift, document
+//
 #include "utils.h"
 #include "hgvs.h"
 #include "genepred.h"
@@ -106,6 +108,7 @@ enum nametype {
     name_is_coding_rna,
     name_is_noncoding_rna,
 };
+
 static int convert_loc2position(struct genepred_line *line, int location, int offset)
 {
     int i;
