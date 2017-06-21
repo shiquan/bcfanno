@@ -1208,7 +1208,7 @@ int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
 		if ( col->setter.vcf(opts, line, col, dat) ) {
-                    error_return("[%s] databases : %s.\n", __func__, file->fname);
+                    error_return("databases : %s.\n", file->fname);
                     return 1;
                 }
 	    }
