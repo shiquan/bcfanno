@@ -66,6 +66,12 @@
 	exit(EXIT_FAILURE);						\
     }while(0)
 
+#define error_return(line, ...) do						\
+    {									\
+	fprintf(stderr, ANSI_COLOR_RED "[error] [func: %s, line: %d] " ANSI_COLOR_RESET ANSI_COLOR_MAGENTA line ANSI_COLOR_RESET "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \
+	errno = 0;							\
+    }while(0)
+
 #define error_print(line, ...) do						\
     {									\
 	fprintf(stderr, "[error] [func: %s, line: %d] " line "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__); \

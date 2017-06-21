@@ -168,9 +168,10 @@ int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(opts->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
-    if ( !map )
-        error("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos +1);
-
+    if ( !map ) {
+        error_return("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos +1);
+        return 1;
+    }
     // fill in any missing values in the target VCF (or all, if not present)
     int ntmpi2 = bcf_get_info_float(opts->hdr_out, line, col->hdr_key, &opts->tmpi2, &opts->mtmpi2);
     if ( ntmpi2 < ndst )
