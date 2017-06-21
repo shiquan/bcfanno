@@ -162,17 +162,17 @@ int vcf_setter_info_flag(struct vcfs_options *opts, bcf1_t *line, struct anno_co
 int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpi)
 {
     if ( col->number==BCF_VL_A && ntmpi!=nals-1 && (ntmpi!=1 || opts->tmpi[0]!=bcf_int32_missing || opts->tmpi[1]!=bcf_int32_vector_end) ) {
-        error_return("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1);
+        error_return("Incorrect number of values (%d) for the %s tag at %s:%d", ntmpi, col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1);
         return 1;
     } else if ( col->number==BCF_VL_R && ntmpi!=nals && (ntmpi!=1 || opts->tmpi[0]!=bcf_int32_missing || opts->tmpi[1]!=bcf_int32_vector_end) ) {
-        error_return("Incorrect number of values (%d) for the %s tag at %s:%d\n", ntmpi, col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1);
+        error_return("Incorrect number of values (%d) for the %s tag at %s:%d", ntmpi, col->hdr_key, bcf_seqname(opts->hdr_out,line), line->pos+1);
         return 1;
     }
 
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(opts->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
     if ( !map ) {
-        error_return("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos +1);
+        error_return("REF alleles not compatible at %s:%d", bcf_seqname(opts->hdr_out, line), line->pos +1);
         return 1;
     }
     // fill in any missing values in the target VCF (or all, if not present)
@@ -393,7 +393,7 @@ int setter_ARinfo_string(struct vcfs_options *opts, bcf1_t *line, struct anno_co
     int ndst = col->number==BCF_VL_A ? line->n_allele - 1 : line->n_allele;
     int *map = vcmp_map_ARvalues(opts->vcmp,ndst,nals,als,line->n_allele,line->d.allele);
     if ( !map ) {
-        error_return("REF alleles not compatible at %s:%d\n", bcf_seqname(opts->hdr_out, line), line->pos+1);
+        error_return("REF alleles not compatible at %s:%d", bcf_seqname(opts->hdr_out, line), line->pos+1);
         return 1;
     }
 
@@ -581,7 +581,7 @@ int setter_format_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *
             char *end = str;
             ptr[ival] = strtol(str, &end, 10); 
             if ( end==str ) {
-                error_return("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
+                error_return("Could not parse %s at %s:%d .. [%s]", col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
                 return 1;
             }
             ival++;
@@ -622,7 +622,7 @@ int setter_format_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col 
             char *end = str;
             ptr[ival] = strtod(str, &end); 
             if ( end==str ) {
-                error_return("Could not parse %s at %s:%d .. [%s]\n", col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
+                error_return("Could not parse %s at %s:%d .. [%s]", col->hdr_key,bcf_seqname(opts->hdr_out,line),line->pos+1,tab->cols[col->icol]);
                 return 1;
             }
             ival++;
@@ -1208,7 +1208,7 @@ int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
 		if ( col->setter.vcf(opts, line, col, dat) ) {
-                    fprintf(stderr, "[%s] databases : %s.\n", __func__, file->fname);
+                    error_return("[%s] databases : %s.\n", __func__, file->fname);
                     return 1;
                 }
 	    }
