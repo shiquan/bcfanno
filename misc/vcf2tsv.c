@@ -557,24 +557,45 @@ int convert_line_no_gt(bcf_hdr_t *hdr, bcf1_t *line)
     int n_alleles = 1;
     set_matrix_cache(cache, n_alleles);
 
-    int i, k;
+    int i, k, j;
 
     for (i=0; i<cache->m_samples; ++i) { 
 	// iterate samples
 	mcache_ps_t *ps = &cache->mcols[i];
 	//ps->n_alleles = n_alleles;
-        mcache_pa_t *pa = &ps->alvals[0];
-        for (k = 0; k < pa->n_cols; ++k) {		
-            col_t *col = args.convert->cols[k];
-            mval_t *val = &pa->mvals[k];		
-            val->type = col->type;
-            val->sample_id = i;		
-            col->setter(hdr, line, col, -1, val);
-            if ( k )
-                kputc('\t', args.mempool);
-            kputs(val->a.s, args.mempool);
-        } // end cols
-        kputc('\n', args.mempool);
+        for (j = 0; j < ps->n_alleles; ++j ) {
+            mcache_pa_t *pa = &ps->alvals[0];
+
+            int iallele = -1;
+            if (args.split_flag & SPLIT_ALT)
+                iallele = j;
+            for (k = 0; k < pa->n_cols; ++k) {		
+                col_t *col = args.convert->cols[k];
+                mval_t *val = &pa->mvals[k];		
+                val->type = col->type;
+                val->sample_id = i;		
+                /* setter function */
+                col->setter(hdr, line, col, iallele, val);
+                if (k) kputc('\t', args.mempool);
+                kputs(val->a.s, args.mempool);
+                //debug_print("%s", val->a.s);
+            } // end cols
+            kputc('\n', args.mempool);
+
+            if ( !(args.split_flag & SPLIT_ALT))
+                break;
+        }
+        /* for (k = 0; k < pa->n_cols; ++k) {		 */
+        /*     col_t *col = args.convert->cols[k]; */
+        /*     mval_t *val = &pa->mvals[k];		 */
+        /*     val->type = col->type; */
+        /*     val->sample_id = i;		 */
+        /*     col->setter(hdr, line, col, -1, val); */
+        /*     if ( k ) */
+        /*         kputc('\t', args.mempool); */
+        /*     kputs(val->a.s, args.mempool); */
+        /* } // end cols */
+        /* kputc('\n', args.mempool); */
     }  // end samples
     return 0;
 }

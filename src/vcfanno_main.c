@@ -16,7 +16,7 @@
 #include "hgvs_vcf.h"
 #include "genepred.h"
 
-const char *vcfanno_version = "version 0.0.5";
+// const char *vcfanno_version = "version 0.0.5";
 // cache ANNOCORE_BUFFER_LINES lines into buffers; for each buffer pool all lines come from one chromosome,
 // if no enough lines, just put as much as possible
 #define ANNOCORE_BUFFER_LINES 1000
