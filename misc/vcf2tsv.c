@@ -521,12 +521,16 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 #undef BRANCH
                 if ( skip_uncover || skip_ref)
                     continue;
+
             }
             
             mcache_pa_t *pa = &ps->alvals[j];
 	    int iallele = -1;
 	    if (args.split_flag & SPLIT_ALT)
                 iallele = j;
+            if ( iallele == 0 && args.skip_ref == 1 )
+                continue;
+            
 	    for (k = 0; k < pa->n_cols; ++k) {		
 		col_t *col = args.convert->cols[k];
 		mval_t *val = &pa->mvals[k];		
