@@ -1,10 +1,14 @@
 
-VCFANNO
+BCFANNO
 ----------
 
-VCFANNO was designed to annotate VCF/BCF files by using local and online databases. The early propose was design an efficient standalone program and put all the annotate informations in the seperated tags in VCF file.
+*release v1.0 :  first stable version, renamed vcfanno to bcfanno.*
 
-Before you try to use VCFANNO, please make sure you know how to find the document of [VCF/BCF format](https://samtools.github.io/hts-specs/VCFv4.2.pdf).
+
+
+bcfanno was designed to annotate VCF/BCF files by using local and online databases. The early propose was design an efficient standalone program and put all the annotate informations in the seperated tags in VCF file.
+
+Before you try to use bcfanno, please make sure you know how to find the document of [VCF/BCF format](https://samtools.github.io/hts-specs/VCFv4.2.pdf).
 
 
 
