@@ -41,6 +41,7 @@ int usage()
     fprintf(stderr, "   -c, --config <file>            configure file, include annotations and tags, see man page for details\n");
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
+    fprintf(stderr, "   -q                             quiet mode\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
     fprintf(stderr, "\n");
@@ -307,17 +308,17 @@ int anno_core(bcf1_t *line)
 
     // Annotate hgvs name
     // anno_refgene_core(&args.hgvs_opts, line);
-    if (setter_hgvs_vcf(args.hdr_out, line) )
+    if (setter_hgvs_vcf(args.hdr_out, line) == 1)
         return 1;
     
     // todo: stat type module, ti,tv etc
     
     // annotate vcf files
-    if (anno_vcfs_core(&args.vcf_opts, line) )
+    if (anno_vcfs_core(&args.vcf_opts, line) == 1)
         return 1;
  
     // annotate bed format datasets
-    if (anno_beds_core(&args.bed_opts, line) )
+    if (anno_beds_core(&args.bed_opts, line) == 1)
         return 1;
 
     // annotate transcript related bed format datasets

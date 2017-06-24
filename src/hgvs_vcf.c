@@ -106,7 +106,8 @@ int init_hgvs_anno(const char *data, const char *fasta, bcf_hdr_t *hdr)
 
 int close_hgvs_anno()
 {
-    hgvs_spec_destroy();
+    if ( init_flag == 1 )
+        hgvs_spec_destroy();
     
     return 0;
 }
