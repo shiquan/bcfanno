@@ -78,27 +78,14 @@ Step 3, write configure file for bcfanno.
 Create *clinvar.json*, and this file should be looked like
 
 ```
-
-```
-
 {
-
-​	"vcfs":[
-
-​		{
-
-​		"file":"path to clinvar.vcf.gz",
-
-​		"columns":"RS,CLNSIG",
-
-​		},
-
-​	],
-
+        "vcfs":[
+        	{
+                	"file":"path to clinvar.vcf.gz",
+                        "columns":"RS,CLNSIG",
+                },
+         ],
 }
-
-```
-
 ```
 
 Step 4, annotation. (If you are in the example directory now you can just run this command)
@@ -117,40 +104,22 @@ After annotation.
 
 ## **Write configure file.**
 
-Configure file should be wrote in json format. Please remember we have some reserved keywords. Just copy the demo.json in the example directory and edit your own configure file from it.
+Configure file should be wrote in json format. Please remember we have some reserved keywords. Just copy the demo.json in the example directory and edit your own configure file from 
 
-```
-
-```
-
+```json
 {
-
-"id":"configure ID and version",
-
-"author":"author of this configure file",
-
-"ref":"hg19",  // hg19 or hg38
-
-"hgvs":{
-
-​    "gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
-
-​    "refseq":"/opt/databases/refgene/refMrna.fa.gz",
-
-},
-
-"vcfs":[    
-
-],
-
-"beds":[
-
-],
-
+        "id":"configure ID and version",
+        "author":"author of this configure file",
+        "ref":"hg19",  // hg19 or hg38
+        "hgvs":{
+                "gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
+                "refseq":"/opt/databases/refgene/refMrna.fa.gz",
+        },
+        "vcfs":[    
+        ],
+        "beds":[
+        ],
 }
-
-```
-
 ```
 
 ## **Convert annotated vcf file to other formats.**
