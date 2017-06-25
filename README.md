@@ -1,12 +1,12 @@
 
 BCFANNO
-----------
+==========
 
 *release v1.0 :  first stable version, renamed vcfanno to bcfanno.*
 
 
 
-**Introduction**
+## **Introduction**
 
 bcfanno was designed to annotate VCF/BCF files by using local and online databases. bcfanno support three kinds of databases which list below. And users could download and build open source or in house databases manually. Please refer to **database** section for the details.
 
@@ -14,7 +14,7 @@ Borrow the advances of VCF format, bcfanno was designed to put all the annotated
 
 
 
-**How to build the programs**
+## **How to build the programs**
 
 *prerequisite:*
 
@@ -43,7 +43,7 @@ Following execute programs should be compiled after several miniters.
 
   ​
 
-**Databases**
+## **Databases**
 
 bcfanno support THREE kinds of databases,
 
@@ -57,7 +57,7 @@ Before you try to use any database, please try to classify the data and follow t
 
 
 
-**Generate databases for bcfanno**
+## **Generate databases for bcfanno**
 
 Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at [More details about databases](https://github.com/shiquan/vcfanno/blob/master/documents/database/more_details.md).
 
@@ -77,7 +77,7 @@ Step 3, write configure file for bcfanno.
 
 Create *clinvar.json*, and this file should be looked like
 
-{
+`{`
 
 ​	"vcfs":[
 
@@ -91,7 +91,7 @@ Create *clinvar.json*, and this file should be looked like
 
 ​	],
 
-}
+`}`
 
 
 
@@ -109,48 +109,46 @@ After annotation.
 
 
 
-**Write configure file.**
+## **Write configure file.**
 
 Configure file should be wrote in json format. Please remember we have some reserved keywords. Just copy the demo.json in the example directory and edit your own configure file from it.
 
-{
-"id":"local_test",
-"author":"shiquan@genomics.cn",
-"ref":"hg19", 
-"hgvs":{
+`{`
+`"id":"configure ID and version",`
+`"author":"author of this configure file",`
+`"ref":"hg19",  // hg19 or hg38`
+`"hgvs":{`
 
-	“gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
+	"gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
 	"refseq":"/opt/databases/refgene/refMrna.fa.gz",
-},
-"vcfs":[
+`},`
+`"vcfs":[`
 ​      
-],
-"beds":[
+`],`
+`"beds":[`
 ​      
-],
-}
+`],`
+`}`
 
 
 
-**Convert annotated vcf file to other formats.**
-
-
-
-
-
-**Interpret the annotations.**
+## **Convert annotated vcf file to other formats.**
 
 
 
 
 
-**Bug report or suggestions**.
+## **Interpret the annotations.**
 
 
 
-**The story behind bcfanno.**
+
+
+## **Bug report or suggestions**.
 
 
 
-**Reference**
+
+
+## **Reference**
 
