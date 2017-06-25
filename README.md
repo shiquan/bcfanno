@@ -77,9 +77,11 @@ Step 3, write configure file for bcfanno.
 
 Create *clinvar.json*, and this file should be looked like
 
-```{
+```
 
 ```
+
+{
 
 ​	"vcfs":[
 
@@ -117,9 +119,11 @@ After annotation.
 
 Configure file should be wrote in json format. Please remember we have some reserved keywords. Just copy the demo.json in the example directory and edit your own configure file from it.
 
-```{
+```
 
 ```
+
+{
 
 "id":"configure ID and version",
 
@@ -143,7 +147,11 @@ Configure file should be wrote in json format. Please remember we have some rese
 
 ],
 
-}```
+}
+
+```
+
+```
 
 ## **Convert annotated vcf file to other formats.**
 
