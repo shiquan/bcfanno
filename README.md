@@ -77,7 +77,9 @@ Step 3, write configure file for bcfanno.
 
 Create *clinvar.json*, and this file should be looked like
 
-`{`
+```{
+
+```
 
 ​	"vcfs":[
 
@@ -91,9 +93,11 @@ Create *clinvar.json*, and this file should be looked like
 
 ​	],
 
-`}`
+}
 
+```
 
+```
 
 Step 4, annotation. (If you are in the example directory now you can just run this command)
 
@@ -113,24 +117,33 @@ After annotation.
 
 Configure file should be wrote in json format. Please remember we have some reserved keywords. Just copy the demo.json in the example directory and edit your own configure file from it.
 
-`{`
-`"id":"configure ID and version",`
-`"author":"author of this configure file",`
-`"ref":"hg19",  // hg19 or hg38`
-`"hgvs":{`
+```{
 
-	"gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
-	"refseq":"/opt/databases/refgene/refMrna.fa.gz",
-`},`
-`"vcfs":[`
-​      
-`],`
-`"beds":[`
-​      
-`],`
-`}`
+```
 
+"id":"configure ID and version",
 
+"author":"author of this configure file",
+
+"ref":"hg19",  // hg19 or hg38
+
+"hgvs":{
+
+​    "gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
+
+​    "refseq":"/opt/databases/refgene/refMrna.fa.gz",
+
+},
+
+"vcfs":[    
+
+],
+
+"beds":[
+
+],
+
+}```
 
 ## **Convert annotated vcf file to other formats.**
 
