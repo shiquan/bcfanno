@@ -155,7 +155,7 @@ static int parse_position(char *ss, char *se, struct genepred_line *line)
     int position = 0;
     int offset = 0;
     // Assume all the position located in the cds region first. For intron region, offset should NOT be 0, and
-    // pos_type is the type of nearby region.        
+    // pos_type is the type of nearby region.
     enum func_region_type pos_type = func_region_cds;
     char *s1 = ss;
     char *s2;

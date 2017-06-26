@@ -14,17 +14,26 @@ Borrow the advances of VCF format, bcfanno was designed to put all the annotated
 
 
 
+## Bechmark
+
+bcfanno annotate a WGS vcf with specified 22 databases in 6 CPU hours. bcfanno usually do not parse the FORMAT of vcf files, and all the annotators (*tags*) will be put into the INFO region, so it is suggested to merge multiple samples by `bcftools merge` before annotation.
+
+
+
+
+
 ## **How to build the programs**
 
 *prerequisite:*
 
 * zlib
 
-`git clone https://github.com/shiquan/vcfanno.git`
+```
 
-`cd vcfanno`
-
-`make`
+git clone https://github.com/shiquan/vcfanno.git
+cd vcfanno
+make
+```
 
 Following execute programs should be compiled after several miniters.
 
@@ -60,7 +69,6 @@ Before you try to use any database, please try to classify the data and follow t
 ## **Generate databases for bcfanno**
 
 Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at [More details about databases](https://github.com/shiquan/vcfanno/blob/master/documents/database/more_details.md).
-
 
 
 *Instruction to build dbsnp for bcfanno:*
@@ -112,12 +120,24 @@ Configure file should be wrote in json format. Please remember we have some rese
         "author":"author of this configure file",
         "ref":"hg19",  // hg19 or hg38
         "hgvs":{
-                "gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
-                "refseq":"/opt/databases/refgene/refMrna.fa.gz",
+           "gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
+           "refseq":"/opt/databases/refgene/refMrna.fa.gz",
         },
-        "vcfs":[    
+        "vcfs":[ 
+          {
+            "file":"path to clinvar.vcf.gz",
+       	    "columns":"RS,CLNSIG",
+          },
+          {
+     	    "file":"path to vcf database",
+            "columns":"tags",
+          },
         ],
         "beds":[
+          {
+            "file":"path to BED-like database",
+            "columns":"tags",
+          },          
         ],
 }
 ```
@@ -125,7 +145,8 @@ Configure file should be wrote in json format. Please remember we have some rese
 ## **Convert annotated vcf file to other formats.**
 
 
-
+```
+vcf2tsv -r BED,REF,ALT,GT,SAMPLE,HGVSnom,ExonIntron,HGMD
 
 
 ## **Interpret the annotations.**
