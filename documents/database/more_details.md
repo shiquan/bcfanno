@@ -18,7 +18,7 @@ bcfanno accept genepred database and transcripts database in fasta to generate H
 
 - Local databases.
 
-  ​
+  See [Build in house databases for you project.](https://github.com/shiquan/vcfanno/blob/master/documents/database/build_own_databases.md).
 
 (3) Prediction databases.
 
