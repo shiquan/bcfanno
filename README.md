@@ -144,11 +144,12 @@ Configure file should be wrote in json format. Please remember we have some rese
 
 ## **Convert annotated vcf file to other formats.**
 
+**vcf2tsv** is a part of bcfanno package, convert selected tags in VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual]().
 
 ```
 vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag example/demo_anno.vcf
 
-
+// results 
 #CHROM	START	END	REF	ALT	GT	SAMPLE	Gene	HGVSnom	ExonIntron	VarType	HGMD_tag
 17	41222825	41222826	A	C	0/1	demo	BRCA1|BRCA1|BRCA1|BRCA1|BRCA1|BRCA1	NM_007294.3:c.4987-3114A>C|NM_007297.3:c.4846-3114A>C|NM_007298.3:c.1675-3114A>C|NM_007299.3:c.1675-3114A>C|NM_007300.3:c.5050-3114A>C|NR_027676.1:n.5123-3114A>C	I15|I14|I14|I15|I16|I15intron|intron|intron|intron|intron|intron	.
 17	41223241	41223242	G	C	0/1	demo	BRCA1|BRCA1|BRCA1|BRCA1|BRCA1|BRCA1	NM_007294.3:c.4689C>G(p.Tyr1563Stop/p.Y1563X)|NM_007297.3:c.4548C>G(p.Tyr1516Stop/p.Y1516X)|NM_007298.3:c.1377C>G(p.Tyr459Stop/p.Y459X)|NM_007299.3:c.1377C>G(p.Tyr459Stop/p.Y459X)|NM_007300.3:c.4752C>G(p.Tyr1584Stop/p.Y1584X)|NR_027676.1:n.4825C>G	E15/C14|E14/C12|E14/C14|E15/C14|E16/C15|E15/C15	nonsense|nonsense|nonsense|nonsense|nonsense|noncoding	DM
