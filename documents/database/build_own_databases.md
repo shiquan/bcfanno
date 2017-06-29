@@ -23,11 +23,11 @@ Assume you have  sequenced a lot of DNA samples, and you want to build a local d
 3. Calculate the allele frequency and remove extra sample information.
 
    ```
-   allele_freqs_count -h                                                                                                                                       17-06-29  8:41PM
-A program to calculate the allele frequency in population for each position.
-Usage:
- vcf_allele_freq [options] input.vcf.gz
- Options:
+   allele_freqs_count -h
+   A program to calculate the allele frequency in population for each position.
+   Usage:
+    vcf_allele_freq [options] input.vcf.gz
+    Options:
      -ac   allele count tag name, default is AlleleCount
      -af   allele frequency tag name, default is AlleleFreq
      -hwe  tag name for Fisher exact test of Hardy-Weinberg Equilibrium
@@ -40,6 +40,6 @@ Usage:
 Note:
 1. For parameter -gen, the tag format is [AA|Aa|aa], 'A' stand for wild allele, and 'a' stand for mutated
    allele(s). All alternative alleles, if more than one alt allele like mnps, should be count into 'a'.
-Version: 8699629 + htslib 1.4.1
-Homepage: https://github.com/shiquan/small_projects
-```
+   Version: 8699629 + htslib 1.4.1
+   Homepage: https://github.com/shiquan/small_projects
+   ```
