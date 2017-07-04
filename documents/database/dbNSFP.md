@@ -27,19 +27,19 @@ Standard dbNSFP and dbscSNV databases are release in gziped tab seperated text f
 
 1. Download dbnsfp from homepage, and unzipped it.
 
-   `wget -c ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.4c.zip`
+```
+$ wget -c ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.4c.zip
 
-   `unzip dbNSFPv3.4c.zip ` 
+$ unzip dbNSFPv3.4c.zip
 
-   `cd dbNSFPv3.4c`
+$ cd dbNSFPv3.4c
 
-   `ls`
+$ ls
 
-   `# belowed datasets should be found at this directory`
-
+// belowed datasets should be found at this directory
+```
    ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_files.png)
 
-   ​
 
 2. Download the related README file and generate INFO descriptions file manually, all the description information could be find from README file.
 
@@ -84,22 +84,28 @@ More details about tsv2vcf, please refer to \href[tsv2vcf manual](https://github
 
    The convert command could be:
 
-   `tsv2vcf -chr 1 -pos 2 -h dbnsfp_header.txt -r Homo_sapiens.GRCh38.dna.toplevel.fa dbNSFP3.4c_variant.chr1 | bcftools view -O b -o chr1.bcf`
+```
+tsv2vcf -chr 1 -pos 2 -h dbnsfp_header.txt -r Homo_sapiens.GRCh38.dna.toplevel.fa dbNSFP3.4c_variant.chr1 | bcftools view -O b -o chr1.bcf
+```
 
-   ​
 
    (4)  `bcftools concat` all the chromosomes BCF files into one big BCF, and index it.
 
-   `bcftools concat chr1.bcf chr2.bcf chr3.bcf chr4.bcf chr5.bcf chr6.bcf chr7.bcf chr8.bcf chr9.bcf chr10.bcf chr11.bcf chr12.bcf chr13.bcf chr14.bcf chr15.bcf chr16.bcf chr17.bcf chr18.bcf chr19.bcf chr20.bcf chr21.bcf chr22.bcf chrX.bcf chrY.bcf chrM.bcf -O b -o dbNSFPv3.4c.bcf`
+```
+$ bcftools concat chr1.bcf chr2.bcf chr3.bcf chr4.bcf chr5.bcf chr6.bcf chr7.bcf chr8.bcf chr9.bcf chr10.bcf chr11.bcf chr12.bcf chr13.bcf chr14.bcf chr15.bcf chr16.bcf chr17.bcf chr18.bcf chr19.bcf chr20.bcf chr21.bcf chr22.bcf chrX.bcf chrY.bcf chrM.bcf -O b -o dbNSFPv3.4c.bcf
 
-   `bcftools index dbNSFPv3.4c.bcf ` 
+
+$ bcftools index dbNSFPv3.4c.bcf 
+```
 
    (5)  If you need rename chromosomes, like if you download UCSC reference and the chromosome name is different in dbNSFP, use vcf_rename_tags rename the chromosome names.
 
-   `vcf_rename_tags -list contig.txt dbNSFPv3.4c.bcf -O b -o dbNSFPv3.4c.renames.bcf`
+```
+$ vcf_rename_tags -list contig.txt dbNSFPv3.4c.bcf -O b -o dbNSFPv3.4c.renames.bcf
 
-   `bcftools index dbNSFPv3.4c.renames.bcf`
+$ bcftools index dbNSFPv3.4c.renames.bcf
 
+```
    *Note:* contig.txt could be found at https://github.com/shiquan/vcfanno/blob/master/documents/database/contig.txt
 
    ​
@@ -107,18 +113,14 @@ More details about tsv2vcf, please refer to \href[tsv2vcf manual](https://github
 3. Test database with vcfanno.
 
    * Edit your configure file and add new database.
-
-     "vcfs": [
-
-     ​	{
-
-     "columns":"SIFT_score,Polyphen2_HDIV_score,Polyphen2_HVAR_score,LRT_score,LRT_pred,MutationTaster_score,MutationTaster_pred,MutationAssessor_pred,FATHMM_pred,PROVEAN_pred,CADD_raw,fathmm-MKL_coding_score,MetaSVM_score,MetaLR_score,GERP++_RS,SiPhy_29way_logOdds",
-
-     "file":"*<u>path to bcf database</u>*",
-
-     ​	},
-
-     ]
+```
+"vcfs": [
+	{
+		"columns":"SIFT_score,Polyphen2_HDIV_score,Polyphen2_HVAR_score,LRT_score,LRT_pred,MutationTaster_score,MutationTaster_pred,MutationAssessor_pred,FATHMM_pred,PROVEAN_pred,CADD_raw,fathmm-MKL_coding_score,MetaSVM_score,MetaLR_score,GERP++_RS,SiPhy_29way_logOdds",
+	"file":"*<u>path to bcf database</u>*",
+	},
+]
+```
 
    * Debug.
 
