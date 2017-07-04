@@ -11,7 +11,7 @@ About *tags*:
 	- **GENOTYPE**, gentype of this position, genotype should be *ref-alt, ref-ref, alt-alt*;
 	- **TGT**, genotype tag, compared with GT tag, TGT use alleles instead of code.
 
-Help message of **vcf2tsv**,
+## Help message of **vcf2tsv**,
 ```
 #vcf2tsv -h
 
@@ -38,7 +38,7 @@ About the parameters,
 *   **G**: for some VCFs, no FORMAT and sample fields, vcf2tsv will not check GT tag if use this parameter.
 
 
-##Example
+## Example
 ```
 $ vcf2tsv -f BED,SAMPLE,TGT example/demo.vcf
 #CHROM	START	END	SAMPLE	TGT
