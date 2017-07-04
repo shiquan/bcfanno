@@ -18,11 +18,11 @@ Assume you have  sequenced a lot of DNA samples, and you want to build a local d
 
    `bcftools merge -m both sample1.vcf.gz sample2.vcf.gz... sampleN.vcf.gz -O b -o merged.bcf`
 
-   ​
+
 
 3. Calculate the allele frequency and remove extra sample information.
 
-   ```
+```
    allele_freqs_count -h
    A program to calculate the allele frequency in population for each position.
    Usage:
@@ -42,4 +42,5 @@ Note:
    allele(s). All alternative alleles, if more than one alt allele like mnps, should be count into 'a'.
    Version: 8699629 + htslib 1.4.1
    Homepage: https://github.com/shiquan/small_projects
-   ```
+
+```
