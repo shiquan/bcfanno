@@ -38,9 +38,9 @@ make
 Following execute programs should be compiled after several miniters.
 
 * ***vcfanno*** , core program to annotate genetic variants
-* ***tsv2vcf*** ,  generate VCF databases from tab-seperated file
+* [***tsv2vcf***](https://github.com/shiquan/vcfanno/blob/master/documents/tsv2vcf_manual.md) ,  generate VCF databases from tab-seperated file
 * [***vcf2tsv***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
-* ***vcf_rename_tags***, rename tags or contig names in the VCF file, usually used to format the databases
+* [***vcf_rename_tags***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf_rename_tags_manual.md), rename tags or contig names in the VCF file, usually used to format the databases
 
 
 
@@ -144,7 +144,7 @@ Configure file should be wrote in json format. Please remember we have some rese
 
 ## **Convert annotated vcf file to other formats.**
 
-**vcf2tsv** is a part of bcfanno package, convert selected tags in VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual]().
+**vcf2tsv** is a part of bcfanno package, convert selected tags in VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md).
 
 ```
 vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag example/demo_anno.vcf
