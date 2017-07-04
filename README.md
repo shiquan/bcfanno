@@ -39,7 +39,7 @@ Following execute programs should be compiled after several miniters.
 
 * ***vcfanno*** , core program to annotate genetic variants
 * ***tsv2vcf*** ,  generate VCF databases from tab-seperated file
-* ***vcf2tsv***, convert VCF file to tab-separated file with selected tags
+* [***vcf2tsv***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
 * ***vcf_rename_tags***, rename tags or contig names in the VCF file, usually used to format the databases
 
 
