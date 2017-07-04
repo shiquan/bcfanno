@@ -43,15 +43,9 @@ $ ls
 
 2. Download the related README file and generate INFO descriptions file manually, all the description information could be find from README file.
 
-   ​
-
    (1) Open README file (this file could be found at dbNSFP package).
 
-   ​
-
    (2) Generate the INFO descriptions for our VCF/BCF database. Please make sure you know the format of VCF header clearly. If no, please refer to *http://samtools.github.io/hts-specs/VCFv4.3.pdf* for the technical knowledge and copy my pre-defined demo INFO description file (*https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_header.txt*) for your sake.
-
-   ​
 
    (3)  Convert each chromosome dataset into BCF files. 
 
@@ -60,8 +54,8 @@ $ ls
    ![](https://github.com/shiquan/vcfanno/blob/master/documents/database/dbNSFP_header.png)
 
    * Convert tablet to VCF.
+```
 
-   ```
 Usage : tsv2vcf -header|-h header.txt -r reference.fa [-force -pos column -O z -o out.vcf.gz] in.tsv.gz
         -header, -h     header file
         -r              reference file
@@ -73,10 +67,10 @@ Usage : tsv2vcf -header|-h header.txt -r reference.fa [-force -pos column -O z -
         -rename         chromosome rename file
 
 Homepage: https://github.com/shiquan/vcfanno
-   ```
 
+```
 
-   **Note :**  the *-r* parameter is mandatory, because program will check each reference base in the datasets, if there are some inconsistance for genetic bases between dbNSFP (or other databases) and human genome reference, you must figure out how it comes and fix it by using right reference or change the dataset manually (I do *not* explicitly recommend change any database manually unless you know what exactly you do and it is suggested to report bugs to the authors).
+**Note :**  the *-r* parameter is mandatory, because program will check each reference base in the datasets, if there are some inconsistance for genetic bases between dbNSFP (or other databases) and human genome reference, you must figure out how it comes and fix it by using right reference or change the dataset manually (I do *not* explicitly recommend change any database manually unless you know what exactly you do and it is suggested to report bugs to the authors).
 
 More details about tsv2vcf, please refer to \href[tsv2vcf manual](https://github.com/shiquan/vcfanno/blob/master/documents/tsv2vcf_manual.md).
 
@@ -93,7 +87,6 @@ tsv2vcf -chr 1 -pos 2 -h dbnsfp_header.txt -r Homo_sapiens.GRCh38.dna.toplevel.f
 
 ```
 $ bcftools concat chr1.bcf chr2.bcf chr3.bcf chr4.bcf chr5.bcf chr6.bcf chr7.bcf chr8.bcf chr9.bcf chr10.bcf chr11.bcf chr12.bcf chr13.bcf chr14.bcf chr15.bcf chr16.bcf chr17.bcf chr18.bcf chr19.bcf chr20.bcf chr21.bcf chr22.bcf chrX.bcf chrY.bcf chrM.bcf -O b -o dbNSFPv3.4c.bcf
-
 
 $ bcftools index dbNSFPv3.4c.bcf 
 ```
@@ -136,8 +129,3 @@ $ bcftools index dbNSFPv3.4c.renames.bcf
 2. If I use hg19 (GRCh37), which dbNSFP version should I download?
 
    My suggestion is dbNSFP **v2.9.1**, but you can always download the most updated version and convert the inconsistent reference bases manually.
-
-   ​
-
-
-
