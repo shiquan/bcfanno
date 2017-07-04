@@ -17,5 +17,8 @@ Usage : tsv2vcf -header|-h header.txt -r reference.fa [-force -pos column -O z -
 Homepage: https://github.com/shiquan/vcfanno
 ```
 
+About parameters：
+* **-header, -h** : header file to specify the tags information is mandatory, for each line in this file, should be format into VCF header style;
+* **-r**: reference genome sequence in fasta format, and it should be indexed by `samtools faidx`;
 
 

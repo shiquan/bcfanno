@@ -109,8 +109,8 @@ $ bcftools index dbNSFPv3.4c.renames.bcf
 ```
 "vcfs": [
 	{
-		"columns":"SIFT_score,Polyphen2_HDIV_score,Polyphen2_HVAR_score,LRT_score,LRT_pred,MutationTaster_score,MutationTaster_pred,MutationAssessor_pred,FATHMM_pred,PROVEAN_pred,CADD_raw,fathmm-MKL_coding_score,MetaSVM_score,MetaLR_score,GERP++_RS,SiPhy_29way_logOdds",
-	"file":"*<u>path to bcf database</u>*",
+	"columns":"SIFT_score,Polyphen2_HDIV_score,Polyphen2_HVAR_score,LRT_score,LRT_pred,MutationTaster_score,MutationTaster_pred,MutationAssessor_pred,FATHMM_pred,PROVEAN_pred,CADD_raw,fathmm-MKL_coding_score,MetaSVM_score,MetaLR_score,GERP++_RS,SiPhy_29way_logOdds",
+	"file":"path to bcf database",
 	},
 ]
 ```
