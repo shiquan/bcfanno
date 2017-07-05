@@ -3,7 +3,6 @@ BCFANNO manual
 ==========
 
 
-
 ## Release note:
 
 *release v1.0 :  first stable version, renamed vcfanno to bcfanno.*
@@ -28,7 +27,6 @@ bcfanno annotate a WGS vcf with specified 22 databases in 6 CPU hours. bcfanno u
 * zlib
 
 ```
-
 git clone https://github.com/shiquan/vcfanno.git
 cd vcfanno
 make
@@ -41,28 +39,23 @@ Following execute programs should be compiled after several miniters.
 * [***vcf2tsv***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
 * [***vcf_rename_tags***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf_rename_tags_manual.md), rename tags or contig names in the VCF file, usually used to format the databases
 
-
-
 *Some other programs should also be install for ongoing test.*
 
 * [bcftools](http://www.htslib.org/download/) 
-
 * [tabix](http://www.htslib.org/download/) (tabix is now a part of HTSlib, so download the htslib and complier it, and you will find tabix then)
 
-  ​
 
 ## **Databases**
 
 bcfanno support THREE kinds of databases,
 
-* *allele specific databases*, like allele frequency or any other allele related databases
-* *region specific databases*, like gene region, function regions or any other genome region related databases
-* *transcript specific databases*, like protein id or any other transcript related databases
+* *allele specific databases*, like allele frequency or any other allele related databases;
+* *region specific databases*, like gene region, function regions or any other genome region related databases;
+* *transcript specific databases*, like protein id or any other transcript related databases.
 
 I think most of database could be classsified into above three kinds. Please email if these three don't define your databases properly.
 
 Before you try to use any database, please try to classify the data and follow the below instruction to check or convert the database for bcfanno.
-
 
 
 ## **Generate databases for bcfanno**
