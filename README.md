@@ -125,8 +125,7 @@ $ cat example/demo.vcf
 17	41258326	.	A	G	.	.	.	GT	0/1
 17	41258504	.	A	C	.	.	.	GT	0/1
 
-[shiquan@shiquan:s002][~VCFANNO][10067]
-$ cat example/demo_anno.vcf                                                                                                                                         17-07-04  2:04PM
+$ cat example/demo_anno.vcf 
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##reference=file://17.fa.gz
@@ -276,6 +275,7 @@ vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag exampl
 
 
 ## **Interpret the annotations.**
+
 
 
 ## **Bug report or suggestions**.
