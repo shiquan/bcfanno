@@ -1207,9 +1207,11 @@ int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
             
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
-		if ( col->setter.vcf(opts, line, col, dat) ) {
+		int ret =  col->setter.vcf(opts, line, col, dat);
+
+                if ( ret ) {
                     error_return("databases : %s.\n", file->fname);
-                    return 1;
+                    return ret;
                 }
 	    }
 	}
