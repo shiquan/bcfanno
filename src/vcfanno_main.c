@@ -347,9 +347,12 @@ int main(int argc, char **argv)
 	if (line->rid == -1)
 	    continue;
 	// annotate vcf line function
-	if ( anno_core(line) ) {
+        int ret = anno_core(line);
+        if ( ret ) {
             fprintf(stderr, "Failed to update bcf line, %s : %d\n", bcf_seqname(args.hdr, line), line->pos+1);
-            return 1;
+            // if return 1 go abort, else give a warning
+            if ( ret == 1 )
+                return 1;
         }
 	bcf_write1(args.fp_out, args.hdr_out, line);
     }
