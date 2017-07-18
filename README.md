@@ -259,7 +259,7 @@ Configure file should be wrote in json format. Please remember we have some rese
 
 ## **Convert annotated vcf file to other formats.**
 
-**vcf2tsv** is a part of bcfanno package, convert selected tags in VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md).
+**vcf2tsv** is a part of bcfanno package, convert selected tags from VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md).
 
 ```
 vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag example/demo_anno.vcf
