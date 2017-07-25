@@ -3,7 +3,7 @@
 #include "number.h"
 #include "sort_list.h"
 #include "zlib.h"
-#include "file.h"
+//#include "file.h"
 #include "htslib/tbx.h"
 #include "htslib/khash.h"
 #include "htslib/hfile.h"
@@ -117,7 +117,7 @@ void destroy_list(struct list* list)
 
 struct genepred_spec *genepred_spec_init()
 {
-    struct genepred_spec *spec = malloc(sizeof(struct genepred_spec));
+    struct genepred_spec *spec = (struct genepred_spec*)malloc(sizeof(struct genepred_spec));
     memset(spec, 0, sizeof(struct genepred_spec));
     return spec;
 }
@@ -197,7 +197,7 @@ int genepred_load_trans(struct genepred_spec *spec, const char *fname)
 }
 struct genepred_line *genepred_line_create()
 {
-    struct genepred_line *line = malloc(sizeof(struct genepred_line));
+    struct genepred_line *line = (struct genepred_line*)malloc(sizeof(struct genepred_line));
     memset(line, 0, sizeof(struct genepred_line));    
     return line;
 }
@@ -206,7 +206,7 @@ void clear_genepred_line(struct genepred_line *line)
 {
     struct genepred_line **pp = &line;
     if ( line == NULL ) {
-        *pp = malloc(sizeof(struct genepred_line));
+        *pp = (struct genepred_line*)malloc(sizeof(struct genepred_line));
     } else {
         if ( line->chrom != NULL)
             free(line->chrom);
@@ -365,7 +365,7 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
     int i;
     // Alloc memory for exons[], exon_offset_pair[], and loc[].
     for ( i = 0; i < 2; i++ ) {
-        line->exons[i] = calloc(line->exon_count, sizeof(int));
+        line->exons[i] = (int*)calloc(line->exon_count, sizeof(int));
     }
     // Release splits.
     free(splits);
@@ -419,7 +419,7 @@ int parse_line_locs(struct genepred_line *line)
     int is_coding = line->cdsstart == line->cdsend ? 0 : 1;
     for ( i = 0; i < 2; i++ ) {
         // line->dna_ref_offsets[i] = calloc(line->exon_count, sizeof(int));
-        line->loc[i] = calloc(line->exon_count, sizeof(int));
+        line->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
     }
             
     // First loop. Purpose of this loop is trying to calculate the forward and backward length.
@@ -571,12 +571,12 @@ struct genepred_line *genepred_line_copy(struct genepred_line *line)
     nl->exon_count = line->exon_count;
     nl->loc_parsed = line->loc_parsed;
     for ( i = 0; i < 2; ++i ) {
-        nl->exons[i] = calloc(line->exon_count, sizeof(int));
+        nl->exons[i] = (int*)calloc(line->exon_count, sizeof(int));
         memcpy(nl->exons[i], line->exons[i], sizeof(int) *line->exon_count);
     }
     if ( nl->loc_parsed ) {
         for ( i = 0; i < 2; ++i ) {
-            nl->loc[i] = calloc(line->exon_count, sizeof(int));
+            nl->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
             memcpy(nl->loc[i], line->loc[i], sizeof(int) *line->exon_count);
         }
     }
@@ -873,7 +873,7 @@ void retrieve_bed()
             parse_line_locs(temp);
             generate_dbref_database(temp);
         }
-        list_lite_delete(&node, genepred_line_destroy);
+        list_lite_del(&node, genepred_line_destroy);
     } else {
         struct genepred_line node;
         memset(&node, 0, sizeof(struct genepred_line));

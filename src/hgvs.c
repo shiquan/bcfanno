@@ -515,7 +515,7 @@ int parse_hgvs_name(const char *name)
             if ( se == se1 )
                 error("No position found.");
             des->end = parse_position(se1, se, line);
-            list_lite_delete(&line, genepred_line_destroy);
+            list_lite_del(&line, genepred_line_destroy);
         } else {
             des->end = des->start;
         }
@@ -523,7 +523,7 @@ int parse_hgvs_name(const char *name)
         if ( line->next != NULL ) {
             warnings("Multiple transcript hits. Only random pick one record. %s.", line->name1);
         }        
-        list_lite_delete(&line, genepred_line_destroy);
+        list_lite_del(&line, genepred_line_destroy);
     }
 
     for ( se1 = se; se != safe_lock && *se != '('; ++se);

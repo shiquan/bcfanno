@@ -21,7 +21,7 @@ int sort_list(void *plist, comp_func *func)
         return 1;
     struct list_lite *el;
     struct list_lite **array;
-    array = malloc(l * sizeof(struct list_lite*));
+    array = (struct list_lite*)malloc(l * sizeof(struct list_lite*));
     int i;
     for ( el = list, i= 0; el != NULL; el = el->next, i++ )
         array[i] = el;
@@ -37,7 +37,7 @@ int sort_list(void *plist, comp_func *func)
     return 0;      
 }
 
-int sort_rmdup_list(void *plist, comp_func *func, delete_func delete)
+int sort_rmdup_list(void *plist, comp_func *func, del_func del_func)
 {
     struct list_lite **pp = (struct list_lite**)plist;
     struct list_lite *list = *pp;
@@ -47,7 +47,7 @@ int sort_rmdup_list(void *plist, comp_func *func, delete_func delete)
         return 1;
     struct list_lite *el;
     struct list_lite **array;
-    array = malloc(l*sizeof(struct list_lite*));
+    array = (struct list_lite*)malloc(l*sizeof(struct list_lite*));
     int i;
     for ( el = list, i = 0; el != NULL; el = el->next, i++)
         array[i] = el;
@@ -55,7 +55,7 @@ int sort_rmdup_list(void *plist, comp_func *func, delete_func delete)
     *pp = array[0];
     for ( el = *pp, i = 1; i < l; i++ ) {
         if ( func(array[i-1], array[i]) == 0 ) {
-            delete(array[i]);
+            del_func(array[i]);
         } else {
             el->next = array[i];
             el = array[i];
@@ -65,7 +65,7 @@ int sort_rmdup_list(void *plist, comp_func *func, delete_func delete)
     free(array);
     return 0;        
 }
-void list_lite_delete(void *plist, delete_func delete)
+void list_lite_del(void *plist, del_func del_func)
 {
     struct list_lite **pp = (struct list_lite**)plist;
     struct list_lite *list = *pp;
@@ -73,6 +73,6 @@ void list_lite_delete(void *plist, delete_func delete)
     while ( *pp ) {
         list = *pp;
         *pp = list->next;
-        delete(list);
+        del_func(list);
     }
 }
