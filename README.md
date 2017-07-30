@@ -276,7 +276,7 @@ vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag exampl
 
 ## **Interpret the annotations.**
 
-Please refer  to (ACMG guideline)[https://www.google.com.hk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwigz5jkzLHVAhUBG5QKHesKAhYQFggkMAA&url=https%3A%2F%2Fwww.acmg.net%2Fdocs%2Fstandards_guidelines_for_the_interpretation_of_sequence_variants.pdf&usg=AFQjCNF_jV6xApr4TCyQhs9p0Iki85oYoQ] to interpret genetic variants.
+Please refer  to [ACMG guideline](https://www.google.com.hk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwigz5jkzLHVAhUBG5QKHesKAhYQFggkMAA&url=https%3A%2F%2Fwww.acmg.net%2Fdocs%2Fstandards_guidelines_for_the_interpretation_of_sequence_variants.pdf&usg=AFQjCNF_jV6xApr4TCyQhs9p0Iki85oYoQ) to interpret genetic variants.
 
 
 
