@@ -4,6 +4,7 @@
 #include "htslib/tbx.h"
 #include "htslib/faidx.h"
 #include "htslib/bgzf.h"
+#include "htslib/kstring.h"
 #include "sort_list.h"
 
 #define BLOCK_START 0
@@ -91,6 +92,7 @@ struct genepred_spec *genepred_spec_init();
 void genepred_spec_destroy(struct genepred_spec *spec);
 extern int parse_line(kstring_t *string, struct genepred_line *line);
 extern int parse_line_locs(struct genepred_line *line);
+extern void genepred2line(struct genepred_line *line, kstring_t *str);
 
 extern int genepred_load_data(struct genepred_spec *spec, const char *fname);
 extern int genepred_load_fasta(struct genepred_spec *spec, const char *fname);

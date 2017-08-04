@@ -11,7 +11,7 @@ HTSLIB = $(HTSDIR)/libhts.a
 
 CC       = gcc
 CFLAGS   = -Wall -O3 -DHTS3
-DEBUG_CFLAGS   = -g -Wall -O0 -DHTS3
+DEBUG_CFLAGS   = -g -Wall -O0 -DHTS3 -DDEBUG_MODE
 DFLAGS   =
 INCLUDES = -I src/ -I. -I$(HTSDIR)/
 
