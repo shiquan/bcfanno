@@ -460,8 +460,7 @@ int parse_line_locs(struct genepred_line *line)
                 x = (c<<GENEPRED_CIGAR_PACKED_FIELD) | (type & GENEPRED_CIGAR_MASK_TYPE); \
             } while(0)
               
-            switch ( line->realn[i] )
-            {
+            switch ( line->realn[i] ) {
                 case GENEPRED_CIGAR_UNKNOWN_TYPE: {
                     if ( line->n_cigar > 0 ) 
                         free(line->cigars);
@@ -577,8 +576,14 @@ int parse_line_locs(struct genepred_line *line)
         int del = 0;
         int ins = 0;
         int offset = 0;
+        
         int i, j;
+        
         for ( i = 0, j = 0; i < line->exon_count*2 && j < line->n_cigar; j++) {
+            // Offset need to be added to utr5 length only if first match block smaller than it.
+            if ( is_coding && line->utr5_length < match + del)
+                line->utr5_length += offset;
+            
             int *loc = line->strand == '+' ? line->loc[i]  : line->loc[line->exon_count*2-i-1];
             if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_MATCH_TYPE ) {                
                 match += line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
