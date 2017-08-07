@@ -928,7 +928,7 @@ void setter_format(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	kputc('1', &val->a);
 	return;
     }
-    int iallele = ale == -1 || c->number == BCF_VL_G || c->number == BCF_VL_FIXED ? -1 : c->number == BCF_VL_R ? ale -1 : ale;
+    int iallele = ale == -1 || c->number == BCF_VL_G || c->number == BCF_VL_FIXED ? -1 : c->number == BCF_VL_A ? ale -1 : ale;
     process_fmt_array(iallele, &val->a, fmt->n, fmt->type, fmt->p + val->sample_id*fmt->size);
 }
 
