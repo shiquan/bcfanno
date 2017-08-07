@@ -563,7 +563,7 @@ int convert_line_no_gt(bcf_hdr_t *hdr, bcf1_t *line)
     int n_alleles = 1;
     set_matrix_cache(cache, n_alleles);
 
-    int i, k, j;
+    int i, k;
 
     for (i=0; i<cache->m_samples; ++i) { 
 	// iterate samples
@@ -919,7 +919,7 @@ void setter_format(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	return;
     }
 
-    if (ale == 0 && c->type == BCF_VL_A) {
+    if (ale == 0 && c->number == BCF_VL_A) {
 	kputc('.', &val->a);
 	return;
     }
@@ -928,7 +928,7 @@ void setter_format(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 	kputc('1', &val->a);
 	return;
     }
-    int iallele = ale == -1 || c->type == BCF_VL_G || c->type == BCF_VL_FIXED ? -1 : c->type == BCF_VL_R ? ale -1 : ale;
+    int iallele = ale == -1 || c->number == BCF_VL_G || c->number == BCF_VL_FIXED ? -1 : c->number == BCF_VL_R ? ale -1 : ale;
     process_fmt_array(iallele, &val->a, fmt->n, fmt->type, fmt->p + val->sample_id*fmt->size);
 }
 
