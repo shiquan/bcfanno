@@ -48,7 +48,15 @@ struct genepred_line {
     // int *dna_ref_offsets[2];
     // Transcript locations of each block, coding transcripts consist of UTRs and CDS,
     // so loc[0,1] is not the edge of coding sequences. Consistant with the strand.
-    int *loc[2];    
+    int *loc[2];
+
+    // realign transcript sequence with reference sequence, record in CIGAR format.
+    // M for match, I for insertion, D for deletion
+    // for an example, 256M1D43M15I stand for 256 base matched and 1 deletion in transcript, and continued with 43 matched bases,
+    // and 15 insertion in the tail (usually the tailAs).
+    char *realn; // orignal string, should be free and point to NULL after parse.
+    int n_cigar;
+    int *cigars;
 };
 
 struct genepred_format {
@@ -64,6 +72,7 @@ struct genepred_format {
     int exon_count;
     int exonstarts;
     int exonends;
+    int realn;
 };
 
 struct list {

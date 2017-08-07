@@ -303,8 +303,8 @@ struct varstat {
 int anno_core(bcf1_t *line)
 {
 #ifdef DEBUG_MODE
-    debug_print("%s:%d",bcf_seqname(args.hdr_out, line->pos+1));
-#endif 
+    debug_print("%s:%d",bcf_seqname(args.hdr_out, line), line->pos+1);
+#endif
     // do nothing for reference positions
     if ( bcf_get_variant_types(line) == VCF_REF )
 	return 0;

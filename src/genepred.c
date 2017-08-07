@@ -50,6 +50,25 @@ int file_seek(htsFile *fp, long offset, int where)
 
 #endif
 
+#define GENEPRED_CIGAR_UNKNOWN_BASE '*'
+#define GENEPRED_CIGAR_MATCH_BASE   'M'
+#define GENEPRED_CIGAR_DELETE_BASE  'D'
+#define GENEPRED_CIGAR_INSERT_BASE  'I'
+
+
+// The fields cigar packed counts and cigar type, as follows:
+//
+//   offset   bits  value
+//   0        2     cigar_type
+//   3        32    cigar_counts
+//
+#define GENEPRED_CIGAR_PACKED_FIELD 2
+#define GENEPRED_CIGAR_UNKNOWN_TYPE 0
+#define GENEPRED_CIGAR_MATCH_TYPE   1
+#define GENEPRED_CIGAR_DELETE_TYPE  2
+#define GENEPRED_CIGAR_INSERT_TYPE  3
+#define GENEPRED_CIGAR_MASK_TYPE    4
+
 struct list *init_list(const char *fn)
 {
     if (fn == NULL)
@@ -88,6 +107,7 @@ struct list *init_list(const char *fn)
     free(list);
     return NULL;
 }
+
 // 1 on failure, 0 on success found.
 int check_list(struct list *list, char *name)
 {
@@ -219,7 +239,11 @@ void clear_genepred_line(struct genepred_line *line)
         if ( line->loc_parsed ) {
             free(line->loc[0]);
             free(line->loc[1]);
-        }        
+        }
+        if ( line->realn )
+            free(line->realn);
+        if ( line->cigars )
+            free(line->cigars);           
     }
     line->loc_parsed = 0;
     memset(*pp, 0, sizeof(struct genepred_line));
@@ -244,6 +268,7 @@ static struct genepred_format refgene_formats = {
     .exon_count = 8,
     .exonstarts = 9,
     .exonends = 10,
+    .realn = -1,
 };
     
 static struct genepred_format genepred_formats = {    
@@ -258,6 +283,7 @@ static struct genepred_format genepred_formats = {
     .exonstarts = 8,
     .exonends = 9,
     .name2 = 10,
+    .realn = 11,
 };
 
 static struct genepred_format refflat_formats = {    
@@ -272,6 +298,7 @@ static struct genepred_format refflat_formats = {
     .exon_count = 8,
     .exonstarts = 9,
     .exonends = 10,
+    .realn = -1,
 };
 
 // The type defined the format of database. Default is genepred format. Access genepred files of
@@ -350,6 +377,11 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
 
     // Parse gene name, for some genepred file, no name2 specified.
     BRANCH(line->name2, type->name2, strdup);
+
+    if (type->realn != -1 && nfields > type->realn) {
+        BRANCH(line->realn, type->realn, strdup);
+    }
+    
 #undef BRANCH
 
     // The genepred file from UCSC define exon regions like 1,2,3,4,5. Here init exon_pair[] and
@@ -386,7 +418,7 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
             se1++;
         se1[0] = '\0';
         line->exons[BLOCK_END][i] = str2int(se);
-        se = ++se1;        
+        se = ++se1;   
     }
     return 0;
 }
@@ -403,10 +435,66 @@ int parse_line_locs(struct genepred_line *line)
 {
     if (line->loc_parsed == 1 )
         error("Double parsed.");
+    
     line->loc_parsed = 1;
     
+    // parse cigar string
+    if ( type->realn > 0 && line->realn != NULL ) {
+        int i, j, l, m = 0;
+        l = strlen(line->realn);
+
+        for ( i = 0; i < l;) {
+            j = i;
+            for (; isdigit(line->realn[i]) && i < l; i++);
+            if ( i == l ) {
+                error_print("Failed to parse CIGAR column. %s", line->realn);
+                return 1;
+            }
+            if ( line->n_cigar == m ) {
+                m = m == 0 ? 2: m + 2;
+                line->cigars = (int*)realloc(line->cigars, m * sizeof(int));
+            }
+
+#define BRANCH(x, type) do {                                            \
+                int c = str2int_l(line->realn+j, i-j);                  \
+                x = (c<<GENEPRED_CIGAR_PACKED_FIELD) | (type & GENEPRED_CIGAR_MASK_TYPE); \
+            } while(0)
+              
+            switch ( line->realn[i] )
+            {
+                case GENEPRED_CIGAR_UNKNOWN_TYPE: {
+                    if ( line->n_cigar > 0 ) 
+                        free(line->cigars);
+                    line->n_cigar = 0;
+                    line->cigars = NULL;
+                    i = l;
+                    break;
+                }
+                    
+                case GENEPRED_CIGAR_MATCH_BASE:
+                    // Symbol M denote match and mismatch, no gaps between transcript and genome.
+                    BRANCH(line->cigars[line->n_cigar], GENEPRED_CIGAR_MATCH_TYPE);
+                    break;
+                    
+                case GENEPRED_CIGAR_INSERT_BASE:
+                    // Insertion in the transcript sequence.
+                    BRANCH(line->cigars[line->n_cigar], GENEPRED_CIGAR_INSERT_TYPE);
+                    break;
+                      
+                case GENEPRED_CIGAR_DELETE_BASE:
+                    BRANCH(line->cigars[line->n_cigar], GENEPRED_CIGAR_DELETE_TYPE);
+                    break;
+                    
+                default:
+                    error_print("Unknown CIGAR type %c", line->realn[i]);
+                    return 1;
+            }
+#undef BRANCH
+        }
+    }
+
     // Calculate the length of function regions, utr5_length is the length of UTR5, and utr3_length
-    // is the length of UTR3, without consider of the strand of transcript.    
+    // is the length of UTR3, without consider of the strand of transcript.
     int read_length = 0;
     int utr5_length = 0;
     int utr3_length = 0;
@@ -417,6 +505,7 @@ int parse_line_locs(struct genepred_line *line)
     int is_strand = line->strand == '+';
     // Check the transcript type, for noncoding RNA cdsstart == cdsend.
     int is_coding = line->cdsstart == line->cdsend ? 0 : 1;
+    
     for ( i = 0; i < 2; i++ ) {
         // line->dna_ref_offsets[i] = calloc(line->exon_count, sizeof(int));
         line->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
@@ -481,8 +570,41 @@ int parse_line_locs(struct genepred_line *line)
         }
     }
 
+
+    // realign genome locations
+    if ( line->n_cigar > 0 ) {
+        int match = 0;
+        int del = 0;
+        int ins = 0;
+        int offset = 0;
+        int i, j;
+        for ( i = 0, j = 0; i < line->exon_count*2 && j < line->n_cigar; j++) {
+            int *loc = line->strand == '+' ? line->loc[i]  : line->loc[line->exon_count*2-i-1];
+            if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_MATCH_TYPE ) {                
+                match += line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
+            }
+            // deletions should be consider as match when count locs
+            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_DELETE_TYPE ) {
+                del = line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
+                offset -= del;
+            }
+            // If insertion is tail-As, skip count offset.
+            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_INSERT_TYPE ) {
+                ins = line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
+                if ( j != line->n_cigar -1) 
+                    offset += ins;
+            }   
+            
+            if ( *loc > match + del)
+                continue;
+
+            *loc += offset;
+            i++;
+        }
+    }    
     return 0;
 }
+
 int read_line(struct genepred_spec *spec, kstring_t *string)
 {
     // int dret, ret;
