@@ -23,6 +23,9 @@ struct genepred_line {
     char strand;
     // Usually the transcript name.
     char *name1;
+    // If transcript format is NAME.VERSION, the version number could be retrieved from it. but if no version specified, like UCSC refgene dataset,
+    // retrieve the version number from transcript database (the title of each transcript sequence should be >NAME[SPACE]VERSION in the FASTA).
+    int name_version;
     // Gene name.
     char *name2;
 
@@ -72,7 +75,8 @@ struct genepred_format {
     int exon_count;
     int exonstarts;
     int exonends;
-    int realn;
+    int name_version;
+    int realn;    
 };
 
 struct list {

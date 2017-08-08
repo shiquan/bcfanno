@@ -39,7 +39,8 @@ struct var_func_type {
 struct hgvs_name {
     // transcripts name, locus name
     char *name1;
-
+    // transcript version
+    int name_version;
     // gene name or null
     char *name2;
     

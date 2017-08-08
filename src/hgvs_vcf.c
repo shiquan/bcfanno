@@ -71,13 +71,13 @@ int hgvs_update_vcf_header(bcf_hdr_t *hdr)
         assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
     }
 
-    /* id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FlankSeq"); */
-    /* if (id == -1) { */
-    /*     bcf_hdr_append(hdr, "##INFO=<ID=FlankSeq,Number=1,Type=String,Description=\"Three nearby bases of current position.\">"); */
-    /*     bcf_hdr_sync(hdr); */
-    /*     id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FlankSeq"); */
-    /*     assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id)); */
-    /* } */
+    id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FlankSeq");
+    if (id == -1) {
+        bcf_hdr_append(hdr, "##INFO=<ID=FlankSeq,Number=1,Type=String,Description=\"Three nearby bases of current position.\">");
+        bcf_hdr_sync(hdr);
+        id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FlankSeq");
+        assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
     
     id = bcf_hdr_id2int(hdr, BCF_DT_ID, "VarType");
     if (id == -1) {
@@ -147,7 +147,11 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
         struct hgvs_name *name = &des->a[i].name;
         struct var_func_type *type = &des->a[i].type;
         if ( i ) kputc('|', &string);
-        ksprintf(&string, "%s:",name->name1);
+        ksprintf(&string, "%s",name->name1);
+        if ( name->name_version > 0 ) {
+            ksprintf(&string, ".%d",name->name_version);
+        }
+        kputc(':', &string);
         if ( type->func == func_region_noncoding ) {
             kputs("n.", &string);
         } else if ( type->func == func_region_cds ) {
@@ -206,12 +210,8 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
             }
         }
         if ( type->loc_amino > 0 && des->type == var_type_snp ) {
-            //if ( type->ori_amino != type->mut_amino ) {
             ksprintf(&string, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino],
                      codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
-                //} else {
-                //kputs("(p.=)", &string);
-                //}
         }
     }
     return string.s;
@@ -407,7 +407,8 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         const char *name = bcf_hdr_id2name(hdr, line->rid);        
         setter_description(name, line->pos+1, line->d.allele[0], line->d.allele[i]);
         struct hgvs_des *des = fill_hgvs_name();
-        
+
+        // if more than one allele, seperated with ','
         if ( i > 1 ) {
             kputc(',', &gene);
             kputc(',', &transcript);
@@ -488,3 +489,141 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
     free(exon_id.s);
     return 0;                  
 }
+
+
+#ifdef HGVS_VCF_MAIN
+int usage()
+{
+    fprintf(stderr, "hgvs_vcf_anno -data genepred.tsv.gz -rna rna.fa.gz in.vcf\n");
+    return 1;
+}
+
+struct args {
+    const char *input_fname;
+    const char *data_fname;
+    const char *rna_fname;
+} args = {
+    .input_fname = NULL,
+    .data_fname = NULL,
+    .rna_fname = NULL,
+};
+
+int parse_args(int argc, char **argv)
+{
+    int i;
+    if (argc == 1)
+        return usage();
+    
+    for ( i = 1; i < argc; ) {
+        const char *a = argv[i++];
+        const char **var = NULL;
+        if ( strcmp(a, "-h") == 0 )
+            return usage();
+
+        if ( strcmp(a, "-data") == 0 && args.data_fname == NULL )
+            var = &args.data_fname;
+        else if ( strcmp(a, "-rna") == 0 && args.rna_fname == NULL )
+            var = &args.rna_fname;
+
+        if ( var != 0 ) {
+            if ( i == argc ) {
+                error_print("Missing an argument after %s.", a);
+                return 1;
+            }
+            *var = argv[i++];
+            continue;
+        }
+
+        if ( args.input_fname == NULL ) {
+            args.input_fname = a;
+            continue;
+        }
+        error_print("Unknown argument %s.", a);
+        return 1;        
+    }
+
+    if ( args.input_fname == NULL && (!isatty(fileno(stdin))) )
+        args.input_fname = "-";
+
+    if ( args.input_fname == NULL )
+        return usage();
+
+    if ( args.data_fname == NULL ) {
+        error_print("-data parameter is mandontory.");
+        return 1;
+    }
+
+    if ( args.rna_fname == NULL ) {
+        error_print("-rna parameter is mandontory.");
+        return 1;
+    }
+    
+    return 0;
+}
+
+int hgvs_vcf_anno()
+{
+    htsFile *fp = NULL;
+    fp = hts_open(args.input_fname, "r");
+    if ( fp == NULL ) {
+        error_print("%s : %s.", args.input_fname, strerror(errno));
+        return 1;
+    }
+    htsFormat type = *hts_get_format(fp);
+    if ( type.format != vcf && type.format != bcf ) {
+        error_print("Unsupported input format. Accept BCF/VCF format only. %s.", args.input_fname);
+        return 1;
+    }
+
+    bcf_hdr_t *hdr = bcf_hdr_read(fp);
+    if ( hdr == NULL ) {
+        error_return("Failed to parse header of input.");
+        return 1;
+    }
+    bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);
+
+    if ( init_hgvs_anno(args.data_fname, args.rna_fname, hdr_out) )
+        goto failed_init;
+    
+    htsFile *fp_out = hts_open("-", "w");
+    bcf_hdr_write(fp_out, hdr_out);
+    
+    bcf1_t *line = bcf_init();
+
+    for ( ;; ) {
+        if ( bcf_read(fp, hdr, line) )
+            break;
+        if ( line->rid == -1 )
+            continue;
+        // do nothing for reference positions
+        if ( bcf_get_variant_types(line) != VCF_REF )
+            setter_hgvs_vcf(hdr_out, line);
+        bcf_write(fp_out, hdr_out, line);
+    }
+
+    close_hgvs_anno();
+    bcf_destroy(line);
+    bcf_hdr_destroy(hdr);
+    bcf_hdr_destroy(hdr_out);
+    hts_close(fp);
+    hts_close(fp_out);
+
+    return 0;
+
+  failed_init:
+    bcf_hdr_destroy(hdr);
+    bcf_hdr_destroy(hdr_out);
+    return 1;
+}
+int main(int argc, char **argv)
+{
+    if ( parse_args(argc, argv) )
+        return 1;
+    if ( hgvs_vcf_anno() )
+        return 1;
+
+    return 0;
+}
+
+
+#endif

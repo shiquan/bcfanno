@@ -54,6 +54,9 @@ force:
 #hgvs_generate: $(HTSLIB) 
 #	$(CC) -D_HGVS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ sequence.c genepred.c hgvs_generate.c $(HTSLIB)
 
+hgvs_vcf: $(HTSLIB)
+	$(CC) -DHGVS_VCF_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/hgvs_vcf.c src/hgvs.c src/sequence.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
+
 vcfadd: $(HTSLIB) 
 	$(CC) -D_VCF_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/vcf_annos.c src/json_config.c src/config.c src/kson.c src/vcmp.c $(HTSLIB)
 
@@ -80,7 +83,7 @@ test: $(HTSLIB) version.h vcfadd bedadd
 clean: testclean
 	-rm -f gmon.out *.o *~ $(PROG) version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
-	-rm -f anno_vcf bedadd vcfadd vcfanno anno_bed hgvs_generate
+	-rm -f anno_vcf bedadd vcfadd vcfanno anno_bed hgvs_generate hgvs_vcf
 	-rm -f config vcfanno_debug vcf2tsv tsv2vcf vcf_rename_tags
 
 testclean:

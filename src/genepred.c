@@ -55,19 +55,18 @@ int file_seek(htsFile *fp, long offset, int where)
 #define GENEPRED_CIGAR_DELETE_BASE  'D'
 #define GENEPRED_CIGAR_INSERT_BASE  'I'
 
-
 // The fields cigar packed counts and cigar type, as follows:
 //
 //   offset   bits  value
-//   0        2     cigar_type
-//   3        32    cigar_counts
+//   0        3     cigar_type
+//   4        32    cigar_counts
 //
-#define GENEPRED_CIGAR_PACKED_FIELD 2
+#define GENEPRED_CIGAR_PACKED_FIELD 3
 #define GENEPRED_CIGAR_UNKNOWN_TYPE 0
 #define GENEPRED_CIGAR_MATCH_TYPE   1
 #define GENEPRED_CIGAR_DELETE_TYPE  2
-#define GENEPRED_CIGAR_INSERT_TYPE  3
-#define GENEPRED_CIGAR_MASK_TYPE    4
+#define GENEPRED_CIGAR_INSERT_TYPE  4
+#define GENEPRED_CIGAR_MASK_TYPE    7
 
 struct list *init_list(const char *fn)
 {
@@ -268,6 +267,7 @@ static struct genepred_format refgene_formats = {
     .exon_count = 8,
     .exonstarts = 9,
     .exonends = 10,
+    .name_version = -1,
     .realn = -1,
 };
     
@@ -283,7 +283,8 @@ static struct genepred_format genepred_formats = {
     .exonstarts = 8,
     .exonends = 9,
     .name2 = 10,
-    .realn = 11,
+    .name_version = 11,
+    .realn = 12,
 };
 
 static struct genepred_format refflat_formats = {    
@@ -298,6 +299,7 @@ static struct genepred_format refflat_formats = {
     .exon_count = 8,
     .exonstarts = 9,
     .exonends = 10,
+    .name_version = -1,
     .realn = -1,
 };
 
@@ -378,8 +380,18 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
     // Parse gene name, for some genepred file, no name2 specified.
     BRANCH(line->name2, type->name2, strdup);
 
+    if (type->name_version != -1 && nfields > type->name_version ) {
+        BRANCH(line->name_version, type->name_version, str2int);
+    }
+    else {
+        line->name_version = 0;
+    }
+    
     if (type->realn != -1 && nfields > type->realn) {
         BRANCH(line->realn, type->realn, strdup);
+    }
+    else {
+        line->realn = NULL;
     }
     
 #undef BRANCH
@@ -391,9 +403,11 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
     if ( type->exonends >= nfields )
         return 1;
 
-    char *ss = string->s + splits[type->exonstarts];
-    char *se = string->s + splits[type->exonends];
-    char *ss1, *se1;
+    char *ss, *se, *ss1, *se1;
+    
+    ss = string->s + splits[type->exonstarts];
+    se = string->s + splits[type->exonends];
+    
     int i;
     // Alloc memory for exons[], exon_offset_pair[], and loc[].
     for ( i = 0; i < 2; i++ ) {
@@ -420,6 +434,7 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
         line->exons[BLOCK_END][i] = str2int(se);
         se = ++se1;   
     }
+    
     return 0;
 }
 int parse_line(kstring_t *string, struct genepred_line *line)
@@ -439,7 +454,7 @@ int parse_line_locs(struct genepred_line *line)
     line->loc_parsed = 1;
     
     // parse cigar string
-    if ( type->realn > 0 && line->realn != NULL ) {
+    if (line->realn != NULL ) {
         int i, j, l, m = 0;
         l = strlen(line->realn);
 
@@ -447,7 +462,7 @@ int parse_line_locs(struct genepred_line *line)
             j = i;
             for (; isdigit(line->realn[i]) && i < l; i++);
             if ( i == l ) {
-                error_print("Failed to parse CIGAR column. %s", line->realn);
+                error_print("Failed to parse CIGAR column. %s %d %d %s", line->chrom, line->txstart, line->txend, line->realn);
                 return 1;
             }
             if ( line->n_cigar == m ) {
@@ -489,6 +504,8 @@ int parse_line_locs(struct genepred_line *line)
                     return 1;
             }
 #undef BRANCH
+            line->n_cigar++;
+            i++;
         }
     }
 
@@ -543,7 +560,7 @@ int parse_line_locs(struct genepred_line *line)
             utr3_length += exon_length;
         } else if ( line->cdsend < line->exons[BLOCK_END][i]) {
             utr3_length += line->exons[BLOCK_END][i] - line->cdsend;
-        }        
+        }
     }
 
     // read_length is the coding reference length for coding transcript or length of noncoding transcript
@@ -568,8 +585,8 @@ int parse_line_locs(struct genepred_line *line)
             line->loc[BLOCK_END][i] = line->reference_length - line->loc[BLOCK_END][i] + 1;
         }
     }
-
-
+    
+    // debug_print("%d", line->utr5_length);
     // realign genome locations
     if ( line->n_cigar > 0 ) {
         int match = 0;
@@ -577,36 +594,46 @@ int parse_line_locs(struct genepred_line *line)
         int ins = 0;
         int offset = 0;
         
-        int i, j;
-        
-        for ( i = 0, j = 0; i < line->exon_count*2 && j < line->n_cigar; j++) {
+        int i = 0, j = 0;
+        int lock_utr5_realign = is_coding ? 0 : 1;
+        // for ( i = 0, j = 0; i < line->exon_count*2 && j < line->n_cigar; j++) {
+        for ( ;; ) {
             // Offset need to be added to utr5 length only if first match block smaller than it.
-            if ( is_coding && line->utr5_length < match + del)
+            if ( lock_utr5_realign == 0 && line->utr5_length <= match) {
                 line->utr5_length += offset;
+                lock_utr5_realign = 1;
+            }
+
+            if ( i == line->exon_count*2 || j == line->n_cigar )
+                break;
             
-            int *loc = line->strand == '+' ? line->loc[i]  : line->loc[line->exon_count*2-i-1];
-            if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_MATCH_TYPE ) {                
+            if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) & GENEPRED_CIGAR_MATCH_TYPE ) {
                 match += line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
             }
             // deletions should be consider as match when count locs
-            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_DELETE_TYPE ) {
+            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) & GENEPRED_CIGAR_DELETE_TYPE ) {
                 del = line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
+                match += del;
                 offset -= del;
             }
             // If insertion is tail-As, skip count offset.
-            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) == GENEPRED_CIGAR_INSERT_TYPE ) {
+            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) & GENEPRED_CIGAR_INSERT_TYPE ) {
                 ins = line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
                 if ( j != line->n_cigar -1) 
                     offset += ins;
-            }   
-            
-            if ( *loc > match + del)
-                continue;
-
-            *loc += offset;
-            i++;
+            }
+            while (1) {
+                int *loc = is_strand ? &line->loc[i%2][i/2] : &line->loc[i%2 ? 0 : 1][line->exon_count-i /2-1];
+                if (*loc > match)
+                    break;
+                
+                *loc += offset;
+                i++;
+            }
+            j++;
         }
-    }    
+    }
+    // debug_print("%d", line->utr5_length);
     return 0;
 }
 
@@ -707,8 +734,36 @@ struct genepred_line *genepred_line_copy(struct genepred_line *line)
             memcpy(nl->loc[i], line->loc[i], sizeof(int) *line->exon_count);
         }
     }
+    if ( line->realn )
+        nl->realn = strdup(line->realn);
+
+    if ( line->n_cigar ) {
+        nl->n_cigar = line->n_cigar;
+        nl->cigars = (int*)malloc(line->n_cigar*sizeof(int));
+        memcpy(nl->cigars, line->cigars, line->n_cigar*sizeof(int));
+    }
+    
     return nl;
 }
+void genepred2line(struct genepred_line *line, kstring_t *str)
+{
+    int i;
+    str->l = 0;
+    ksprintf(str, "%s\t%s\t%c\t%d\t%d\t%d\t%d\t%d\t",
+            line->name1, line->chrom, line->strand, line->txstart-1, line->txend, line->cdsstart-1, line->cdsend, line->exon_count
+        );
+    for ( i = 0; i < line->exon_count; ++i )
+        ksprintf(str, "%d,", line->exons[BLOCK_START][i]-1);
+
+    kputc('\t', str);
+
+    for ( i = 0; i < line->exon_count; ++i )
+        ksprintf(str, "%d,", line->exons[BLOCK_END][i]);
+    kputc('\t', str);
+    kputs(line->name2, str);
+
+}
+
 char *generate_dbref_header()
 {
     kstring_t string = KSTRING_INIT;
@@ -803,9 +858,12 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
     memset(&node, 0, sizeof(node));
     char *ss = (char*)name;
     int check_version = 0;
+    int length;
+    length = strlen(name);
     for ( ; ss != NULL && *ss; ss++ ) {
         if ( *ss == '.' ) {
             check_version = 1;
+            length = ss-name;
             break;
         }
     }
@@ -821,16 +879,18 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
 
         if ( check_version == 0 ) {
             char *ss;
-            int i;
+            //int i;
             ss = node.name1;
-            for ( i = 0; ss; ++ss, ++i) {
-                if ( *ss == '.')
-                    break;
-                if (name[i] != *ss)
-                    break;
-            }
-            if ( *ss != '.' || name[i] != '\0' )
+            if ( strncmp(name, node.name1, length) != 0 )
                 continue;
+            /* for ( i = 0; ss; ++ss, ++i) { */
+            /*     if ( *ss == '.') */
+            /*         break; */
+            /*     if (name[i] != *ss) */
+            /*         break; */
+            /* } */
+            /* if ( *ss != '.' || name[i] != '\0' ) */
+            /*     continue; */
             
             // if (strncasecmp(node.name1, name, i ) == 0 ) {
             struct genepred_line *temp1 = genepred_line_copy(&node);
@@ -840,7 +900,6 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
                 temp->next = temp1;
             }
             temp = temp1;
-                // }
         } else if ( strcasecmp(node.name1, name) == 0 ) {            
             struct genepred_line *temp1 = genepred_line_copy(&node);
             if ( head == NULL )
@@ -983,7 +1042,7 @@ int parse_args(int argc, char **argv)
     return 0;
 }
 
-void retrieve_bed()
+int retrieve_bed()
 {
     if ( args.noheader == 0 ) {
         char *header = generate_dbref_header();
@@ -997,7 +1056,8 @@ void retrieve_bed()
             node = genepred_retrieve_trans(args.spec, args.fast);
         struct genepred_line *temp = node;
         for ( ; temp; temp = temp->next )  {
-            parse_line_locs(temp);
+            if ( parse_line_locs(temp) )
+                return 1;
             generate_dbref_database(temp);
         }
         list_lite_del(&node, genepred_line_destroy);
@@ -1014,13 +1074,15 @@ void retrieve_bed()
         }
         clear_genepred_line(&node);
     }
+    return 0;
 }
 int main(int argc, char **argv)
 {
     if ( parse_args(argc, argv) )
         return 1;
 
-    retrieve_bed();
+    if ( retrieve_bed() )
+        return 1;
     destroy_args();
     
     return 0;

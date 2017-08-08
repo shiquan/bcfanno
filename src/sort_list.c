@@ -21,7 +21,7 @@ int sort_list(void *plist, comp_func *func)
         return 1;
     struct list_lite *el;
     struct list_lite **array;
-    array = (struct list_lite*)malloc(l * sizeof(struct list_lite*));
+    array = (struct list_lite**)malloc(l * sizeof(struct list_lite*));
     int i;
     for ( el = list, i= 0; el != NULL; el = el->next, i++ )
         array[i] = el;
@@ -47,7 +47,7 @@ int sort_rmdup_list(void *plist, comp_func *func, del_func del_func)
         return 1;
     struct list_lite *el;
     struct list_lite **array;
-    array = (struct list_lite*)malloc(l*sizeof(struct list_lite*));
+    array = (struct list_lite**)malloc(l*sizeof(struct list_lite*));
     int i;
     for ( el = list, i = 0; el != NULL; el = el->next, i++)
         array[i] = el;

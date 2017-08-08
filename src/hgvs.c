@@ -587,7 +587,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
 {    
     if ( line->cdsstart == line->cdsend ) {
         type->func = func_region_noncoding;
-    } else {
+    }
+    else {
         if ( pos <= line->utr5_length ) {
             type->func = func_region_utr5;
             // pos = line->utr5_length - pos + 1;
@@ -601,10 +602,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     }
 
     struct hgvs_des *des = &spec.des;
-    // Exon or intron id.
-    int i;
-    // CDS id.
-    int h;
+    int i;    // Exon or intron id.
+    int h;    // CDS id.
     int cds_pos;
     type->vartype = var_is_unknown;
 
@@ -613,7 +612,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             type->vartype = _type;                      \
         }                                               \
 } while(0)
-
+    
     if ( line->strand == '+' ) {
         for ( i = 0, h = 0; i < line->exon_count; ) {
             if ( line->loc[BLOCK_END][i] > line->utr5_length &&
@@ -834,24 +833,35 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     type->fs = 0;
     return 0;
 }
+
+static int hgvs_func_vartype(struct genepred_line *line, int pos, int offset, int ref_length, char *ref, int alt_length, char *alt, struct var_func_type *type)
+{
+    
+    return 0;
+}
 int print_hgvs_summary();
 
 // return 0 on success, 1 on out of range.
 int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int start, int end, int ref_length, char *ref, int alt_length, char *alt)
 {
-    // int i;
-    // int blk_start = 0, blk_end = 0;
     struct hgvs_name *name = &core->name;
     struct var_func_type *type = &core->type;
     
-    if ( line->loc_parsed == 0 )
-        parse_line_locs(line);
+    if ( line->loc_parsed == 0 ) {
+        if ( parse_line_locs(line) ) {
+            error_print("Failed to parse locs of line:. %s", line->name1);
+            return 1;
+        }
+    }
 
     // generate amino acid length
     name->aa_length = line->cdsstart == line->cdsend ? 0 : (line->reference_length - line->utr5_length - line->utr3_length)/3;
         
     // in case dual strands transcript RNAs, record strand for each transcript
     name->strand = line->strand;
+    // transcript version will be used to generate HGVS nomen
+    name->name_version = line->name_version;
+    
     int exon_id1 = 0;
     int exon_id2 = 0;
     if ( find_locate(line, &name->pos, &name->offset, start, &exon_id1) )
@@ -876,6 +886,7 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
     name->name1 = strdup(line->name1);
     name->name2 = strdup(line->name2);
 
+    
     // Check the vartype.
     if ( check_func_vartype(line, name->pos, name->offset, ref_length, ref, alt_length, alt, type) )
         return 1;
