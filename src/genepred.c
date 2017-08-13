@@ -476,12 +476,12 @@ int parse_line_locs(struct genepred_line *line)
             } while(0)
               
             switch ( line->realn[i] ) {
-                case GENEPRED_CIGAR_UNKNOWN_TYPE: {
-                    if ( line->n_cigar > 0 ) 
+                case GENEPRED_CIGAR_UNKNOWN_BASE: {
+                    if ( m > 0 ) 
                         free(line->cigars);
                     line->n_cigar = 0;
-                    line->cigars = NULL;
-                    i = l;
+                    line->cigars = NULL;              
+                    m = 0;
                     break;
                 }
                     
@@ -504,16 +504,20 @@ int parse_line_locs(struct genepred_line *line)
                     return 1;
             }
 #undef BRANCH
+            // not allocated memory for cigars, get out of realign...
+            if ( m == 0 )
+                break;
             line->n_cigar++;
             i++;
-        }
+        }                
     }
 
     // Calculate the length of function regions, utr5_length is the length of UTR5, and utr3_length
     // is the length of UTR3, without consider of the strand of transcript.
-    int read_length = 0;
+    // int read_length = 0;
     int utr5_length = 0;
     int utr3_length = 0;
+    // int cds_length = 0;
     int loc = 0;
     int i;
     int exon_start, exon_end, exon_length;
@@ -523,7 +527,6 @@ int parse_line_locs(struct genepred_line *line)
     int is_coding = line->cdsstart == line->cdsend ? 0 : 1;
     
     for ( i = 0; i < 2; i++ ) {
-        // line->dna_ref_offsets[i] = calloc(line->exon_count, sizeof(int));
         line->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
     }
             
@@ -564,29 +567,34 @@ int parse_line_locs(struct genepred_line *line)
     }
 
     // read_length is the coding reference length for coding transcript or length of noncoding transcript
-    if ( is_coding == 0 ) {
-        read_length = line->reference_length;
-    }  else {
-        read_length = line->reference_length - utr5_length - utr3_length;
-        // Init forward and backward length. For minus strand, reverse the backward and forward length.
-        if ( is_strand ) {
-            line->utr5_length = utr5_length;
-            line->utr3_length = utr3_length;
-        } else {
-            line->utr5_length = utr3_length;
-            line->utr3_length = utr5_length;
-        }
-    }
-
-    // For minus strand, reverse the locations.
-    if ( is_strand == 0 ) {
+    // if ( is_coding == 0 ) {
+    // read_length = line->reference_length;
+    // }  else {
+    //    read_length = line->reference_length - utr5_length - utr3_length;
+    // Init forward and backward length. For minus strand, reverse the backward and forward length.
+    if ( is_strand ) {
+        line->utr5_length = utr5_length;
+        // line->utr3_length = utr3_length;
+        line->cds_length = line->reference_length - utr3_length;
+    } else {
+        line->utr5_length = utr3_length;
+        // line->utr3_length = utr5_length;
+        line->cds_length = line->reference_length - utr5_length;
         for ( i = 0; i < line->exon_count; ++i ) {
             line->loc[BLOCK_START][i] = line->reference_length - line->loc[BLOCK_START][i] + 1;
             line->loc[BLOCK_END][i] = line->reference_length - line->loc[BLOCK_END][i] + 1;
         }
     }
+    // }
+
+    // For minus strand, reverse the locations.
+    // if ( is_strand == 0 ) {
+    // for ( i = 0; i < line->exon_count; ++i ) {
+    // line->loc[BLOCK_START][i] = line->reference_length - line->loc[BLOCK_START][i] + 1;
+    // line->loc[BLOCK_END][i] = line->reference_length - line->loc[BLOCK_END][i] + 1;
+    // }
+    // }
     
-    // debug_print("%d", line->utr5_length);
     // realign genome locations
     if ( line->n_cigar > 0 ) {
         int match = 0;
@@ -596,12 +604,19 @@ int parse_line_locs(struct genepred_line *line)
         
         int i = 0, j = 0;
         int lock_utr5_realign = is_coding ? 0 : 1;
-        // for ( i = 0, j = 0; i < line->exon_count*2 && j < line->n_cigar; j++) {
+        int lock_cds_realign = is_coding ? 0 : 1;
+
         for ( ;; ) {
             // Offset need to be added to utr5 length only if first match block smaller than it.
             if ( lock_utr5_realign == 0 && line->utr5_length <= match) {
                 line->utr5_length += offset;
                 lock_utr5_realign = 1;
+            }
+            
+            // Adjust the cds length.
+            if ( lock_cds_realign == 0 && line->cds_length >= match) {
+                line->cds_length += offset;
+                lock_cds_realign = 1;
             }
 
             if ( i == line->exon_count*2 || j == line->n_cigar )
@@ -622,18 +637,19 @@ int parse_line_locs(struct genepred_line *line)
                 if ( j != line->n_cigar -1) 
                     offset += ins;
             }
-            while (1) {
+            for (; i < line->exon_count*2;) {
                 int *loc = is_strand ? &line->loc[i%2][i/2] : &line->loc[i%2 ? 0 : 1][line->exon_count-i /2-1];
                 if (*loc > match)
                     break;
                 
                 *loc += offset;
                 i++;
+                // debug_print("%d, %d, ", i,*loc, match);
             }
             j++;
         }
     }
-    // debug_print("%d", line->utr5_length);
+
     return 0;
 }
 
@@ -720,7 +736,8 @@ struct genepred_line *genepred_line_copy(struct genepred_line *line)
     nl->cdsstart = line->cdsstart;
     nl->cdsend = line->cdsend;
     nl->utr5_length = line->utr5_length;
-    nl->utr3_length = line->utr3_length;
+    //nl->utr3_length = line->utr3_length;
+    nl->cds_length = line->cds_length;
     nl->reference_length = line->reference_length;
     nl->exon_count = line->exon_count;
     nl->loc_parsed = line->loc_parsed;
@@ -782,9 +799,9 @@ void generate_dbref_database(struct genepred_line *line)
         if ( line->loc[BLOCK_START][i] < line->utr5_length ) {
             kputc('-', &temp[0]);
             kputw(line->utr5_length - line->loc[BLOCK_START][i] + 1, &temp[0]);
-        } else if ( line->loc[BLOCK_START][i] > line->reference_length - line->utr3_length ) {
+        } else if ( line->loc[BLOCK_START][i] > line->cds_length ) {
             kputc('*', &temp[0]);
-            kputw(line->loc[BLOCK_START][i] - (line->reference_length - line->utr3_length), &temp[0]);
+            kputw(line->loc[BLOCK_START][i] - line->cds_length, &temp[0]);
         } else {
             kputw(line->loc[BLOCK_START][i] - line->utr5_length, &temp[0]);
         }
@@ -792,9 +809,9 @@ void generate_dbref_database(struct genepred_line *line)
         if ( line->loc[BLOCK_END][i] < line->utr5_length ) {
             kputc('-', &temp[1]);
             kputw(line->utr5_length - line->loc[BLOCK_END][i] + 1, &temp[1]);
-        } else if ( line->loc[BLOCK_END][i] > line->reference_length - line->utr3_length ) {
+        } else if ( line->loc[BLOCK_END][i] > line->cds_length ) {
             kputc('*', &temp[1]);
-            kputw(line->loc[BLOCK_END][i] - (line->reference_length - line->utr3_length), &temp[1]);
+            kputw(line->loc[BLOCK_END][i] - line->cds_length, &temp[1]);
         } else {
             kputw(line->loc[BLOCK_END][i] - line->utr5_length, &temp[1]);
         }            

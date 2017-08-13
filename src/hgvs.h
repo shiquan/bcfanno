@@ -4,8 +4,12 @@
 #include <stdlib.h>
 #include "sequence.h"
 
-#define SPLIT_RANGE 3
-
+#define SPLICE_SITE_EXON_RANGE      3
+#define SPLICE_SITE_INTRON5_RANGE   3
+#define SPLICE_SITE_INTRON3_RANGE   8
+#define SPLICE_DONDOR_RANGE         2
+#define SPLICE_ACCEPTOR_RANGE       2
+ 
 enum func_region_type {
     _func_region_promote_to_int = -1,
     func_region_unknown,

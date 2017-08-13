@@ -96,4 +96,14 @@
 
 #define BE_SMART_STRING "Please DO NOT post this error message on forums or emails. And please read the online manual"
 
+static inline void *bcfanno_realloc(void *x, size_t size)
+{
+    void *y = realloc(x, size);
+    if ( y == NULL ) {
+        free(x);
+        return NULL;
+    }
+    return y;
+}
+
 #endif

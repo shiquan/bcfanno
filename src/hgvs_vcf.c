@@ -135,6 +135,9 @@ static char *retrieve_trans_des(struct hgvs_des *des)
         struct hgvs_name *name = &des->a[i].name;
         if ( i ) kputc('|', &string);
         kputs(name->name1, &string);
+        if ( name->name_version > 0 ) {
+            ksprintf(&string, ".%d",name->name_version);
+        }        
     }
     return string.s;
 }
@@ -230,7 +233,12 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
         if ( j ) kputc('|', &string);
         j++;
         
-        ksprintf(&string, "%s:",name->name1);
+        ksprintf(&string, "%s",name->name1);
+        if ( name->name_version > 0 ) {
+            ksprintf(&string, ".%d",name->name_version);
+        }
+        kputc(':', &string);
+
         kputs("n.", &string);
         ksprintf(&string, "%d", name->pos);
         if ( name->offset > 0 ) {
@@ -313,8 +321,12 @@ static char *retrieve_ivsnom_des(struct hgvs_des *des)
         if ( j ) kputc('|', &string);
         ++j;
         
-        ksprintf(&string, "%s:IVS%d",name->name1, type->count);
-        
+        ksprintf(&string, "%s",name->name1);
+        if ( name->name_version > 0 ) {
+            ksprintf(&string, ".%d",name->name_version);
+        }
+        kputc(':', &string);
+        ksprintf(&string, "c.IVS%d", type->count);
         if ( name->offset > 0 ) {
             ksprintf(&string, "+%d", name->offset);
         } else if (name->offset < 0) {

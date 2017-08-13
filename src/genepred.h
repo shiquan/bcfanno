@@ -14,6 +14,26 @@
 #define read_end(a, l) (a[BLOCK_END][l])
 #define get_length_exon(a, l) (a[BLOCK_END][l] - a[BLOCK_START][l] + 1)
 
+// CIGARS
+#define GENEPRED_CIGAR_UNKNOWN_BASE '*'
+#define GENEPRED_CIGAR_MATCH_BASE   'M'
+#define GENEPRED_CIGAR_DELETE_BASE  'D'
+#define GENEPRED_CIGAR_INSERT_BASE  'I'
+
+// The fields cigar packed counts and cigar type, as follows:
+//
+//   offset   bits  value
+//   0        3     cigar_type
+//   4        32    cigar_counts
+//
+#define GENEPRED_CIGAR_PACKED_FIELD 3
+#define GENEPRED_CIGAR_UNKNOWN_TYPE 0
+#define GENEPRED_CIGAR_MATCH_TYPE   1
+#define GENEPRED_CIGAR_DELETE_TYPE  2
+#define GENEPRED_CIGAR_INSERT_TYPE  4
+#define GENEPRED_CIGAR_MASK_TYPE    7
+
+// STRUCT
 struct genepred_line {
     struct genepred_line *next;
     // Chromosome id.
@@ -37,7 +57,9 @@ struct genepred_line {
     // for noncoding transcript, no UTRs, so the forward and backward length should
     // always be 0.
     int utr5_length;
-    int utr3_length;
+    // int utr3_length;
+    // the length of utr5 and cds
+    int cds_length; 
 
     // Length of this transcript.
     int reference_length;

@@ -20,26 +20,6 @@ struct hgvs_spec {
     regex_t *exp;
 } spec;
 
-struct splice_sites_definition {
-    int splice_sites5_upstream;
-    int splice_sites5_downstream;
-    int splice_sites3_upstream;
-    int splice_sites3_downstream;
-} ss = {
-    .splice_sites5_downstream = 3,
-    .splice_sites5_upstream = 3,
-    .splice_sites3_upstream = 3,
-    .splice_sites3_downstream = 3,
-};
-
-void splice_sites_definition_update(int downstream5, int upstream5, int downstream3, int upstream3)
-{
-    ss.splice_sites5_downstream = downstream5;
-    ss.splice_sites5_upstream = upstream5;
-    ss.splice_sites3_downstream = downstream3;
-    ss.splice_sites3_upstream = upstream3;
-}
-
 void hgvs_core_clear(struct hgvs_core *core)
 {
     if ( core->name.name1 != NULL)
@@ -130,6 +110,9 @@ static int convert_loc2position(struct genepred_line *line, int location, int of
         }
         return line->exons[BLOCK_START][i] + location - line->loc[BLOCK_START][i];        
     } else {
+        // for minus strand, reverse offset
+        offset = -offset;
+        
         for ( i = 0; i < line->exon_count; ++i ) {
             if ( location >= line->loc[BLOCK_END][i] && location <= line->loc[BLOCK_START][i])
                 break;            
@@ -185,7 +168,7 @@ static int parse_position(char *ss, char *se, struct genepred_line *line)
     } else if ( pos_type == func_region_utr5 ) {
         position = line->utr5_length - position + 1;
     } else if ( pos_type == func_region_utr3 ) {
-        position = line->reference_length - line->utr3_length + position;    
+        position = line->cds_length + position;    
     } else {
         error("Impossible situation.");
     }
@@ -566,38 +549,100 @@ static int find_locate(struct genepred_line *line, int *pos, int *offset, int st
         if ( line->strand == '+' ) {
             *pos = line->loc[BLOCK_START][block1] + start - line->exons[BLOCK_START][block1];
         } else {
-            *pos = line->loc[BLOCK_START][block1] - (start - line->exons[BLOCK_START][block1]);
+            *pos = line->loc[BLOCK_END][block1] + ( line->exons[BLOCK_END][block1] - start);
         }
         *offset = 0;
     } else {
         int upstream =  start - line->exons[BLOCK_END][block1];
-        int downstream = line->exons[BLOCK_START][block2];
+        int downstream = line->exons[BLOCK_START][block2]-start;
         if ( upstream > downstream ) {
             *pos = line->loc[BLOCK_START][block2];
             *offset = line->strand == '+' ? -downstream : downstream;
         } else {
             *pos = line->loc[BLOCK_END][block1];
             *offset = line->strand == '+' ? upstream : -upstream;
-        }        
+        }
     }
     *exon_id = block1;
+
+    // adjust position if located in exon and there are realignments in the transcript sequence
+    if ( *offset != 0 )
+        return 0;
+
+    if ( line->n_cigar == 0 )
+        return 0;
+
+    if ( line->n_cigar == 1 && (line->cigars[0] & GENEPRED_CIGAR_MATCH_TYPE) )
+        return 0;
+    
+    int adjust = 0;
+    int i;
+    int match = 0;
+    int ins, del;
+    for ( i = 0; i < line->n_cigar; ++i ) {            
+        if ( line->cigars[i] & GENEPRED_CIGAR_MATCH_TYPE )  {
+            match += line->cigars[i] >> GENEPRED_CIGAR_PACKED_FIELD;
+        }
+        else if ( line->cigars[i] & GENEPRED_CIGAR_DELETE_TYPE ) {
+            del = line->cigars[i] >> GENEPRED_CIGAR_PACKED_FIELD;
+            // there is no need to check match and *pos, becase for plus strand match will be always smaller than *pos in  this function,
+            // check if this deletion in the target block
+            if ( line->loc[line->strand == '+' ? BLOCK_START : BLOCK_END][i] <= match && *pos > match) {
+                adjust -= del;            
+                // if this variant located in the deletion, just put pos to the edge of this gap
+                if ( *pos < match +  del ) {
+                    *pos += 1;
+                    return 0;
+                }
+            }
+            match += del;
+        }
+        else if ( line->cigars[i] & GENEPRED_CIGAR_INSERT_TYPE ) {
+            ins = line->cigars[i] >> GENEPRED_CIGAR_PACKED_FIELD;
+            if ( line->loc[line->strand == '+' ? BLOCK_START : BLOCK_END][block1] <= match  && *pos > match )
+                adjust += ins;
+        }
+        if ( line->strand == '+' && match >= *pos )     
+            break;
+        else if ( line->strand == '-' && match < *pos )
+            break;
+    }
+    *pos += adjust;
+    /*             if ( match >= line->loc[BLOCK_START][i] && *pos > match ) */
+    /*                 adjust -= del; */
+                
+    /*             match += del; */
+    /*         } */
+    /*         else if ( line->cigars[i] & GENEPRED_CIGAR_INSERT_TYPE ) { */
+    /*             ins = line->cigars[i] >> GENEPRED_CIGAR_PACKED_FIELD; */
+    /*             if ( match >= line->loc[BLOCK_START][i] && *pos > match ) */
+    /*                 adjust += ins; */
+    /*         } */
+    /*         if ( *pos > match) */
+    /*             break; */
+    /*     }         */
+    /*     *pos += adjust; */
+    /* } */
     return 0;
 }
+
+// pos     - position or nearest position on the transcript (include UTR, count from transcription strand)
+// offset  - offset near the pos, always be 0 if variant located in exon
 static int check_func_vartype(struct genepred_line *line, int pos, int offset, int ref_length, char *ref, int alt_length, char *alt, struct var_func_type *type)
 {    
     if ( line->cdsstart == line->cdsend ) {
         type->func = func_region_noncoding;
     }
+    // if coding transcript, check UTR or coding region
     else {
         if ( pos <= line->utr5_length ) {
             type->func = func_region_utr5;
-            // pos = line->utr5_length - pos + 1;
-        } else if ( line->reference_length - pos <= line->utr3_length ) {
+        }
+        else if ( pos > line->cds_length ) {
             type->func = func_region_utr3;
-            // pos = line->utr3_length - (line->reference_length - pos);
-        } else {
+        }
+        else {
             type->func = func_region_cds;
-            // pos = pos - line->utr5_length;
         }
     }
 
@@ -615,40 +660,37 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     
     if ( line->strand == '+' ) {
         for ( i = 0, h = 0; i < line->exon_count; ) {
-            if ( line->loc[BLOCK_END][i] > line->utr5_length &&
-                 pos > line->utr5_length &&
-                 pos <= line->reference_length - line->utr3_length)
+            // count cds
+            if ( line->loc[BLOCK_END][i] > line->utr5_length && pos > line->utr5_length && pos <= line->cds_length)
                 h++;
-
+            // block found
             if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i] ) {
-                if ( pos <= line->loc[BLOCK_START][i] + SPLIT_RANGE || pos >= line->loc[BLOCK_END][i] - SPLIT_RANGE) {
+                if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
-
                 break;
             }
             ++i;
         }
-
+        
         if ( offset == 0 ) {
             type->count = i+1;
             type->count2 = h;
         } else {
             type->count = offset < 0 ? i : i + 1;
+            // for intron, cds count should be 0
             type->count2 = 0;
         }
     } else {
         for ( i = 0, h = 0; i < line->exon_count; ) {
             int j = line->exon_count - i - 1;
-            if ( line->loc[BLOCK_START][j] > line->utr5_length &&
-                 pos > line->utr5_length &&
-                 pos <= line->reference_length - line->utr3_length)
+            if ( line->loc[BLOCK_START][j] > line->utr5_length && pos > line->utr5_length && pos <= line->cds_length)
                 h++;
 
             if ( pos >= line->loc[BLOCK_END][j] && pos <= line->loc[BLOCK_START][j] ) {
-                if ( pos <= line->loc[BLOCK_END][j] + SPLIT_RANGE || pos >= line->loc[BLOCK_START][j] - SPLIT_RANGE) {
+                if (pos <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE) {
                     type->vartype = var_is_splice_site;
-                }                
+                } 
                 break;
             }
             ++i;
@@ -662,22 +704,29 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             type->count2 = 0;
         }
     }
-    // check if variantion located in the splice sites around the edge of utr and cds regions
-    
-    if ( offset != 0 ) {        
-        if ( offset < SPLIT_RANGE && offset > -SPLIT_RANGE ) {
-            type->vartype = var_is_splice_site;
-        } else {
+
+    // check if variantion located in the splice sites around the edge of utr and cds regions    
+    if ( offset < 0 ) {
+        if ( offset > -SPLICE_SITE_EXON_RANGE )
+            type->vartype = var_is_splice_acceptor;
+        else
             type->vartype = var_is_intron;
-        }
+        
         goto no_amino_code;
-    } else if ( pos > line->utr5_length - SPLIT_RANGE && pos < line->utr5_length + SPLIT_RANGE ) {
-        type->vartype = var_is_splice_site;
-    } else if ( line->reference_length - pos > line->utr3_length - SPLIT_RANGE && line->reference_length -pos < line->utr3_length + SPLIT_RANGE ) {
+    }
+    else if ( offset > 0 ) {
+        if ( offset < SPLICE_SITE_EXON_RANGE )
+            type->vartype = var_is_splice_donor;
+        else
+            type->vartype = var_is_intron;
+    }
+    else if ( pos > line->utr5_length - SPLICE_SITE_EXON_RANGE && pos < line->utr5_length + SPLICE_SITE_EXON_RANGE ) {
         type->vartype = var_is_splice_site;
     }
-    
-    
+    else if ( pos > line->cds_length - SPLICE_SITE_EXON_RANGE && pos < line->cds_length + SPLICE_SITE_EXON_RANGE ) {
+        type->vartype = var_is_splice_site;
+    }
+        
     // Check if noncoding transcript.
     if ( line->cdsstart == line->cdsend ) {
         // no cds count for noncoding transcript
@@ -685,7 +734,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         if ( line->strand == '+') {
             for ( i = 0; i < line->exon_count; ++i ) {
                 if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i]) {
-                    if ( pos <= line->loc[BLOCK_START][i] + SPLIT_RANGE || pos >= line->loc[BLOCK_END][i] - SPLIT_RANGE ) {
+                    if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) {
                         type->vartype = var_is_splice_site;
                     } else {
                         type->vartype = var_is_noncoding;
@@ -696,7 +745,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         } else {
             for ( i = 0; i < line->exon_count; ++i ) {
                 if ( pos <= line->loc[BLOCK_START][i] && pos >= line->loc[BLOCK_END][i]) {
-                    if ( pos <= line->loc[BLOCK_END][i] + SPLIT_RANGE || pos >= line->loc[BLOCK_START][i] -SPLIT_RANGE ) {
+                    if ( pos <= line->loc[BLOCK_END][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][i] -SPLICE_SITE_EXON_RANGE ) {
                         type->vartype = var_is_splice_site;
                     } else {
                         type->vartype = var_is_noncoding;
@@ -710,7 +759,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     }
 
     // Check if utr regions.
-    if ( pos <= line->utr5_length -SPLIT_RANGE ) {
+    if ( pos <= line->utr5_length -SPLICE_SITE_EXON_RANGE ) {
         BRANCH(var_is_utr5);
         goto no_amino_code;
     }
@@ -720,18 +769,19 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         goto no_amino_code;
     }
 
-    cds_pos = line->reference_length - line->utr3_length;
+    // cds_pos = line->reference_length - line->utr3_length;
     
-    if ( pos >= cds_pos + SPLIT_RANGE ) {
+    if ( pos >= line->cds_length + SPLICE_SITE_EXON_RANGE ) {
         BRANCH(var_is_utr3);
         goto no_amino_code;
     }
 
-    if ( pos >= cds_pos ) {
+    if ( pos >= line->cds_length ) {
         type->vartype = var_is_splice_site;
         goto no_amino_code;
     }
-
+    if ( offset != 0 )
+        goto no_amino_code;
     // amino_code:
     // Check if cds regions.
     cds_pos = pos - line->utr5_length;
@@ -763,13 +813,13 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 if ( seq2code4(ori_seq[cod+i]) == seq2code4(alt_seq[i]) ) {
                     type->vartype = var_is_no_call;
                 } else {
-                    warnings("Inconsistance nucletide. %s:%d, %c vs %c.", des->chrom, des->start+i,ori_seq[cod+i], ref_seq[i]);
+                    warnings("Inconsistance nucletide. %s:%d, %s:%d, %c vs %c.", des->chrom, des->start, line->name1, pos, ori_seq[cod+i], ref_seq[i]);
                     break;
                 }
             }
         }
     }
-
+    
     if ( ref_length == alt_length ) {
         char codon[4];
         memcpy(codon, ori_seq, 3);
@@ -802,7 +852,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 //type->vartype = var_is_missense;
                 BRANCH(var_is_missense);
             }
-        }                
+        } 
     } else {
         // Insertion
         
@@ -834,11 +884,6 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     return 0;
 }
 
-static int hgvs_func_vartype(struct genepred_line *line, int pos, int offset, int ref_length, char *ref, int alt_length, char *alt, struct var_func_type *type)
-{
-    
-    return 0;
-}
 int print_hgvs_summary();
 
 // return 0 on success, 1 on out of range.
@@ -855,7 +900,7 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
     }
 
     // generate amino acid length
-    name->aa_length = line->cdsstart == line->cdsend ? 0 : (line->reference_length - line->utr5_length - line->utr3_length)/3;
+    name->aa_length = line->cdsstart == line->cdsend ? 0 : (line->cds_length - line->utr5_length)/3;
         
     // in case dual strands transcript RNAs, record strand for each transcript
     name->strand = line->strand;
@@ -886,7 +931,6 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
     name->name1 = strdup(line->name1);
     name->name2 = strdup(line->name2);
 
-    
     // Check the vartype.
     if ( check_func_vartype(line, name->pos, name->offset, ref_length, ref, alt_length, alt, type) )
         return 1;
@@ -896,8 +940,8 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
         name->loc = line->utr5_length - name->pos + 1;
         name->end_loc = line->utr5_length - name->end_pos + 1;
     } else if ( type->func == func_region_utr3 ) {
-        name->loc = line->utr3_length - ( line->reference_length - name->pos );
-        name->end_loc = line->utr3_length - ( line->reference_length - name->end_pos );            
+        name->loc = name->pos - line->cds_length; // line->utr3_length - ( line->reference_length - name->pos );
+        name->end_loc = name->end_pos - line->cds_length; // line->utr3_length - ( line->reference_length - name->end_pos );            
     } else if ( type->func == func_region_cds ) {
         name->loc = name->pos - line->utr5_length;
         name->end_loc = name->end_pos - line->utr5_length;
