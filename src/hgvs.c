@@ -850,20 +850,42 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 BRANCH(var_is_missense);
             }
         } 
-    } else {
+    }
+    else {
         // Insertion
         if ( ref_length == 0 ) {
-            if ( alt_length % 3 )
-                BRANCH(var_is_frameshift);
-            else
-                BRANCH(var_is_inframe_insertion);
             kstring_t str = {0, 0, 0};
-        }        
+            kputsn(ori_seq, cod, &str);
+            kputsn(alt, alt_length, &str);
+            kputs(ori_seq + cod +1, &str);
+            type->ori_amino = codon2aminoid(ori_seq);
+            // AA123AAfs123
+            if ( alt_length % 3 ) {
+                BRANCH(var_is_frameshift);
+                type->mut_amino = codon2aminoid(str.s);
+                type->fs = check_stop_codon(str.s, NULL);
+                free(str.s);
+            }
+            // AA123delinsAAs
+            else {
+                BRANCH(var_is_inframe_insertion);
+                int j;
+                char codon[4];                
+                int m = 0;
+                
+                for (j = 0; j < (alt_length+1)%3; ++j) {
+                    memcpy(codon, str.s + 3*j, 3);
+                }
+            } 
+        }    
         // Deletion
         else if ( alt_length == 0 ) {
+            
         }
-        // Delins
+        // Delins        
         else {
+            // delins:
+            //des->loc_amino = pos
         }
     }
 
@@ -886,8 +908,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     type->loc_amino = 0;
     type->ori_amino = 0;
     type->mut_amino = 0;
-    type->n_ins = 0;
-    type->ins_amino = 0;
+    type->n = 0;
+    type->aminos = 0;
     type->fs = 0;
     return 0;
 }

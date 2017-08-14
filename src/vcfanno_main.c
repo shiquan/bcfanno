@@ -42,7 +42,7 @@ int usage()
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
-    fprintf(stderr, "   -t                             warning instead of abortion for inconsistant position\n"
+    fprintf(stderr, "   -t                             warning instead of abortion for inconsistant position\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
     fprintf(stderr, "\n");

@@ -237,10 +237,8 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
         if ( name->name_version > 0 ) {
             ksprintf(&string, ".%d",name->name_version);
         }
-        kputc(':', &string);
-        if ( name->offset == 0 && name->end_offset == 0 ) {
-            kputs("n.", &string);
-        ksprintf(&string, "%d", name->pos);
+        //kputc(':', &string);        
+        ksprintf(&string, ":n.%d", name->pos);
         if ( name->offset > 0 ) {
             ksprintf(&string, "+%d", name->offset);
         } else if (name->offset < 0) {
@@ -283,7 +281,7 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
                 free(alt);
             }
         }
-    }
+        }
     return string.s;
 }
 
