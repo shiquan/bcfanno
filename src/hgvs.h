@@ -31,11 +31,16 @@ struct var_func_type {
     int count;
     // CDS count, for noncoding transcript always be 0.
     int count2;
-    // Location of amino first influenced. Sometime a indel may change the amino sequence after severl condons.
+    // Location of amino first influenced. Sometime a indel may change the amino sequence after several condons.
     int loc_amino;
     // Original amino acid and mutated amino acid. Check amino type only if variants happed in cds region.
     int ori_amino;
+    int loc_end_amino;
+    // fast access for single amino acid change
     int mut_amino;
+    // buffer for insertion and deletion
+    int n;
+    int *aminos;
     // Terminal sequence after loc_amino.
     int fs;
 };

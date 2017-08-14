@@ -42,6 +42,7 @@ int usage()
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
+    fprintf(stderr, "   -t                             warning instead of abortion for inconsistant position\n"
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
     fprintf(stderr, "\n");
@@ -75,6 +76,9 @@ struct args {
     struct beds_options bed_opts;
     struct vcfs_options vcf_opts;
     // struct refgene_options hgvs_opts;
+
+    // warning instead of abortion flag
+    int tol;
 };
 
 struct args args = {
@@ -87,9 +91,7 @@ struct args args = {
     .fp_out = NULL,
     .output_type = 0,
     .commands = KSTRING_INIT,
-    //.bed_opts = BED_OPTS_INIT,
-    //.vcf_opts = VCF_OPTS_INIT,
-    //.hgvs_opts = HGVS_OPTS_INIT,
+    .tol = 0,
 };
 
 void args_destroy(){
@@ -141,7 +143,11 @@ int parse_args(int argc, char **argv)
 	if ( strcmp(a, "--test_only") == 0 ) {
 	    args.test_databases_only = 1;
 	    continue;
-	}	    
+	}
+        if ( strcmp(a, "-t") == 0 ) {
+            args.tol = 1;
+            continue;
+        }
 	const char **var = 0;
 	if ( strcmp(a, "-c") == 0 || strcmp(a, "--config") == 0 ) 
 	    var = &args.fname_json;
@@ -313,17 +319,17 @@ int anno_core(bcf1_t *line)
 
     // Annotate hgvs name
     // anno_refgene_core(&args.hgvs_opts, line);
-    if (setter_hgvs_vcf(args.hdr_out, line) == 1)
+    if (args.tol == 0 && setter_hgvs_vcf(args.hdr_out, line) == 1)
         return 1;
     
     // todo: stat type module, ti,tv etc
     
     // annotate vcf files
-    if (anno_vcfs_core(&args.vcf_opts, line) == 1)
+    if (args.tol == 0 && anno_vcfs_core(&args.vcf_opts, line) == 1)
         return 1;
  
     // annotate bed format datasets
-    if (anno_beds_core(&args.bed_opts, line) == 1)
+    if (args.tol == 0 && anno_beds_core(&args.bed_opts, line) == 1)
         return 1;
 
     // annotate transcript related bed format datasets

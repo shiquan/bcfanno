@@ -608,21 +608,7 @@ static int find_locate(struct genepred_line *line, int *pos, int *offset, int st
             break;
     }
     *pos += adjust;
-    /*             if ( match >= line->loc[BLOCK_START][i] && *pos > match ) */
-    /*                 adjust -= del; */
-                
-    /*             match += del; */
-    /*         } */
-    /*         else if ( line->cigars[i] & GENEPRED_CIGAR_INSERT_TYPE ) { */
-    /*             ins = line->cigars[i] >> GENEPRED_CIGAR_PACKED_FIELD; */
-    /*             if ( match >= line->loc[BLOCK_START][i] && *pos > match ) */
-    /*                 adjust += ins; */
-    /*         } */
-    /*         if ( *pos > match) */
-    /*             break; */
-    /*     }         */
-    /*     *pos += adjust; */
-    /* } */
+
     return 0;
 }
 
@@ -668,6 +654,10 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE) {
                     type->vartype = var_is_splice_site;
                 }
+                // in case indels cover splice site
+                else if ( pos + ref_length <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) {
+                    type->vartype = var_is_splice_site;
+                }
                 break;
             }
             ++i;
@@ -690,7 +680,11 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             if ( pos >= line->loc[BLOCK_END][j] && pos <= line->loc[BLOCK_START][j] ) {
                 if (pos <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE) {
                     type->vartype = var_is_splice_site;
-                } 
+                }
+                // in case indels cover splice site
+                else if ( pos + ref_length <= line->loc[BLOCK_END][i] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_START][i] - SPLICE_SITE_EXON_RANGE ) {
+                    type->vartype = var_is_splice_site;
+                }
                 break;
             }
             ++i;
@@ -719,6 +713,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             type->vartype = var_is_splice_donor;
         else
             type->vartype = var_is_intron;
+        goto no_amino_code;
     }
     else if ( pos > line->utr5_length - SPLICE_SITE_EXON_RANGE && pos < line->utr5_length + SPLICE_SITE_EXON_RANGE ) {
         type->vartype = var_is_splice_site;
@@ -782,6 +777,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     }
     if ( offset != 0 )
         goto no_amino_code;
+
     // amino_code:
     // Check if cds regions.
     cds_pos = pos - line->utr5_length;
@@ -837,14 +833,15 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         type->mut_amino = codon2aminoid(codon);
         if ( type->ori_amino == type->mut_amino ) {
             if ( type->ori_amino == 0 ) {
-                BRANCH(var_is_stop_retained);
+                //BRANCH(var_is_stop_retained);
+                type->vartype = var_is_stop_retained;
             } else {
                 BRANCH(var_is_synonymous);
             }
         } else {
             if ( type->ori_amino == 0 ) {
-                //type->vartype = var_is_stop_lost;
-                BRANCH(var_is_stop_lost);
+                type->vartype = var_is_stop_lost;
+                // BRANCH(var_is_stop_lost);
             } else if ( type->mut_amino == 0 ) {
                 //type->vartype = var_is_nonsense;
                 BRANCH(var_is_nonsense);
@@ -855,10 +852,19 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         } 
     } else {
         // Insertion
-        
+        if ( ref_length == 0 ) {
+            if ( alt_length % 3 )
+                BRANCH(var_is_frameshift);
+            else
+                BRANCH(var_is_inframe_insertion);
+            kstring_t str = {0, 0, 0};
+        }        
         // Deletion
-
+        else if ( alt_length == 0 ) {
+        }
         // Delins
+        else {
+        }
     }
 
     if (ref_seq != NULL ) {
@@ -880,6 +886,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     type->loc_amino = 0;
     type->ori_amino = 0;
     type->mut_amino = 0;
+    type->n_ins = 0;
+    type->ins_amino = 0;
     type->fs = 0;
     return 0;
 }
