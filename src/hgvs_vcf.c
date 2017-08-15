@@ -212,9 +212,42 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
                 free(alt);
             }
         }
+        // protein code for snp
         if ( type->loc_amino > 0 && des->type == var_type_snp ) {
             ksprintf(&string, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino],
                      codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+        }
+        // indels
+        else {
+            if ( type->vartype == var_is_inframe_insertion ) {
+                ksprintf(&string, "(p.%s%d_%s%dins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                int i;
+                for (i = 0; i < type->n; ++i)
+                    kputs(codon_names[type->aminos[i]], &string);
+                kputc(')', &string);                         
+            }
+            else if ( type->vartype == var_is_inframe_deletion ) {
+                ksprintf(&string, "(p.%s%d_%s%ddel",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                int i;
+                for (i = 0; i < type->n; ++i)
+                    kputs(codon_names[type->aminos[i]], &string);
+                kputc(')', &string);                                         
+            }
+            else if ( type->vartype == var_is_inframe_delins ) {
+                ksprintf(&string, "(p.%s%d_%s%ddelins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                int i;
+                for (i = 0; i < type->n; ++i)
+                    kputs(codon_names[type->aminos[i]], &string);
+                kputc(')', &string);                                         
+            }
+            else if ( type->vartype == var_is_frameshift ) {
+                ksprintf(&string, "(p.%s%d%sfs",codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino]);
+                if ( type->fs == -1 )
+                    kputc('*', &string);
+                else
+                    kputw(type->fs, &string);
+                kputc(')', &string);                                         
+            }
         }
     }
     return string.s;

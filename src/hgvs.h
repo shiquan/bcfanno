@@ -35,6 +35,8 @@ struct var_func_type {
     int loc_amino;
     // Original amino acid and mutated amino acid. Check amino type only if variants happed in cds region.
     int ori_amino;
+    // the end_amino only used in delins
+    int ori_end_amino;
     int loc_end_amino;
     // fast access for single amino acid change
     int mut_amino;

@@ -104,6 +104,7 @@ enum var_type {
     var_is_nonsense, // stop gain
     var_is_inframe_insertion,
     var_is_inframe_deletion,
+    var_is_inframe_delins,
     var_is_frameshift,
     var_is_stop_lost,
     var_is_stop_retained,
@@ -128,6 +129,7 @@ static inline const char *var_type_string(enum var_type type)
         "nonsense",
         "inframe_insertion",
         "inframe_deletion",
+        "inframe_delins",
         "frameshift",
         "stop_lost",
         "stop_retained",

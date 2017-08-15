@@ -22,10 +22,14 @@ struct hgvs_spec {
 
 void hgvs_core_clear(struct hgvs_core *core)
 {
-    if ( core->name.name1 != NULL)
-        free(core->name.name1);
-    if ( core->name.name2 != NULL)
-        free(core->name.name2);
+    struct hgvs_name *name = &core->name;
+    struct var_func_type *type = &core->type;
+    if ( name->name1 != NULL)
+        free(name->name1);
+    if ( name->name2 != NULL)
+        free(name->name2);
+    if ( type->n)
+        free(type->aminos);
     memset(core, 0, sizeof(struct hgvs_core));
 }
 void hgvs_des_clear(struct hgvs_des *des)
@@ -40,7 +44,8 @@ void hgvs_des_clear(struct hgvs_des *des)
     if ( des->ref != NULL && des->ref_length > 0)
         free(des->ref);
     if ( des->alt != NULL && des->alt_length > 0) 
-        free(des->alt);    
+        free(des->alt);
+
     memset(des, 0, sizeof(struct hgvs_des));    
 }
 void hgvs_spec_destroy()
@@ -325,10 +330,11 @@ int setter_description(const char *name, int _pos, char *ref, char *alt)
     if ( *a && !*r ) {
 	des->type = var_type_ins;
 	while ( *a ) a++;
-	des->start = pos;
+        // for insertion, start capped to inition base
+	des->start = pos-1;
 	des->ref_length = 0;
 	des->ref = str_init;
-	des->end = pos +1;
+	des->end = pos;
 	des->alt_length = (a-alt) - (r-ref);
 	des->alt = strndup(a-des->alt_length, des->alt_length);
 	return 0;
@@ -615,7 +621,8 @@ static int find_locate(struct genepred_line *line, int *pos, int *offset, int st
 // pos     - position or nearest position on the transcript (include UTR, count from transcription strand)
 // offset  - offset near the pos, always be 0 if variant located in exon
 static int check_func_vartype(struct genepred_line *line, int pos, int offset, int ref_length, char *ref, int alt_length, char *alt, struct var_func_type *type)
-{    
+{
+    // check the location
     if ( line->cdsstart == line->cdsend ) {
         type->func = func_region_noncoding;
     }
@@ -637,7 +644,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     int h;    // CDS id.
     int cds_pos;
     type->vartype = var_is_unknown;
-
+    // check the splice sites
 #define BRANCH(_type) do {                              \
         if ( type->vartype == var_is_unknown ) {        \
             type->vartype = _type;                      \
@@ -721,7 +728,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     else if ( pos > line->cds_length - SPLICE_SITE_EXON_RANGE && pos < line->cds_length + SPLICE_SITE_EXON_RANGE ) {
         type->vartype = var_is_splice_site;
     }
-        
+    
     // Check if noncoding transcript.
     if ( line->cdsstart == line->cdsend ) {
         // no cds count for noncoding transcript
@@ -783,13 +790,10 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     cds_pos = pos - line->utr5_length;
     // 0 based.
     int start = (cds_pos-1)/3*3 + line->utr5_length;
-    type->loc_amino = (cds_pos-1)/3 + 1;
-    int cod = (cds_pos-1) % 3;
-    
+    int cod = (cds_pos-1) % 3;    
     int l = 0;
     char *name = line->name1;
     char *ori_seq = faidx_fetch_seq(spec.data->fai, name, start, start + 1000, &l);
-    
     if ( ori_seq == NULL || l == 0 )
         goto failed_check;
     
@@ -804,32 +808,25 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( ref_length > 0 && ref != NULL ) {
         int i;    
         for ( i = 0; i < ref_length; ++i ) {
-            // debug_print("%d, %d, %d, %s.", line->utr5_length, start, cod, ori_seq);
             if ( seq2code4(ori_seq[cod+i]) != seq2code4(ref_seq[i]) ) {
                 if ( seq2code4(ori_seq[cod+i]) == seq2code4(alt_seq[i]) ) {
                     type->vartype = var_is_no_call;
                 } else {
-                    warnings("Inconsistance nucletide. %s:%d, %s:%d, %c vs %c.", des->chrom, des->start, line->name1, pos, ori_seq[cod+i], ref_seq[i]);
+                    warnings("Inconsistance nucletide: %s,%d,%c vs %s,%d,%c.", des->chrom, des->start, ref_seq[i], line->name1, pos, ori_seq[cod+i]);
                     break;
                 }
             }
         }
     }
     
-    if ( ref_length == alt_length ) {
-        char codon[4];
-        memcpy(codon, ori_seq, 3);
-        codon[3] = '\0';
-        type->ori_amino = codon2aminoid(codon);
-        if ( ref_length == 1 ) {
-            codon[cod] = *alt_seq;
-        } else {
-            int i;
-            for ( i = cod; i < 3; ++i ) {
-                codon[i] = alt_seq[i-cod];
-            }                           
-        }
-        
+    char codon[4];
+    memcpy(codon, ori_seq, 3);
+    codon[3] = '\0';
+    type->ori_amino = codon2aminoid(codon);
+    type->loc_amino = (cds_pos-1)/3 + 1;
+
+    if ( ref_length == 1 && ref_length == alt_length ) {
+        codon[cod] = *alt_seq;
         type->mut_amino = codon2aminoid(codon);
         if ( type->ori_amino == type->mut_amino ) {
             if ( type->ori_amino == 0 ) {
@@ -852,40 +849,132 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         } 
     }
     else {
+        // align variant position
+        char *ss = ori_seq + cod;
+        //cod++;
+        //cod = cod == 3 ? 0 : cod;
         // Insertion
         if ( ref_length == 0 ) {
-            kstring_t str = {0, 0, 0};
-            kputsn(ori_seq, cod, &str);
-            kputsn(alt, alt_length, &str);
-            kputs(ori_seq + cod +1, &str);
-            type->ori_amino = codon2aminoid(ori_seq);
-            // AA123AAfs123
-            if ( alt_length % 3 ) {
-                BRANCH(var_is_frameshift);
-                type->mut_amino = codon2aminoid(str.s);
-                type->fs = check_stop_codon(str.s, NULL);
-                free(str.s);
-            }
-            // AA123delinsAAs
-            else {
-                BRANCH(var_is_inframe_insertion);
-                int j;
-                char codon[4];                
-                int m = 0;
-                
-                for (j = 0; j < (alt_length+1)%3; ++j) {
-                    memcpy(codon, str.s + 3*j, 3);
+            // if insert frameshift sequence goto check delins
+            if ( alt_length%3 )
+                goto delins;
+            
+            char *se = alt;
+            int offset = 0;
+            do {
+                if ( offset == alt_length )
+                    se = ori_seq+cod;
+                if ( *ss == *se ) {
+                    ss++; se++; offset++;
                 }
-            } 
+                else {
+                    break;
+                }
+            } while (1);
+            char *offset_seq = ori_seq;
+            if ( offset != 0 ) {
+                offset_seq = ori_seq + (offset+cod)/3*3;
+                cds_pos += offset;
+                cod = (cds_pos-1)%3;
+                type->loc_amino = (cds_pos-1)+1;
+                memcpy(codon, offset_seq, 3);
+                type->ori_amino = codon2aminoid(codon);
+            }
+            // check if insertion does NOT change the amino acid, treat as inframe insertion, else go to delins
+            int i,j;
+            
+            for (i= cod, j=0; i < 3; ++i )
+                codon[i] = se[j++];
+            if ( type->ori_amino != codon2aminoid(codon) )
+                goto delins;
+            
+            BRANCH(var_is_inframe_insertion);           
+            memcpy(codon, offset_seq+3,3);
+            type->ori_end_amino = codon2aminoid(codon);
+            type->loc_end_amino = type->loc_amino + 1;
+            
+            type->n = alt_length/3;
+            type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
+            for ( i = 0; i < alt_length/3; ++i ) {
+                // aa[R..]
+                for (j =0; j < 3; ++j ) {
+                    int c = 3*i+cod+j;
+                    if ( c >= alt_length)
+                        codon[j] = offset_seq[cod+c-alt_length];
+                    else
+                        codon[j] = alt[c];
+                }
+                type->aminos[i] = codon2aminoid(codon);
+            }
         }    
         // Deletion
         else if ( alt_length == 0 ) {
+            if ( ref_length%3 || cod != 2)
+                goto delins;
+            // for ( i = cod, j = 0; i < 3; ++j )
+            //  codon[i] = ori_seq[ref_length+j];
+            //if ( type->ori_amino != codon2aminoid(codon) )
+            //   goto delins;
             
+            BRANCH(var_is_inframe_deletion);
+            type->loc_amino++;
+            memcpy(codon, ori_seq, 3);
+            type->ori_amino = codon2aminoid(codon);
+            memcpy(codon, ori_seq + ref_length - 3, 3);
+            type->ori_end_amino = codon2aminoid(codon);
+            type->loc_end_amino = type->loc_amino + ref_length/3 -1;
+            type->n = ref_length/3;
+            type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
+            int i;
+            for ( i = 0; i < ref_length/3; ++i )
+                type->aminos[i] = codon2aminoid(ref+i*3);
         }
         // Delins        
         else {
-            // delins:
-            //des->loc_amino = pos
+          delins:
+            if ( alt_length == ref_length ) {
+                BRANCH(var_is_inframe_delins);
+                
+                memcpy(codon, ori_seq + ref_length, 3);
+                type->ori_end_amino = codon2aminoid(codon);
+                type->loc_end_amino = (cds_pos+ref_length-1)/3+1;
+                int i, j;
+                for ( i = 0, j = cod; i < ref_length; ++i )
+                    ori_seq[++j] = ref[i];
+                type->n= type->loc_end_amino - type->loc_amino + 1;
+                type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
+                for ( i = 0; i < type->n; ++i ) {
+                    type->aminos[i] = codon2aminoid(ori_seq+i*3);
+                }                    
+            }
+            else {
+                BRANCH(var_is_frameshift);
+                int i, j;
+                for ( i = 0; i < l/3; ++i )
+                    if ( check_is_stop(ori_seq+i*3) )
+                        break;
+                int ori_stop = i+1;
+                char codon[4];
+                memcpy(codon, ori_seq, 3);
+                if ( ref_length > 0 ) {
+                    memmove(ori_seq+cod+1, ori_seq+cod+ref_length, l - cod - ref_length);
+                    l -= ref_length;
+                }
+                type->ori_amino = codon2aminoid(codon);
+                if ( alt_length > 0 ) {
+                    ori_seq = (char*)bcfanno_realloc(ori_seq, (l+alt_length)*sizeof(char));
+                    memmove(ori_seq+cod+alt_length+1, ori_seq+cod+1, l - cod);
+                    l += alt_length;
+                    for ( i = 0, j = cod; i < alt_length; ++i )
+                        ori_seq[j++] = alt[i];
+                    for ( i = 0; i < l/3; ++i )
+                        if ( check_is_stop(ori_seq+i*3) )
+                            break;
+                    type->fs = ori_stop == i +1 ? -1 : i+1;                
+                }
+                memcpy(codon, ori_seq, 3);
+                type->mut_amino = codon2aminoid(codon);
+            }
         }
     }
 
@@ -896,7 +985,9 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( alt_seq != NULL ) {
         free(alt_seq);
     }
-        
+    
+    free(ori_seq);
+    
     return 0;
     
 #undef BRANCH
@@ -908,6 +999,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     type->loc_amino = 0;
     type->ori_amino = 0;
     type->mut_amino = 0;
+    type->ori_end_amino = 0;
+    type->loc_end_amino = 0;
     type->n = 0;
     type->aminos = 0;
     type->fs = 0;
@@ -999,10 +1092,14 @@ struct hgvs_des *fill_hgvs_name()
         if ( des->l == des->m ) {
             des->m += 2;
             des->a = (struct hgvs_core*)realloc(des->a, des->m*sizeof(struct hgvs_core));
-            memset(&des->a[des->l], 0, sizeof(struct genepred_line));
+            //memset(&des->a[des->l], 0, sizeof(struct hgvs_core));
+            
         }
-
-        hgvs_core_clear(&des->a[des->l]);
+        struct hgvs_core *core = &des->a[des->l];
+        memset(&core->type, 0, sizeof(struct var_func_type));
+        memset(&core->name, 0, sizeof(struct hgvs_name));
+        memset(core, 0, sizeof(struct hgvs_core));
+        //hgvs_core_clear(&des->a[des->l]);
         if ( generate_hgvs_core(line, &des->a[des->l], des->start, des->end, des->ref_length, des->ref, des->alt_length, des->alt) == 0 )
             des->l++;
         
