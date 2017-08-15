@@ -319,18 +319,27 @@ int anno_core(bcf1_t *line)
 
     // Annotate hgvs name
     // anno_refgene_core(&args.hgvs_opts, line);
-    if (args.tol == 0 && setter_hgvs_vcf(args.hdr_out, line) == 1)
-        return 1;
+    if ( setter_hgvs_vcf(args.hdr_out, line) == 1) {
+        if ( args.tol == 0 ) {
+            return 1;
+        }
+    }
     
     // todo: stat type module, ti,tv etc
     
     // annotate vcf files
-    if (args.tol == 0 && anno_vcfs_core(&args.vcf_opts, line) == 1)
-        return 1;
+    if ( anno_vcfs_core(&args.vcf_opts, line) == 1) {
+        if ( args.tol == 0 ) {
+            return 1;
+        }
+    }
  
     // annotate bed format datasets
-    if (args.tol == 0 && anno_beds_core(&args.bed_opts, line) == 1)
-        return 1;
+    if ( anno_beds_core(&args.bed_opts, line) == 1) {
+        if ( args.tol == 0 ) {
+            return 1;
+        }
+    }
 
     // annotate transcript related bed format datasets
     // anno_trans_core();
