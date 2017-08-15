@@ -50,7 +50,7 @@ int hgvs_update_vcf_header(bcf_hdr_t *hdr)
     id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Oldnom");
     if (id == -1) {
 	bcf_hdr_append(hdr, "##INFO=<ID=Oldnom,Number=A,Type=String,Description=\"Old style nomenclature for the description of variants. Based on the gene position. Compared with HGVS nomenclature, Oldnom also count UTR5 length for coding transcript. For noncoding transcript, HGVSnom is same with Oldnom. For intron, c.IVS notation will be annotated.\">");
-	bcf_hdr_sync(hdr);
+bcf_hdr_sync(hdr);
 	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Oldnom");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
     }
@@ -270,23 +270,37 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
         if ( name->name_version > 0 ) {
             ksprintf(&string, ".%d",name->name_version);
         }
-        //kputc(':', &string);        
-        ksprintf(&string, ":n.%d", name->pos);
-        if ( name->offset > 0 ) {
-            ksprintf(&string, "+%d", name->offset);
-        } else if (name->offset < 0) {
-            ksprintf(&string, "%d", name->offset);
+        kputc(':', &string);
+        if ( name->offset == 0 ) {
+            ksprintf(&string, ":n.%d", name->pos);
+            if ( des->start != des->end ) {
+                kputc('_', &string);
+                if ( name->end_offset != 0 )
+                    kputc('?', &string);
+                else
+                    ksprintf(&string, "%d", name->end_pos);
+            }
         }
-        if ( des->start != des->end ) {
-            kputc('_', &string);
-            ksprintf(&string, "%d", name->end_pos);
-            if ( name->end_offset > 0 ) {
-                ksprintf(&string, "+%d", name->end_offset);
-            } else if ( name->end_offset < 0) {
-                ksprintf(&string, "%d", name->end_offset);
+        // c.IVS nomen
+        else {
+            ksprintf(&string, "c.IVS%d", type->count);
+            if ( name->offset > 0 ) {
+                ksprintf(&string, "+%d", name->offset);
+            } else if (name->offset < 0) {
+                ksprintf(&string, "%d", name->offset);
+            }
+            if ( des->start != des->end ) {
+                kputc('_', &string);
+                if ( name->end_offset == 0 ) {
+                    kputc('?', &string);
+                } else if ( name->end_offset > 0 ) {
+                    ksprintf(&string, "+%d", name->end_offset);
+                } else if ( name->end_offset < 0) {
+                    ksprintf(&string, "%d", name->end_offset);
+                }            
             }            
         }
-        
+            
         if ( des->ref_length == 0 ) {
             if ( name->strand == '+' || name->offset != 0) {
                 ksprintf(&string, "ins%s", des->alt);
@@ -314,7 +328,7 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
                 free(alt);
             }
         }
-        }
+    }
     return string.s;
 }
 
@@ -359,7 +373,7 @@ static char *retrieve_ivsnom_des(struct hgvs_des *des)
         kputc(':', &string);
         ksprintf(&string, "c.IVS%d", type->count);
         if ( name->offset > 0 ) {
-            ksprintf(&string, "+%d", name->offset);
+            ksprintf(&string, "+ %d", name->offset);
         } else if (name->offset < 0) {
             ksprintf(&string, "%d", name->offset);
         }
