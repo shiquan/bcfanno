@@ -975,6 +975,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 }
                 memcpy(codon, buffer, 3);
                 type->mut_amino = codon2aminoid(codon);
+                free(buffer);
             }
         }
     }
