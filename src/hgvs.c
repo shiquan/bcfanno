@@ -864,7 +864,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             do {
                 if ( offset == alt_length )
                     se = ori_seq+cod;
-                if ( *ss == *se ) {
+                if ( seq2code4(*ss) == seq2code4(*se) ) {
                     ss++; se++; offset++;
                 }
                 else {
@@ -950,29 +950,30 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             else {
                 BRANCH(var_is_frameshift);
                 int i, j;
-                for ( i = 0; i < l/3; ++i )
-                    if ( check_is_stop(ori_seq+i*3) )
-                        break;
-                int ori_stop = i+1;
+                //for ( i = 0; i < l/3; ++i )
+                // if ( check_is_stop(ori_seq+i*3) )
+                // break;
+                char *buffer = strdup(ori_seq);
+                int ori_stop = line->cds_length - type->loc_amino;
                 char codon[4];
-                memcpy(codon, ori_seq, 3);
+                memcpy(codon, buffer, 3);
                 if ( ref_length > 0 ) {
-                    memmove(ori_seq+cod+1, ori_seq+cod+ref_length, l - cod - ref_length);
+                    memmove(buffer+cod+1, buffer+cod+ref_length, l - cod - ref_length);
                     l -= ref_length;
                 }
                 type->ori_amino = codon2aminoid(codon);
                 if ( alt_length > 0 ) {
-                    ori_seq = (char*)bcfanno_realloc(ori_seq, (l+alt_length)*sizeof(char));
-                    memmove(ori_seq+cod+alt_length+1, ori_seq+cod+1, l - cod);
+                    buffer = (char*)bcfanno_realloc(buffer, (l+alt_length)*sizeof(char));
+                    memmove(buffer+cod+alt_length+1, buffer+cod+1, l - cod);
                     l += alt_length;
                     for ( i = 0, j = cod; i < alt_length; ++i )
-                        ori_seq[j++] = alt[i];
+                        buffer[j++] = alt[i];
                     for ( i = 0; i < l/3; ++i )
-                        if ( check_is_stop(ori_seq+i*3) )
+                        if ( check_is_stop(buffer+i*3) )
                             break;
                     type->fs = ori_stop == i +1 ? -1 : i+1;                
                 }
-                memcpy(codon, ori_seq, 3);
+                memcpy(codon, buffer, 3);
                 type->mut_amino = codon2aminoid(codon);
             }
         }
@@ -985,8 +986,9 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( alt_seq != NULL ) {
         free(alt_seq);
     }
-    
-    free(ori_seq);
+    if ( ori_seq != NULL ) {
+        free(ori_seq);
+    }
     
     return 0;
     
