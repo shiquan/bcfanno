@@ -953,29 +953,37 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 //for ( i = 0; i < l/3; ++i )
                 // if ( check_is_stop(ori_seq+i*3) )
                 // break;
-                char *buffer = strdup(ori_seq);
+                //char *buffer = strdup(ori_seq);
+                kstring_t str = {0, 0, 0};
                 int ori_stop = line->cds_length - type->loc_amino;
                 char codon[4];
-                memcpy(codon, buffer, 3);
-                if ( ref_length > 0 ) {
-                    memmove(buffer+cod+1, buffer+cod+ref_length, l - cod - ref_length);
-                    l -= ref_length;
-                }
+                memcpy(codon, ori_seq, 3);
                 type->ori_amino = codon2aminoid(codon);
+                
+                if ( cod > 0 ) 
+                    kputsn(ori_seq, cod, &str);
+                /* if ( ref_length > 0 ) { */
+                /*     memmove(buffer+cod+1, buffer+cod+ref_length, l - cod - ref_length); */
+                /*     l -= ref_length; */
+                /* } */
+                
                 if ( alt_length > 0 ) {
-                    buffer = (char*)bcfanno_realloc(buffer, (l+alt_length)*sizeof(char));
-                    memmove(buffer+cod+alt_length+1, buffer+cod+1, l - cod);
-                    l += alt_length;
-                    for ( i = 0, j = cod; i < alt_length; ++i )
-                        buffer[j++] = alt[i];
-                    for ( i = 0; i < l/3; ++i )
-                        if ( check_is_stop(buffer+i*3) )
+                    kputsn(alt_seq, alt_length, &str);
+                    //buffer = (char*)bcfanno_realloc(buffer, (l+alt_length)*sizeof(char));
+                    //memmove(buffer+cod+alt_length+1, buffer+cod+1, l - cod);
+                    //l += alt_length;
+                    //for ( i = 0, j = cod; i < alt_length; ++i )
+                    //buffer[j++] = alt[i];
+                    kputsn(ori_seq+cod+ref_length, l-cod-ref_length, &str);
+                    for ( i = 0; i < str.l/3; ++i )
+                        if ( check_is_stop(str.s+i*3) )
                             break;
                     type->fs = ori_stop == i +1 ? -1 : i+1;                
                 }
-                memcpy(codon, buffer, 3);
+                memcpy(codon, str.s, 3);
                 type->mut_amino = codon2aminoid(codon);
-                free(buffer);
+                if ( str.m )
+                    free(str.s);
             }
         }
     }
