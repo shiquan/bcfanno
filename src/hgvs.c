@@ -969,17 +969,17 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 
                 if ( alt_length > 0 ) {
                     kputsn(alt_seq, alt_length, &str);
+                }
                     //buffer = (char*)bcfanno_realloc(buffer, (l+alt_length)*sizeof(char));
                     //memmove(buffer+cod+alt_length+1, buffer+cod+1, l - cod);
                     //l += alt_length;
                     //for ( i = 0, j = cod; i < alt_length; ++i )
                     //buffer[j++] = alt[i];
-                    kputsn(ori_seq+cod+ref_length, l-cod-ref_length, &str);
-                    for ( i = 0; i < str.l/3; ++i )
-                        if ( check_is_stop(str.s+i*3) )
-                            break;
-                    type->fs = ori_stop == i +1 ? -1 : i+1;                
-                }
+                kputsn(ori_seq+cod+ref_length, l-cod-ref_length, &str);
+                for ( i = 0; i < str.l/3; ++i )
+                    if ( check_is_stop(str.s+i*3) )
+                        break;
+                type->fs = ori_stop == i +1 ? -1 : i+1;                
                 memcpy(codon, str.s, 3);
                 type->mut_amino = codon2aminoid(codon);
                 if ( str.m )
