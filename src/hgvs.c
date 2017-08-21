@@ -949,7 +949,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             }
             else {
                 BRANCH(var_is_frameshift);
-                int i, j;
+                int i;
                 //for ( i = 0; i < l/3; ++i )
                 // if ( check_is_stop(ori_seq+i*3) )
                 // break;
@@ -979,7 +979,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 for ( i = 0; i < str.l/3; ++i )
                     if ( check_is_stop(str.s+i*3) )
                         break;
-                type->fs = ori_stop == i +1 ? -1 : i+1;                
+                type->fs = ori_stop == i +1 ? -1 : i+1;
+                assert(str.l > 3);
                 memcpy(codon, str.s, 3);
                 type->mut_amino = codon2aminoid(codon);
                 if ( str.m )

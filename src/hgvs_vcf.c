@@ -271,38 +271,43 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
             ksprintf(&string, ".%d",name->name_version);
         }
         kputc(':', &string);
-        if ( name->offset == 0 ) {
-            ksprintf(&string, ":n.%d", name->pos);
-            if ( des->start != des->end ) {
+        //if ( name->offset == 0 ) {
+        ksprintf(&string, "n.%d", name->pos);
+        if ( name->offset > 0 ) 
+            ksprintf(&string, "+%d", name->offset);
+        else if (name->offset < 0 )
+            kputw(name->offset, &string);
+        
+        if ( des->start != des->end ) {
                 kputc('_', &string);
-                if ( name->end_offset != 0 )
-                    kputc('?', &string);
-                else
-                    ksprintf(&string, "%d", name->end_pos);
-            }
-        }
-        // c.IVS nomen
-        else {
-            ksprintf(&string, "c.IVS%d", type->count);
-            if ( name->offset > 0 ) {
-                ksprintf(&string, "+%d", name->offset);
-            } else if (name->offset < 0) {
-                ksprintf(&string, "%d", name->offset);
-            }
-            if ( des->start != des->end ) {
-                kputc('_', &string);
-                if ( name->end_offset == 0 ) {
-                    kputc('?', &string);
-                } else if ( name->end_offset > 0 ) {
+                ksprintf(&string, "%d", name->end_pos);
+                if ( name->end_offset > 0 ) 
                     ksprintf(&string, "+%d", name->end_offset);
-                } else if ( name->end_offset < 0) {
-                    ksprintf(&string, "%d", name->end_offset);
-                }            
-            }            
+                else if (name->end_offset < 0 )
+                    kputw(name->end_offset, &string);
         }
+        /* // c.IVS nomen */
+        /* else { */
+        /*     ksprintf(&string, "c.IVS%d", type->count); */
+        /*     if ( name->offset > 0 ) { */
+        /*         ksprintf(&string, "+%d", name->offset); */
+        /*     } else if (name->offset < 0) { */
+        /*         ksprintf(&string, "%d", name->offset); */
+        /*     } */
+        /*     if ( des->start != des->end ) { */
+        /*         kputc('_', &string); */
+        /*         if ( name->end_offset == 0 ) { */
+        /*             kputc('?', &string); */
+        /*         } else if ( name->end_offset > 0 ) { */
+        /*             ksprintf(&string, "+%d", name->end_offset); */
+        /*         } else if ( name->end_offset < 0) { */
+        /*             ksprintf(&string, "%d", name->end_offset); */
+        /*         }             */
+        /*     }             */
+        /* } */
             
         if ( des->ref_length == 0 ) {
-            if ( name->strand == '+' || name->offset != 0) {
+            if ( name->strand == '+') {
                 ksprintf(&string, "ins%s", des->alt);
             } else {
                 char *rev = rev_seqs(des->alt, des->alt_length);
@@ -310,7 +315,7 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
                 free(rev);
             }
         } else if ( des->alt_length == 0 ) {
-            if ( name->strand == '+' || name->offset != 0 ) {
+            if ( name->strand == '+' ) {
                 ksprintf(&string, "del%s", des->ref);
             } else {
                 char *rev = rev_seqs(des->ref, des->ref_length);
@@ -318,7 +323,7 @@ static char *retrieve_oldnom_des(struct hgvs_des *des)
                 free(rev);                
             }
         } else {
-            if ( name->strand == '+' || name->offset != 0) {
+            if ( name->strand == '+') {
                 ksprintf(&string, "%s>%s", des->ref, des->alt);
             } else {
                 char *ref = rev_seqs(des->ref, des->ref_length);
@@ -455,7 +460,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
     kstring_t hgvs_nom = { 0, 0, 0};
     kstring_t vartype = { 0, 0, 0};
     kstring_t exon_id = {0, 0, 0};
-    // kstring_t ivs_nom = { 0, 0, 0};
+    kstring_t ivs_nom = { 0, 0, 0};
     kstring_t old_nom = { 0, 0, 0};
     kstring_t aa_length = { 0, 0, 0};
     
@@ -471,7 +476,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             kputc(',', &transcript);
             kputc(',', &hgvs_nom);
             kputc(',', &exon_id);
-            // kputc(',', &ivs_nom);
+            kputc(',', &ivs_nom);
             kputc(',', &old_nom);
             kputc(',', &aa_length);
             kputc(',', &vartype);
@@ -483,7 +488,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         char *vartype_string = retrieve_vartype_des(des);
         char *oldnom_string = retrieve_oldnom_des(des);
         char *exonintron_string = retrieve_exonintron_des(des);
-        // char *ivsnom_string = retrieve_ivsnom_des(des);
+        char *ivsnom_string = retrieve_ivsnom_des(des);
         char *aalength_string = retrieve_aalength_des(des);
         
         hgvs_des_clear(des);
@@ -493,7 +498,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             kputs(".", &hgvs_nom);
             kputs(".", &vartype);
             kputs(".", &exon_id);
-            // kputs(".", &ivs_nom);
+            kputs(".", &ivs_nom);
             kputs(".", &old_nom);
             kputs(".", &aa_length);
         } else {
@@ -505,8 +510,8 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             if ( oldnom_string != NULL)
                 kputs(oldnom_string, &old_nom);
             kputs(exonintron_string, &exon_id);
-            // if ( ivsnom_string != NULL ) 
-            // kputs(ivsnom_string, &ivs_nom);
+            if ( ivsnom_string != NULL ) 
+                kputs(ivsnom_string, &ivs_nom);
             kputs(aalength_string, &aa_length);
             
             free(gene_string);
@@ -516,8 +521,8 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             if ( oldnom_string != NULL)
                 free(oldnom_string);
             free(exonintron_string);
-            // if ( ivsnom_string != NULL)
-            // free(ivsnom_string);
+            if ( ivsnom_string != NULL)
+                free(ivsnom_string);
             free(aalength_string);
         }        
     }
@@ -526,12 +531,12 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         bcf_update_info_string(hdr, line, "Transcript", transcript.s);
         bcf_update_info_string(hdr, line, "HGVSnom", hgvs_nom.s);
         bcf_update_info_string(hdr, line, "VarType", vartype.s);
-        /* if ( ivs_nom.l ) { */
-        /*     bcf_update_info_string(hdr, line, "IVSnom", ivs_nom.s); */
-        /* } */
-        if ( old_nom.l ) {
+        if ( ivs_nom.l ) 
+            bcf_update_info_string(hdr, line, "IVSnom", ivs_nom.s); 
+
+        if ( old_nom.l ) 
             bcf_update_info_string(hdr, line, "Oldnom", old_nom.s);
-        }
+        
         bcf_update_info_string(hdr, line, "AAlength", aa_length.s);
         bcf_update_info_string(hdr, line, "ExonIntron", exon_id.s);
     }
@@ -540,7 +545,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
     free(transcript.s);
     free(hgvs_nom.s);
     free(vartype.s);
-    // free(ivs_nom.s);
+    free(ivs_nom.s);
     free(old_nom.s);
     free(aa_length.s);
     free(exon_id.s);
