@@ -478,7 +478,7 @@ int parse_hgvs_name(const char *name)
             for ( i = 0; se[0] == '?' || se[0] == '*' || se[0] == '-' || se[0] == '+' || (se[0] >= 48 && se[0] <= 57); ++se, ++i);
             if ( se == se1 )
                 error("No position found.");            
-            if ( check_num_likely_l(se1, i) == 0 ) {
+           if ( check_num_likely_l(se1, i) == 0 ) {
                 des->end = str2int_l(se1, i);
             } else {
                 error("Genome position not readable. %s.", se1);
@@ -786,12 +786,25 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( offset != 0 )
         goto no_amino_code;
 
-    // amino_code:
-    // Check if cds regions.
+
+    
+
+
+
+    
+    // For variants in coding region, check the amino acid changes.
+
+
+   
     cds_pos = pos - line->utr5_length;
-    // 0 based.
+
+    // variant start in the amino codon, 0 based, [0,3)
+    int cod = (cds_pos-1) % 3;
+    // codon inition position in the transcript, 0 based.
+    // NOTICE: One to 3 base(s) will be CAPPED for the start of insertion; remove caps to check amino acid changes.
     int start = (cds_pos-1)/3*3 + line->utr5_length;
-    int cod = (cds_pos-1) % 3;    
+
+    // retrieve affected sequences and downstream    
     int l = 0;
     char *name = line->name1;
     char *ori_seq = faidx_fetch_seq(spec.data->fai, name, start, start + 1000, &l);
@@ -800,23 +813,44 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     
     char *ref_seq = ref == NULL ? NULL : strdup(ref);
     char *alt_seq = alt == NULL ? NULL : strdup(alt);
-
+    // for reverse strand, complent sequence
     if ( line->strand == '-' ) {        
         compl_seq(ref_seq, strlen(ref_seq));
         compl_seq(alt_seq, strlen(alt_seq));
     }
-    // Check the ref sequence consistant with database or not.        
+    
+    // Check the ref sequence consistant with database or not. If variants are same with transcript sequence, set type to no_call.
+    // Only check the first base.
     if ( ref_length > 0 && ref != NULL ) {
-        int i;    
-        for ( i = 0; i < ref_length; ++i ) {
-            if ( seq2code4(ori_seq[cod+i]) != seq2code4(ref_seq[i]) ) {
-                if ( seq2code4(ori_seq[cod+i]) == seq2code4(alt_seq[i]) ) {
-                    type->vartype = var_is_no_call;
-                } else {
-                    warnings("Inconsistance nucletide: %s,%d,%c vs %s,%d,%c.", des->chrom, des->start, ref_seq[i], line->name1, pos, ori_seq[cod+i]);
-                    break;
-                }
-            }
+        if ( seq2code4(ori_seq[cod]) != seq2code4(ref_seq[0]) ) {
+            if ( seq2code4(ori_seq[cod]) == seq2code4(alt_seq[0]) ) 
+                type->vartype = var_is_no_call;            
+            else 
+                warnings("Inconsistance nucletide: %s,%d,%c vs %s,%d,%c.", des->chrom, des->start, ref_seq[0], line->name1, pos, ori_seq[cod]); 
+        }
+    }
+    // if insert bases in tandam short repeats region, amino acids will be changed in the downstream;
+    // realign the alternative allele
+    if ( ref_length == 0 && alt_length > 0) {
+        int offset = 0;
+        char *ss = ori_seq;
+        // remove caps
+        ss += cod+1;
+        
+        while ( same_DNA_seqs(alt_seq, ss, alt_length) == 0 ) {
+            ss += alt_length;
+            offset += alt_length;
+        }
+        if ( offset > 0 ) {
+            if ( l <= offset )
+                goto failed_check;
+            l -= offset;
+            char *offset_seq = strndup(ori_seq+offset, l);
+            // point ori_seq to new memory address, this is not safe!
+            free(ori_seq);
+            ori_seq = offset_seq;
+            cds_pos += offset;
+            start = (cds_pos-1)/3*3 + line->utr5_length;
         }
     }
     
@@ -830,105 +864,83 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         codon[cod] = *alt_seq;
         type->mut_amino = codon2aminoid(codon);
         if ( type->ori_amino == type->mut_amino ) {
-            if ( type->ori_amino == 0 ) {
-                //BRANCH(var_is_stop_retained);
+            
+            if ( type->ori_amino == 0 )
                 type->vartype = var_is_stop_retained;
-            } else {
+            else
                 BRANCH(var_is_synonymous);
-            }
-        } else {
-            if ( type->ori_amino == 0 ) {
+            
+        }
+        else {
+            
+            if ( type->ori_amino == 0 )
                 type->vartype = var_is_stop_lost;
-                // BRANCH(var_is_stop_lost);
-            } else if ( type->mut_amino == 0 ) {
-                //type->vartype = var_is_nonsense;
-                BRANCH(var_is_nonsense);
-            } else {
-                //type->vartype = var_is_missense;
-                BRANCH(var_is_missense);
-            }
-        } 
+            else if ( type->mut_amino == 0 )
+                type->vartype = var_is_nonsense;
+            else
+                BRANCH(var_is_missense);           
+        }
     }
+    // if insert or delete
     else {
-        // align variant position
-        char *ss = ori_seq + cod;
-        //cod++;
-        //cod = cod == 3 ? 0 : cod;
-        // Insertion
+
+        // Insertions
         if ( ref_length == 0 ) {
+
             // if insert frameshift sequence goto check delins
             if ( alt_length%3 )
                 goto delins;
+
+            // Check if insertion does NOT change the amino acid, treat as inframe insertion, else go to delins
+            memcpy(codon, ori_seq, 3);
             
-            char *se = alt;
-            int offset = 0;
-            do {
-                if ( offset == alt_length )
-                    se = ori_seq+cod;
-                if ( seq2code4(*ss) == seq2code4(*se) ) {
-                    ss++; se++; offset++;
-                }
-                else {
-                    break;
-                }
-            } while (1);
-            char *offset_seq = ori_seq;
-            if ( offset != 0 ) {
-                offset_seq = ori_seq + (offset+cod)/3*3;
-                cds_pos += offset;
-                cod = (cds_pos-1)%3;
-                type->loc_amino = (cds_pos-1)+1;
-                memcpy(codon, offset_seq, 3);
-                type->ori_amino = codon2aminoid(codon);
-            }
-            // check if insertion does NOT change the amino acid, treat as inframe insertion, else go to delins
-            int i,j;
-            
-            for (i= cod, j=0; i < 3; ++i )
-                codon[i] = se[j++];
             if ( type->ori_amino != codon2aminoid(codon) )
                 goto delins;
-            
-            BRANCH(var_is_inframe_insertion);           
-            memcpy(codon, offset_seq+3,3);
+            BRANCH(var_is_inframe_insertion);
+
+            // end amino acid
+            memcpy(codon, ori_seq+3, 3);            
             type->ori_end_amino = codon2aminoid(codon);
             type->loc_end_amino = type->loc_amino + 1;
             
             type->n = alt_length/3;
             type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
+
+            kstring_t str = { 0, 0, 0};
+            kputs(alt+2-cod, &str);
+            kputsn(ori_seq + cod +1, 2 - cod, &str);
+
+            int i;
             for ( i = 0; i < alt_length/3; ++i ) {
-                // aa[R..]
-                for (j =0; j < 3; ++j ) {
-                    int c = 3*i+cod+j;
-                    if ( c >= alt_length)
-                        codon[j] = offset_seq[cod+c-alt_length];
-                    else
-                        codon[j] = alt[c];
-                }
+                memcpy(codon, str.s+i*3, 3);
                 type->aminos[i] = codon2aminoid(codon);
             }
-        }    
+            if (str.m)
+                free(str.s);
+        } 
         // Deletion
         else if ( alt_length == 0 ) {
             if ( ref_length%3 || cod != 2)
                 goto delins;
-            // for ( i = cod, j = 0; i < 3; ++j )
-            //  codon[i] = ori_seq[ref_length+j];
-            //if ( type->ori_amino != codon2aminoid(codon) )
-            //   goto delins;
-            
+
             BRANCH(var_is_inframe_deletion);
-            type->loc_amino++;
-            memcpy(codon, ori_seq, 3);
-            type->ori_amino = codon2aminoid(codon);
-            memcpy(codon, ori_seq + ref_length - 3, 3);
-            type->ori_end_amino = codon2aminoid(codon);
-            type->loc_end_amino = type->loc_amino + ref_length/3 -1;
+            
+            //type->loc_amino++;
+            //memcpy(codon, ori_seq, 3);
+            //type->ori_amino = codon2aminoid(codon);
+            if ( ref_length == 3 ) {
+                type->loc_end_amino = 0;
+                type->ori_end_amino = 0;
+            } else {
+                memcpy(codon, ori_seq + ref_length, 3);            
+                type->ori_end_amino = codon2aminoid(codon);
+                type->loc_end_amino = type->loc_amino + ref_length/3;
+            }
             type->n = ref_length/3;
             type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
             int i;
             for ( i = 0; i < ref_length/3; ++i )
-                type->aminos[i] = codon2aminoid(ref+i*3);
+                type->aminos[i] = codon2aminoid(ori_seq+i*3);
         }
         // Delins        
         else {
@@ -941,14 +953,47 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 type->loc_end_amino = (cds_pos+ref_length-1)/3+1;
                 int i, j;
                 for ( i = 0, j = cod; i < ref_length; ++i )
-                    ori_seq[++j] = ref[i];
+                    ori_seq[++j] = alt_seq[i];
                 type->n= type->loc_end_amino - type->loc_amino + 1;
                 type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
                 for ( i = 0; i < type->n; ++i ) {
                     type->aminos[i] = codon2aminoid(ori_seq+i*3);
                 }                    
             }
-            else {
+            // inframe insertion
+            else if ( ref_length == 0 && alt_length %3 == 0 ) {
+                BRANCH(var_is_inframe_delins);
+                type->loc_end_amino = 0;
+                type->ori_end_amino = 0;
+                kstring_t str = { 0, 0, 0 };
+                //if (cod > 0 )
+                kputsn(ori_seq, cod+1, &str);
+                kputs(alt, &str);
+                kputsn(ori_seq+cod+1, 3-cod-1, &str);
+                assert(str.l%3 == 0);
+                type->n = str.l/3;
+                type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
+                int i;
+                for ( i = 0; i < type->n; ++i) {
+                    type->aminos[i] = codon2aminoid(str.s+3*i);
+                }
+                if ( str.m )
+                    free(str.s);
+            }
+            // inframe deletion
+            else if ( alt_length == 0 && ref_length %3 == 0 ) {
+                BRANCH(var_is_inframe_delins);
+                type->loc_end_amino = (cds_pos+ref_length-1)/3+1;
+                memcpy(codon, ori_seq + ref_length, 3);              
+                type->ori_end_amino = codon2aminoid(codon);                
+                if (cod > 0 )
+                    memcpy(codon, ori_seq, cod);
+                memcpy(codon+cod, ori_seq+ref_length+cod, 3-cod);                
+                type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int));
+                type->aminos[0] = codon2aminoid(codon);
+            }
+            // frameshift
+            else {                
                 BRANCH(var_is_frameshift);
                 int i;
                 //for ( i = 0; i < l/3; ++i )

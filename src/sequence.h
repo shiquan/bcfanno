@@ -160,7 +160,9 @@ static inline void compl_seq(char *seq, int l)
     if ( l & 1 ) {
         seq[l/2] = revseqarr[seq2code4(seq[l/2])];
     }
+
 }
+extern int same_DNA_seqs(const char *a, const char *b, int l );
 extern int check_stop_codon(char *seq, char *p_end);
 extern enum var_type check_var_type(char *block, int block_length, int start, char *ref, int ref_length, char *alt, int alt_length );
 

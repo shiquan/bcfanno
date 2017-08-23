@@ -227,14 +227,24 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
                 kputc(')', &string);                         
             }
             else if ( type->vartype == var_is_inframe_deletion ) {
-                ksprintf(&string, "(p.%s%d_%s%ddel",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                if ( type->loc_end_amino == 0 ) {
+                    ksprintf(&string, "(p.%s%ddel",codon_names[type->ori_amino], type->loc_amino);
+                }
+                else {
+                    ksprintf(&string, "(p.%s%d_%s%ddel",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                }
                 int i;
                 for (i = 0; i < type->n; ++i)
                     kputs(codon_names[type->aminos[i]], &string);
                 kputc(')', &string);                                         
             }
             else if ( type->vartype == var_is_inframe_delins ) {
-                ksprintf(&string, "(p.%s%d_%s%ddelins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                if ( type->loc_end_amino == 0 ) {
+                    ksprintf(&string, "(p.%s%ddelins",codon_names[type->ori_amino], type->loc_amino);
+                }
+                else {
+                    ksprintf(&string, "(p.%s%d_%s%ddelins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                }
                 int i;
                 for (i = 0; i < type->n; ++i)
                     kputs(codon_names[type->aminos[i]], &string);
