@@ -733,30 +733,31 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( line->cdsstart == line->cdsend ) {
         // no cds count for noncoding transcript
         type->count2 = 0;
-        if ( line->strand == '+') {
-            for ( i = 0; i < line->exon_count; ++i ) {
-                if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i]) {
-                    if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) {
-                        type->vartype = var_is_splice_site;
-                    } else {
-                        type->vartype = var_is_noncoding;
-                    }
-                    goto no_amino_code;
-                }
-            }
-        } else {
-            for ( i = 0; i < line->exon_count; ++i ) {
-                if ( pos <= line->loc[BLOCK_START][i] && pos >= line->loc[BLOCK_END][i]) {
-                    if ( pos <= line->loc[BLOCK_END][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][i] -SPLICE_SITE_EXON_RANGE ) {
-                        type->vartype = var_is_splice_site;
-                    } else {
-                        type->vartype = var_is_noncoding;
-                    }
-                    goto no_amino_code;
-                }
-            }
-        }
-        type->vartype = var_is_noncoding;
+        /* if ( line->strand == '+') { */
+        /*     for ( i = 0; i < line->exon_count; ++i ) { */
+        /*         if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i]) { */
+        /*             if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) { */
+        /*                 type->vartype = var_is_splice_site; */
+        /*             } else { */
+        /*                 type->vartype = var_is_noncoding; */
+        /*             } */
+        /*             goto no_amino_code; */
+        /*         } */
+        /*     } */
+        /* } else { */
+        /*     for ( i = 0; i < line->exon_count; ++i ) { */
+        /*         if ( pos <= line->loc[BLOCK_START][i] && pos >= line->loc[BLOCK_END][i]) { */
+        /*             if ( pos <= line->loc[BLOCK_END][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][i] -SPLICE_SITE_EXON_RANGE ) { */
+        /*                 type->vartype = var_is_splice_site; */
+        /*             } else { */
+        /*                 type->vartype = var_is_noncoding; */
+        /*             } */
+        /*             goto no_amino_code; */
+        /*         } */
+        /*     } */
+        /* } */
+        /* type->vartype = var_is_noncoding; */
+        BRANCH(var_is_noncoding);
         goto no_amino_code;
     }
 
