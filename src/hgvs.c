@@ -689,7 +689,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                     type->vartype = var_is_splice_site;
                 }
                 // in case indels cover splice site
-                else if ( pos + ref_length <= line->loc[BLOCK_END][i] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_START][i] - SPLICE_SITE_EXON_RANGE ) {
+                else if ( pos + ref_length <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE ) {
                     type->vartype = var_is_splice_site;
                 }
                 break;
