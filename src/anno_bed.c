@@ -18,8 +18,9 @@ struct anno_stack* anno_stack_init()
     return stack;
 }
 static void anno_stack_push(struct anno_stack *stack, char *name)
-{
+{    
     int i;
+    assert(name);
     for ( i = 0; i < stack->l; ++i ) {
 	if ( strcmp(stack->a[i], name) == 0 )
 	    return;
