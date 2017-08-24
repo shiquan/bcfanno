@@ -376,10 +376,10 @@ int main(int argc, char **argv)
         }
 	bcf_write1(args.fp_out, args.hdr_out, line);
     }
-    if ( quiet_mode == 0 )
-        LOG_print("Annotate finished. Close.");
     bcf_destroy(line);
     export_reports();
     args_destroy();
+    if ( quiet_mode == 0 )
+        LOG_print("Annotate finished. Close.");
     return 0;
 }

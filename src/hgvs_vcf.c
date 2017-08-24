@@ -39,13 +39,13 @@ int hgvs_update_vcf_header(bcf_hdr_t *hdr)
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
     }
 
-    /* id = bcf_hdr_id2int(hdr, BCF_DT_ID, "IVSnom"); */
-    /* if (id == -1) { */
-    /*     bcf_hdr_append(hdr, "##INFO=<ID=IVSnom,Number=A,Type=String,Description=\"Old style nomenclature for the description of intron variants. Not recommand to use it in normal practice.\">"); */
-    /*     bcf_hdr_sync(hdr); */
-    /*     id = bcf_hdr_id2int(hdr, BCF_DT_ID, "IVSnom"); */
-    /*     assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id)); */
-    /* } */
+    id = bcf_hdr_id2int(hdr, BCF_DT_ID, "IVSnom");
+    if (id == -1) {
+        bcf_hdr_append(hdr, "##INFO=<ID=IVSnom,Number=A,Type=String,Description=\"Old style nomenclature for the description of intron variants. Not recommand to use it in normal practice.\">");
+        bcf_hdr_sync(hdr);
+        id = bcf_hdr_id2int(hdr, BCF_DT_ID, "IVSnom");
+        assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
+    }
 
     id = bcf_hdr_id2int(hdr, BCF_DT_ID, "Oldnom");
     if (id == -1) {
@@ -511,7 +511,8 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             kputs(".", &ivs_nom);
             kputs(".", &old_nom);
             kputs(".", &aa_length);
-        } else {
+        }
+        else {
             is_empty = 0;
             kputs(gene_string, &gene);
             kputs(trans_string, &transcript);
