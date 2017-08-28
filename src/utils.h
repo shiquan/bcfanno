@@ -111,23 +111,4 @@ static inline void *bcfanno_realloc(void *x, size_t size)
     return y;
 }
 
-static inline void *bcfanno_realloc_safe(void *x, size_t *size, size_t realloc_size)
-{
-    void *y = NULL;
-    if ( *size == 0 ) 
-        y = malloc(size);
-    else
-        y = realloc(x, realloc_size);
-    
-    if ( y == NULL ) {
-        free(x);
-        *size = 0;
-        return NULL;
-    }
-    *size = realloc_size;
-    return y;
-}
-
-
-
 #endif
