@@ -789,8 +789,6 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
 
     
 
-
-
     
     // For variants in coding region, check the amino acid changes.
 
@@ -853,13 +851,16 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             start = (cds_pos-1)/3*3 + line->utr5_length;
         }
     }
-    
+
     char codon[4];
     memcpy(codon, ori_seq, 3);
     codon[3] = '\0';
     type->ori_amino = codon2aminoid(codon);
     type->loc_amino = (cds_pos-1)/3 + 1;
-
+    if ( type->n ) {
+        free(type->aminos);
+        type->n = 0;
+    }
     if ( ref_length == 1 && ref_length == alt_length ) {
         codon[cod] = *alt_seq;
         type->mut_amino = codon2aminoid(codon);
@@ -903,9 +904,11 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             type->ori_end_amino = codon2aminoid(codon);
             type->loc_end_amino = type->loc_amino + 1;
             
+            
+            //type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
+            // free aminos buffer before reallocated it, previous memory leaks
             type->n = alt_length/3;
-            type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
-
+            type->aminos = (int*)malloc(type->n *sizeof(int));
             kstring_t str = { 0, 0, 0};
             kputs(alt+2-cod, &str);
             kputsn(ori_seq + cod +1, 2 - cod, &str);
@@ -937,7 +940,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 type->loc_end_amino = type->loc_amino + ref_length/3;
             }
             type->n = ref_length/3;
-            type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
+            //type->aminos = (int*)bcfanno_realloc(type->aminos, type->n *sizeof(int));
+            type->aminos = (int*)malloc(type->n *sizeof(int));
             int i;
             for ( i = 0; i < ref_length/3; ++i )
                 type->aminos[i] = codon2aminoid(ori_seq+i*3);
@@ -955,7 +959,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 for ( i = 0, j = cod; i < ref_length; ++i )
                     ori_seq[++j] = alt_seq[i];
                 type->n= type->loc_end_amino - type->loc_amino + 1;
-                type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
+                //type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
+                type->aminos = (int*)malloc(sizeof(int)*type->n);
                 for ( i = 0; i < type->n; ++i ) {
                     type->aminos[i] = codon2aminoid(ori_seq+i*3);
                 }                    
@@ -972,7 +977,8 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 kputsn(ori_seq+cod+1, 3-cod-1, &str);
                 assert(str.l%3 == 0);
                 type->n = str.l/3;
-                type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
+                //type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int)*type->n);
+                type->aminos = (int*)malloc(sizeof(int)*type->n);
                 int i;
                 for ( i = 0; i < type->n; ++i) {
                     type->aminos[i] = codon2aminoid(str.s+3*i);
@@ -989,7 +995,9 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 if (cod > 0 )
                     memcpy(codon, ori_seq, cod);
                 memcpy(codon+cod, ori_seq+ref_length+cod, 3-cod);                
-                type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int));
+                //type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int));
+                type->n = 1;
+                type->aminos = (int*)malloc(sizeof(int));
                 type->aminos[0] = codon2aminoid(codon);
             }
             // frameshift

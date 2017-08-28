@@ -50,24 +50,6 @@ int file_seek(htsFile *fp, long offset, int where)
 
 #endif
 
-#define GENEPRED_CIGAR_UNKNOWN_BASE '*'
-#define GENEPRED_CIGAR_MATCH_BASE   'M'
-#define GENEPRED_CIGAR_DELETE_BASE  'D'
-#define GENEPRED_CIGAR_INSERT_BASE  'I'
-
-// The fields cigar packed counts and cigar type, as follows:
-//
-//   offset   bits  value
-//   0        3     cigar_type
-//   4        32    cigar_counts
-//
-#define GENEPRED_CIGAR_PACKED_FIELD 3
-#define GENEPRED_CIGAR_UNKNOWN_TYPE 0
-#define GENEPRED_CIGAR_MATCH_TYPE   1
-#define GENEPRED_CIGAR_DELETE_TYPE  2
-#define GENEPRED_CIGAR_INSERT_TYPE  4
-#define GENEPRED_CIGAR_MASK_TYPE    7
-
 struct list *init_list(const char *fn)
 {
     if (fn == NULL)
@@ -622,17 +604,17 @@ int parse_line_locs(struct genepred_line *line)
             if ( i == line->exon_count*2 || j == line->n_cigar )
                 break;
             
-            if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) & GENEPRED_CIGAR_MATCH_TYPE ) {
+            if ( line->cigars[j] & GENEPRED_CIGAR_MATCH_TYPE ) {
                 match += line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
             }
             // deletions should be consider as match when count locs
-            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) & GENEPRED_CIGAR_DELETE_TYPE ) {
+            else if ( line->cigars[j] & GENE_CIGAR_DELETE_TYPE ) {
                 del = line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
                 match += del;
                 offset -= del;
             }
             // If insertion is tail-As, skip count offset.
-            else if ( (line->cigars[j] & GENEPRED_CIGAR_MASK_TYPE) & GENEPRED_CIGAR_INSERT_TYPE ) {
+            else if ( line->cigars[j] & GENEPRED_CIGAR_INSERT_TYPE ) {
                 ins = line->cigars[j] >> GENEPRED_CIGAR_PACKED_FIELD;
                 if ( j != line->n_cigar -1) 
                     offset += ins;

@@ -78,6 +78,11 @@ struct beds_anno_tsv *beds_anno_tsv_init()
 }
 void convert_string_tsv(struct beds_anno_tsv *tsv)
 {
+    // empty fields and realloc new memory for this string
+    if (tsv->nfields ) {
+        free(tsv->fields);
+        tsv->nfields = 0;
+    }
     tsv->fields = ksplit(&tsv->string, '\t', &tsv->nfields);
     assert(tsv->nfields > 3);
     tsv->start = atoi(tsv->string.s + tsv->fields[1]);
@@ -246,7 +251,8 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	warnings("No columns string specified for %s. Will annotate all tags in this data.", fname);
         file->no_such_chrom = 1;
 	no_columns = 1;
-    } else {
+    }
+    else {
 	int *splits = NULL;
 	kputs(columns, &string);
 	int nfields;
@@ -262,7 +268,8 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 	    if (*ss == '+') {
 		col->replace = REPLACE_MISSING;
 		ss++;
-	    } else if ( *ss == '-' ) {
+	    }
+            else if ( *ss == '-' ) {
 		col->replace = REPLACE_EXISTING;
 		ss++;
 	    }
@@ -272,7 +279,6 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 		ss += 5;
 	    col->hdr_key = strdup(ss);	    
 	    col->icol = -1;
-	    // debug_print("%s, %d", col->hdr_key, file->n_cols);
 	    file->n_cols++;	    
 	}
 	string.l = 0;
@@ -301,7 +307,8 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
 		col->icol = -1;
 		col->hdr_key = strndup(ss, se-ss+1);
 		col->hdr_key[se-ss] = '\0';
-	    } else {
+	    }
+            else {
 		for ( i = 0; i < file->n_cols; ++i ) {		    
 		    if ( strncmp(file->cols[i].hdr_key, ss, se-ss) == 0)
 			break;

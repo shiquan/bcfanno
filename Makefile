@@ -22,7 +22,7 @@ all:$(PROG)
 PACKAGE_VERSION = 0.01
 ifneq "$(wildcard .git)" ""
 PACKAGE_VERSION := $(shell git describe --tags)
-DOC_VERSION :=  $(shell git describe --always)+
+DOC_VERSION :=  $(shell git describe --tags)+
 DOC_DATE := $(shell date +'%Y-%m-%d %R %Z')
 version.h: $(if $(wildcard version.h),$(if $(findstring "$(PACKAGE_VERSION)",$(shell cat version.h)),,force))
 endif
