@@ -476,10 +476,6 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
     
     int is_empty = 1;
     for ( i = 1; i < line->n_allele; ++i ) {
-        const char *name = bcf_hdr_id2name(hdr, line->rid);        
-        setter_description(name, line->pos+1, line->d.allele[0], line->d.allele[i]);
-        struct hgvs_des *des = fill_hgvs_name();
-
         // if more than one allele, seperated with ','
         if ( i > 1 ) {
             kputc(',', &gene);
@@ -491,7 +487,13 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             kputc(',', &aa_length);
             kputc(',', &vartype);
         }
-    
+        // deletion skips
+        if ( *line->d.allele[i] == '*') 
+            goto empty_alleles;
+        
+        const char *name = bcf_hdr_id2name(hdr, line->rid);        
+        setter_description(name, line->pos+1, line->d.allele[0], line->d.allele[i]);
+        struct hgvs_des *des = fill_hgvs_name();            
         char *gene_string = retrieve_gene_des(des);
         char *trans_string = retrieve_trans_des(des);
         char *hgvs_string = retrieve_hgvs_des(des);
@@ -503,6 +505,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         
         hgvs_des_clear(des);
         if ( gene_string == NULL ) {
+          empty_alleles:
             kputs(".", &gene);
             kputs(".", &transcript);
             kputs(".", &hgvs_nom);
