@@ -67,7 +67,7 @@ Before you try to use any database, please try to classify the data and follow t
 
 ## **Generate databases for bcfanno**
 
-Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at [More details about databases](https://github.com/shiquan/vcfanno/blob/master/Documentation/database/more_details.md).
+Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at section [Generate databases](https://github.com/shiquan/vcfanno/blob/master/Documentation/database/more_details.md).
 
 
 *Instruction to build dbsnp for bcfanno:*
@@ -283,11 +283,17 @@ vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag exampl
 
 ## **Interpret the annotations.**
 
+###* For human genetic variants
+
 The American College of Medical Genetics and Genomics (ACMG) supply a decision-tree roadmap and recommend using 28 criteria to help the clinical researcher to interpret genetic variants, however no computation approach could interpret the genetic variants directly, that's because gathering information for all the criteria is quite complicated and no specific algorithms for implementing this guidelines specified. See details, please refer to  [ACMG guideline](https://www.google.com.hk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwigz5jkzLHVAhUBG5QKHesKAhYQFggkMAA&url=https%3A%2F%2Fwww.acmg.net%2Fdocs%2Fstandards_guidelines_for_the_interpretation_of_sequence_variants.pdf&usg=AFQjCNF_jV6xApr4TCyQhs9p0Iki85oYoQ).
 
 
 
-bcfanno predict the variants types and generate HGVS nomenclature for genetic variants, please refer to [VarType and HGVSnom section](https://github.com/shiquan/vcfanno/blob/master/Documentation/genetic_variant_types.md) for details.
+Section  [VarType and HGVSnom](https://github.com/shiquan/vcfanno/blob/master/Documentation/genetic_variant_types.md) introduce the genetic variant types and HGVS nomenclature.
+
+Section [ACMG interpretation]() introduce how to use bcfanno and open distribute databases to interpret the pathogenic variants.
+
+
 
 
 
