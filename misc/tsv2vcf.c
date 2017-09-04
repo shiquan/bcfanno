@@ -225,7 +225,7 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
             if ( end_is_set ) {
                 int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "END");
                 if ( id == -1 ) {
-                    bcf_hdr_append(hdr, "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position.\">");
+                    bcf_hdr_append(hdr, "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position of this variants.\">");
                     bcf_hdr_sync(hdr);
                     id = bcf_hdr_id2int(hdr, BCF_DT_ID, "END");
                     assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
@@ -474,13 +474,14 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
     /*     return 0; */
     /* } */
 
-    if ( strcasecmp("end", name) == 0 ) {
+    if ( strcasecmp("end", name) == 0 && end_is_set) {
         // append END tag in the header, this is mandontary
         col->hdr_id = bcf_hdr_id2int(hdr, BCF_HL_INFO, "END");
         if ( col->hdr_id == -1 ) {
-            bcf_hdr_append(hdr, "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position of the variant described in this record\">");
+            bcf_hdr_append(hdr, "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position of the variant described in this record.\">");
             bcf_hdr_sync(hdr);
             col->hdr_id = bcf_hdr_id2int(hdr, BCF_HL_INFO, "END");
+            assert(col->hdr_id != -1);
         }
         col->type = bcf_hdr_id2type(hdr, BCF_HL_INFO, col->hdr_id);
         col->key = strdup("END");
