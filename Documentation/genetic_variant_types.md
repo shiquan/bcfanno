@@ -24,7 +24,7 @@ Supported VarTypes are summaried below.
 * [*SpliceAcceptor*](http://www.sequenceontology.org/miso/current_release/term/SO:0001574), genetic variants in the 2 base region at the 3' end of an intron;
 * *Complex*,  large variants overlapped coding and noncoding regions, or influence more than one gene;
 * *NoCall*,  genetic variants in coding region, and the alternative allele is the same with the base in the transcript sequence, the *NoCall* type come from the inconsistance between genome reference and transcription reference, and usually come with high allele frequency in population database;
-* *Unknown*, genetic variants in coding region but could not interpret by bcfanno, usually account for some program bugs.
+* *Unknown*, genetic variants in coding region but could not be interpreted by bcfanno, usually account for program bugs.
 
 For any other variants not annotated with bcfanno (empty or no VarType tag) could be interpret as intergenic type.
 
