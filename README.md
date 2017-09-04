@@ -9,9 +9,16 @@ BCFANNO manual
 
 ## **Introduction**
 
-bcfanno was designed to annotate VCF/BCF files by using local and online databases. bcfanno support three kinds of databases which list below. And users could download and build open source or in house databases manually. Please refer to **database** section for the details.
+Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-stat-of-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants from labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure or coding sequences. However, to efficient annotate large scale genetic variants like several whole genome sequenced data with more than 20 databases is still a challange. Cloud based tools like vcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, a fast, flexible and standalone annotation tool to interpret genetic variants with very low resource consume. 
 
-Borrow the advances of VCF format, bcfanno was designed to put all the annotated data (dubbed *tags*) in the *INFO*, and the annotated VCF file could be convert to other formats or reused as a database. So before you try to use bcfanno, please make sure you know the structure of VCF file and how to find the document of [VCF/BCF format](https://samtools.github.io/hts-specs/VCFv4.2.pdf).
+***High Speed, Small Memory***
+
+bcfanno was designed to annotate VCF/BCF files by using local and online databases. bcfanno wrote in pure C language, and only cached the index structure of databases with very small memory (usually <5M per dataset). Databases in VCF/BCF and bed format are supported, users could download and build open source and in house databases manually.
+
+***Every File is a Database***
+
+With the advances of VCF file, bcfanno was designed to put all the annotated data (dubbed *tags*) in the *INFO*. Since bcfanno support VCF/BCF databases, every annotated file could be reused as a database to annotate other files. For example, for one project, user could annotate all the reported genetic variants with preferred databases in the first batch, and the annotated VCF could be released as an ALL-IN-ONE database to be reused to annotate any further variant file in the same project with very small memory and CPU resources.  And for another example, if new databases should be added, just reannotate with new databases and no tags will be lost in these steps.
+
 
 
 ## Bechmark
@@ -276,16 +283,19 @@ vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag exampl
 
 ## **Interpret the annotations.**
 
-The American College of Medical Genetics and Genomics (ACMG) supply a decision-tree roadmap to help the clinical researchers to interpret the genetic variants, however only very few of computation approaches could 
+The American College of Medical Genetics and Genomics (ACMG) supply a decision-tree roadmap and recommend using 28 criteria to help the clinical researcher to interpret genetic variants, however no computation approach could interpret the genetic variants directly, that's because gathering information for all the criteria is quite complicated and no specific algorithms for implementing this guidelines specified. See details, please refer to  [ACMG guideline](https://www.google.com.hk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwigz5jkzLHVAhUBG5QKHesKAhYQFggkMAA&url=https%3A%2F%2Fwww.acmg.net%2Fdocs%2Fstandards_guidelines_for_the_interpretation_of_sequence_variants.pdf&usg=AFQjCNF_jV6xApr4TCyQhs9p0Iki85oYoQ).
 
- bcfanno interpret the types and amino acid changs of genetic variants, 
 
-Please refer  to [ACMG guideline](https://www.google.com.hk/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0ahUKEwigz5jkzLHVAhUBG5QKHesKAhYQFggkMAA&url=https%3A%2F%2Fwww.acmg.net%2Fdocs%2Fstandards_guidelines_for_the_interpretation_of_sequence_variants.pdf&usg=AFQjCNF_jV6xApr4TCyQhs9p0Iki85oYoQ) to interpret genetic variants.
+
+bcfanno predict the variants types and generate HGVS nomenclature for genetic variants, please refer to [VarType and HGVSnom section](https://github.com/shiquan/vcfanno/blob/master/Documentation/genetic_variant_types.md) for details.
 
 
 
 ## **Bug report or suggestions**.
 
+Currently, you could report bugs from GitHub or email me directly. Please be kind to specify which exactly version you test in the report message.
 
-## **Reference**
+
+
+## Reference
 
