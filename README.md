@@ -17,7 +17,7 @@ bcfanno was designed to annotate VCF/BCF files by using local and online databas
 
 ***Every File is a Database***
 
-With the advances of VCF file, bcfanno was designed to put all the annotated data (dubbed *tags*) in the *INFO*. Since bcfanno support VCF/BCF databases, every annotated file could be reused as a database to annotate other files. For example, for one project, user could annotate all the reported genetic variants with preferred databases in the first batch, and the annotated VCF could be released as an ALL-IN-ONE database to be reused to annotate any further variant file in the same project with very small memory and CPU resources.  And for another example, if new databases should be added, just reannotate with new databases and no tags will be lost in these steps.
+With the advances of VCF file, bcfanno was designed to put all the annotated data (dubbed *tags*) in the *INFO*. Since bcfanno support VCF/BCF databases, every annotated file could be reused as a database to annotate other files. For example, for one project, user could annotate all the reported genetic variants with preferred databases in the first batch, and the annotated VCF could be released as an ALL-IN-ONE database to be reused to annotate any further variant file in the same project with very small memory and CPU resources.  For another example, if you need annotate a lot of VCFs, saying 1,000 WGS VCFs, you could merge all the VCFs into one VCF first and annotate the merged VCF in one batch, so for same genome position in different samples will be annotated just once. And if you want to update one or more databases, just update related tags instead of rebuild all the records from scratch.
 
 
 
