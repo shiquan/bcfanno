@@ -1,4 +1,4 @@
-#include "utils.h"
+U#include "utils.h"
 #include "hgvs.h"
 #include "hgvs_vcf.h"
 #include "genepred.h"
@@ -521,22 +521,34 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             kputs(trans_string, &transcript);
             kputs(hgvs_string, &hgvs_nom);
             kputs(vartype_string, &vartype);
+
             if ( oldnom_string != NULL)
                 kputs(oldnom_string, &old_nom);
+            else
+                kputc('.', &old_nom);
+            
             kputs(exonintron_string, &exon_id);
+
             if ( ivsnom_string != NULL ) 
                 kputs(ivsnom_string, &ivs_nom);
+            else
+                kputc('.', &ivs_nom);
+            
             kputs(aalength_string, &aa_length);
             
             free(gene_string);
             free(trans_string);
             free(hgvs_string);
             free(vartype_string);
+
             if ( oldnom_string != NULL)
                 free(oldnom_string);
+
             free(exonintron_string);
+
             if ( ivsnom_string != NULL)
                 free(ivsnom_string);
+
             free(aalength_string);
         }        
     }
