@@ -900,7 +900,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             BRANCH(var_is_inframe_insertion);
 
             // end amino acid
-            memcpy(codon, ori_seq+3, 3);            
+            memcpy(codon, ori_seq+3, 3);
             type->ori_end_amino = codon2aminoid(codon);
             type->loc_end_amino = type->loc_amino + 1;
             
@@ -909,6 +909,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             // free aminos buffer before reallocated it, previous memory leaks
             type->n = alt_length/3;
             type->aminos = (int*)malloc(type->n *sizeof(int));
+
             kstring_t str = { 0, 0, 0};
             kputs(alt+2-cod, &str);
             kputsn(ori_seq + cod +1, 2 - cod, &str);
