@@ -44,4 +44,5 @@ Please notice that one gene may encode more than one transcript, bcfanno will an
 
 ####Reference
 
-http://varnomen.hgvs.org/
+[http://varnomen.hgvs.org/](http://varnomen.hgvs.org/)
+[https://mutalyzer.nl/](https://mutalyzer.nl/)
