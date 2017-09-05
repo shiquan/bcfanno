@@ -32,15 +32,16 @@ For any other variants not annotated with bcfanno (empty or no VarType tag) coul
 
 # HGVS nomenclature
 
+HGVS is short for Human Genome Variation Society. Nowadays, HGVS nomenclature (**HGVSnom**) is recommended to report and describe sequence variants found in DNA, RNA and protein. bcfanno generate three kinds of HGVS tags to describe the variants in gene regions, **HGVSnom** is the standard HGVS nomenclature, **Oldnom** descibe the variant location in gene without count the UTR regions, **IVSnom** describe the variants in intron. **Oldnom** and **IVSnom** only used to check the record published several years ago. It is recommend to descibe and publish genetic variants in standard format.
 
+Here is a demo:
+```
+#CHROM	START	END	TGT	HGVSnom	Oldnom	IVSnom
+chr8	37821852	37821853	T/C	NM_000025.2:c.1206-96A>G	NM_000025.2:n.1403-96A>G	NM_000025.2:c.IVS1-96T>C
+chr1	11906067	11906068	A/A	NR_037806.1:n.1479+245A>G|NM_006172.3:c.454T>C(p.Stop152Arg/p.X152R)	NM_006172.3:n.553T>C	NR_037806.1:c.IVS3+245A>G
+```
+Please notice that one gene may encode more than one transcript, bcfanno will annotate all the transcripts in the refgene databases if no transcript list specified. And the HGVS names of different transcripts will seperated with "|". If two or more transcripts found, the **Gene** tag, **Transcripts** tag and **HGVSnom** tag will generated in same order. However, **Oldnom** will be exported only if coding variants in the transcript and **IVSnom** for intron variants.
 
+####Reference
 
-
-
-
-
-
-
-
-
-
+http://varnomen.hgvs.org/

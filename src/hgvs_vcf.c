@@ -1,4 +1,4 @@
-U#include "utils.h"
+#include "utils.h"
 #include "hgvs.h"
 #include "hgvs_vcf.h"
 #include "genepred.h"
@@ -388,7 +388,7 @@ static char *retrieve_ivsnom_des(struct hgvs_des *des)
         kputc(':', &string);
         ksprintf(&string, "c.IVS%d", type->count);
         if ( name->offset > 0 ) {
-            ksprintf(&string, "+ %d", name->offset);
+            ksprintf(&string, "+%d", name->offset);
         } else if (name->offset < 0) {
             ksprintf(&string, "%d", name->offset);
         }
