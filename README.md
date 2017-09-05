@@ -9,23 +9,23 @@ BCFANNO manual
 
 ## **Introduction**
 
-Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-stat-of-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants from labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure or coding sequences. However, to efficient annotate large scale genetic variants like several whole genome sequenced data with more than 20 databases is still a challange. Cloud based tools like vcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, a fast, flexible and standalone annotation tool to interpret genetic variants with very low resource consume. 
+Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-stat-of-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants in different labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure and combine more than 20 databases to interpret the pathogenic variants. However, to efficient annotate large scale data like genetic variants in WGS samples is still a challange. Cloud based tools like vcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, implement from personal PC to cloud-based server, a fast, flexible annotation tool to interpret genetic variants with very low computer resource. 
 
-***High Speed, Small Memory***
+***Fast : High Speed, Small Memory***
 
-bcfanno was designed to annotate VCF/BCF files by using local and online databases. bcfanno wrote in pure C language, and only cached the index structure of databases with very small memory (usually <5M per dataset). Databases in VCF/BCF and bed format are supported, users could download and build open source and in house databases manually.
+bcfanno was designed to annotate VCF/BCF files by using local and online databases. bcfanno wrote in pure C language, designed to cache the index structure instead of records in the memory. This design very small memory (usually <5M per dataset). Databases in VCF/BCF and bed format are supported, users could download and build open source and in house databases manually.
 
-***Every File is a Database***
+***Flexible : Every File is a Database***
 
-With the advances of VCF file, bcfanno was designed to put all the annotated data (dubbed *tags*) in the *INFO*. Since bcfanno support VCF/BCF databases, every annotated file could be reused as a database to annotate other files. For example, for one project, user could annotate all the reported genetic variants with preferred databases in the first batch, and the annotated VCF could be released as an ALL-IN-ONE database to be reused to annotate any further variant file in the same project with very small memory and CPU resources.  For another example, if you need annotate a lot of VCFs, saying 1,000 WGS VCFs, you could merge all the VCFs into one VCF first and annotate the merged VCF in one batch, so for same genome position in different samples will be annotated just once. And if you want to update one or more databases, just update related tags instead of rebuild all the records from scratch.
+VCF is well supported and extensively used in a lot of projects. With the advances of VCF file, bcfanno was designed to put all the annotated data (dubbed *tags*) in the *INFO* and export annotated VCF. And the annotated VCF can be reused as database in next batch. For example, for one project, user could annotate all the reported genetic variants with preferred databases in the first batch, and the annotated VCF could be released as an ALL-IN-ONE database to be reused to annotate any further variant file in the same project but with very small memory and CPU resources.  For another example, to annotate a lot of VCFs, saying 1,000 WGS VCFs, merge all the VCFs into one VCF first and annotate the merged VCF in one batch, so for same genome position in different samples will be annotated just once. Compare with flat text files, manage and update VCFs could be much easier and more efficient with current stat softwares like bcftools and vcflib. bcfanno also supply two programs (***tsv2vcf*** and ***vcf2tsv***) to convert tab seperared text file to VCF and convert VCF to user friendly text file.
 
 
 
 ## Bechmark
 
-bcfanno annotate a WGS vcf with specified 22 databases in 6 CPU hours. bcfanno usually do not parse the FORMAT of vcf files, and all the annotators (*tags*) will be put into the INFO region, so it is suggested to merge multiple samples by `bcftools merge` before annotation.
+bcfanno annotate a WGS vcf with specified 22 databases in 6 CPU hours. 
 
-
+bcfanno usually do not parse the *FORMAT* of VCFs, and all the *tags* will be put into the INFO region, it is strongly suggested to merge multiple samples by `bcftools merge` before annotation.
 
 ## **How to build the programs**
 
