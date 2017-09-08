@@ -1,4 +1,8 @@
-# Variant types
+#Generate VarType and HGVSnom.
+
+
+
+##Variant types
 
 For genetic variants located in the transcript regions, bcfanno will interpret the amino acid changes and the variant types (**VarType**). One major challange encountered with interpreting VarType is multi transcripts may be encoded by one gene, several VarTypes will be exported and separated with "|" in such a record. Beside VarType, any other transcription-related tags (records), like **HGVSnom**, will also be generated in such a format, which multi transcription-related information seperated with "|" and exported in order.
 
@@ -30,7 +34,7 @@ For any other variants not annotated with bcfanno (empty or no VarType tag) coul
 
 
 
-# HGVS nomenclature
+##HGVS nomenclature
 
 HGVS is short for Human Genome Variation Society. Nowadays, HGVS nomenclature (**HGVSnom**) is recommended to report and describe sequence variants found in DNA, RNA and protein. bcfanno generate three kinds of HGVS tags to describe the variants in gene regions, **HGVSnom** is the standard HGVS nomenclature, **Oldnom** descibe the variant location in gene without count the UTR regions, **IVSnom** describe the variants in intron. **Oldnom** and **IVSnom** only used to check the record published several years ago. It is recommend to descibe and publish genetic variants in standard format.
 
@@ -42,7 +46,18 @@ chr1	11906067	11906068	A/A	NR_037806.1:n.1479+245A>G|NM_006172.3:c.454T>C(p.Stop
 ```
 Please notice that one gene may encode more than one transcript, bcfanno will annotate all the transcripts in the refgene databases if no transcript list specified. And the HGVS names of different transcripts will seperated with "|". If two or more transcripts found, the **Gene** tag, **Transcripts** tag and **HGVSnom** tag will generated in same order. However, **Oldnom** will be exported only if coding variants in the transcript and **IVSnom** for intron variants.
 
-####Reference
+
+
+###Reference
 
 [http://varnomen.hgvs.org/](http://varnomen.hgvs.org/)
 [https://mutalyzer.nl/](https://mutalyzer.nl/)
+
+
+
+##Generate HGVSnom and VarType with bcfanno.
+
+For GRCh37 (hg19), please refer to section [build databases for hg19]().
+
+For GRCh38 (hg38), please refer to section [build databases for hg38]().
+
