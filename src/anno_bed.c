@@ -412,7 +412,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
     return 0;
 }
 
-int anno_beds_core(bcf_hdr_t *hdr, struct beds_options *opts, bcf1_t *line)
+int anno_beds_core(struct beds_options *opts, bcf1_t *line)
 {
     if ( opts->beds_is_inited == 0 )
 	return 0;
@@ -422,7 +422,7 @@ int anno_beds_core(bcf_hdr_t *hdr, struct beds_options *opts, bcf1_t *line)
 	struct beds_anno_file *file = &opts->files[i];
 	for ( j = 0; j < file->n_cols; ++j ) {
 	    struct anno_col *col = &file->cols[j];
-            col->curr_name = bcf_seqname(hdr, line);
+            col->curr_name = bcf_seqname(opts->hdr_out, line);
             col->curr_line = line->pos+1;
 	    if ( col->setter.bed(opts, line, col) ) {
                 fprintf(stderr, "[%s] database : %s; key : %s.\n", __func__, file->fname, col->hdr_key);
