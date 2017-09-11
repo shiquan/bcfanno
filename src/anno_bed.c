@@ -58,6 +58,11 @@ static char *generate_funcreg_string (struct beds_anno_file *file, struct anno_c
     int i;
     for ( i = 0; i < file->cached; ++i ) {
 	struct beds_anno_tsv *tsv = file->buffer[i];
+        char *name = get_col_tsv(tsv, col->icol);
+        if (name == NULL) {
+            warnings("Failed to retrieve record. %s, %s, %d", file->fname, col->hdr_key,  col->curr_name, col->curr_line);
+            name = ".";
+        }
 	anno_stack_push(stack, get_col_tsv(tsv, col->icol));
     }
     kstring_t string = KSTRING_INIT;
@@ -407,7 +412,7 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
     return 0;
 }
 
-int anno_beds_core(struct beds_options *opts, bcf1_t *line)
+int anno_beds_core(bcf_hdr_t *hdr, struct beds_options *opts, bcf1_t *line)
 {
     if ( opts->beds_is_inited == 0 )
 	return 0;
@@ -417,6 +422,8 @@ int anno_beds_core(struct beds_options *opts, bcf1_t *line)
 	struct beds_anno_file *file = &opts->files[i];
 	for ( j = 0; j < file->n_cols; ++j ) {
 	    struct anno_col *col = &file->cols[j];
+            col->curr_name = bcf_seqname(hdr, line);
+            col->curr_line = line->pos+1;
 	    if ( col->setter.bed(opts, line, col) ) {
                 fprintf(stderr, "[%s] database : %s; key : %s.\n", __func__, file->fname, col->hdr_key);
                 return 1;

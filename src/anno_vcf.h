@@ -62,6 +62,6 @@ extern int vcfs_options_destroy(struct vcfs_options *opts);
 // add new vcf/bcf database and init columns
 extern int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *columns);
 // core function to annotate
-extern int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line);
+extern int anno_vcfs_core(bcf_hdr_t *hdr, struct vcfs_options *opts, bcf1_t *line);
 
 #endif

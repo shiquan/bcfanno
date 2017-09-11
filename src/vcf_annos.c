@@ -1179,7 +1179,7 @@ int match_allele(bcf1_t *line, bcf1_t *dat)
     // if no matchs
     return 1;
 }
-int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
+int anno_vcfs_core(bcf_hdr_t *hdr, struct vcfs_options *opts, bcf1_t *line)
 {
     // just skip the next steps if vcfs databases not inited
     if ( opts->vcfs_is_inited == 0 )
@@ -1207,6 +1207,8 @@ int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
             
 	    for ( k = 0; k < file->ncols; ++k ) {
 		struct anno_col *col = &file->cols[k];
+                col->curr_name = bcf_seqname(hdr, line);
+                col->curr_line = line->pos+1;
 		int ret =  col->setter.vcf(opts, line, col, dat);
 
                 if ( ret ) {

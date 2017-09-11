@@ -70,6 +70,9 @@ struct anno_col {
     char *hdr_key;
     // setter function
     setter_func setter;
+    // point to chromosome name and position, do NOT free it.
+    char *curr_name;
+    int curr_line;
 };
 
 typedef void (* rel_func)(void*);

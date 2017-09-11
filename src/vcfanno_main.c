@@ -328,14 +328,14 @@ int anno_core(bcf1_t *line)
     // todo: stat type module, ti,tv etc
     
     // annotate vcf files
-    if ( anno_vcfs_core(&args.vcf_opts, line) == 1) {
+    if ( anno_vcfs_core(args.hdr_out, &args.vcf_opts, line) == 1) {
         if ( args.tol == 0 ) {
             return 1;
         }
     }
  
     // annotate bed format datasets
-    if ( anno_beds_core(&args.bed_opts, line) == 1) {
+    if ( anno_beds_core(args.hdr_out, &args.bed_opts, line) == 1) {
         if ( args.tol == 0 ) {
             return 1;
         }
