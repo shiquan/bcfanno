@@ -61,9 +61,10 @@ static char *generate_funcreg_string (struct beds_anno_file *file, struct anno_c
         char *name = get_col_tsv(tsv, col->icol);
         if (name == NULL) {
             warnings("Failed to retrieve record. %s, %s, %d", file->fname, col->hdr_key,  col->curr_name, col->curr_line);
-            name = ".";
+            // name = ".";
         }
-	anno_stack_push(stack, get_col_tsv(tsv, col->icol));
+        else 
+            anno_stack_push(stack, name);
     }
     kstring_t string = KSTRING_INIT;
     for ( i = 0; i < stack->l; ++i ) {
@@ -203,8 +204,7 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 	if ( file->last_end < tsv->end )
 	    file->last_end = tsv->end;
 	if ( file->last_start > tsv->start )
-	    file->last_start = tsv->start;
-        
+	    file->last_start = tsv->start;        
     }
     hts_itr_destroy(itr);
     // if buffer is filled return 0, else return 1
