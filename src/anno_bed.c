@@ -76,13 +76,25 @@ struct beds_anno_tsv *beds_anno_tsv_init()
     tsv->string.s = 0;
     return tsv;
 }
+void clean_string_tsv(struct beds_anno_tsv *tsv)
+{
+    if ( tsv->field != 0 ) {
+	free(tsv->fields);
+    }
+    tsv->fields = NULL;
+    tsv->nfields = 0;
+    tsv->start = 0;
+    tsv->end = 0;
+    tsv->string.l = 0;
+}
+
 void convert_string_tsv(struct beds_anno_tsv *tsv)
 {
     // empty fields and realloc new memory for this string
-    if (tsv->nfields ) {
-        free(tsv->fields);
-        tsv->nfields = 0;
-    }
+    //if (tsv->nfields ) {
+    //    free(tsv->fields);
+    //    tsv->nfields = 0;
+    //}
     tsv->fields = ksplit(&tsv->string, '\t', &tsv->nfields);
     assert(tsv->nfields > 3);
     tsv->start = atoi(tsv->string.s + tsv->fields[1]);
@@ -146,10 +158,11 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 	    for (i = 8; i > 0; --i)
 		file->buffer[file->max - i] = beds_anno_tsv_init();
 	}
-
-	if ( tbx_itr_next(file->fp, file->idx, itr, &file->buffer[file->cached]->string) < 0)
-	    break;
 	struct beds_anno_tsv *tsv = file->buffer[file->cached];
+	clean_string_tsv(tsv);
+	if ( tbx_itr_next(file->fp, file->idx, itr, &tsv->string) < 0)
+	    break;
+
 	convert_string_tsv(tsv);
         // Skip if variant located outside of region.
         

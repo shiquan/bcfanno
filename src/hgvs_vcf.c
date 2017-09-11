@@ -489,7 +489,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
         }
         // deletion skips
         if ( line->d.allele[i] == NULL || *line->d.allele[i] == '*') 
-            goto empty_alleles;
+	    goto empty_alleles;
         
         const char *name = bcf_hdr_id2name(hdr, line->rid);        
         setter_description(name, line->pos+1, line->d.allele[0], line->d.allele[i]);
