@@ -1210,7 +1210,8 @@ int anno_vcfs_core(struct vcfs_options *opts, bcf1_t *line)
 		int ret =  col->setter.vcf(opts, line, col, dat);
 
                 if ( ret ) {
-                    error_return("Failed to annotate %s:%d with database: %s.\n", bcf_seqname(opts->hdr_out, line), line->pos+1, file->fname);
+                    error_return("Failed to annotate %s:%d with database: %s.\n",
+				 bcf_seqname(opts->hdr_out, line), line->pos+1, file->fname);
                     // return ret;
                 }
 	    }

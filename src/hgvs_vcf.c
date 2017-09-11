@@ -488,7 +488,7 @@ int setter_hgvs_vcf(bcf_hdr_t *hdr, bcf1_t *line)
             kputc(',', &vartype);
         }
         // deletion skips
-        if ( *line->d.allele[i] == '*') 
+        if ( line->d.allele[i] == NULL || *line->d.allele[i] == '*') 
             goto empty_alleles;
         
         const char *name = bcf_hdr_id2name(hdr, line->rid);        
