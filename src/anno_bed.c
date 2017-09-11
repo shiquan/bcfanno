@@ -46,6 +46,7 @@ char * get_col_tsv(struct beds_anno_tsv *tsv, int icol)
 	warnings("out of columns");
 	return NULL;
     }
+    
     return tsv->string.s + tsv->fields[icol];
 }
 static char *generate_funcreg_string (struct beds_anno_file *file, struct anno_col *col)
@@ -78,7 +79,7 @@ struct beds_anno_tsv *beds_anno_tsv_init()
 }
 void clean_string_tsv(struct beds_anno_tsv *tsv)
 {
-    if ( tsv->field != 0 ) {
+    if ( tsv->nfields != 0 ) {
 	free(tsv->fields);
     }
     tsv->fields = NULL;
@@ -88,17 +89,33 @@ void clean_string_tsv(struct beds_anno_tsv *tsv)
     tsv->string.l = 0;
 }
 
-void convert_string_tsv(struct beds_anno_tsv *tsv)
+int convert_string_tsv(struct beds_anno_tsv *tsv)
 {
     // empty fields and realloc new memory for this string
     //if (tsv->nfields ) {
     //    free(tsv->fields);
     //    tsv->nfields = 0;
     //}
-    tsv->fields = ksplit(&tsv->string, '\t', &tsv->nfields);
+    int *tmp = ksplit(&tsv->string, '\t', &tsv->nfields);
+    if ( tmp != NULL )
+	tsv->fields =  tmp;
+    else {	    
+	warnings("failed to split %s, retry..", tsv->string.s);
+	tmp = ksplit(&tsv->string, '\t', &tsv->nfields);
+	if ( tmp != NULL )
+	    tsv->fields = tmp;
+	else {
+	    warnings("failed again, this may caused by insufficient memory..");
+	    goto failed_convert;
+	}
+    }
     assert(tsv->nfields > 3);
     tsv->start = atoi(tsv->string.s + tsv->fields[1]);
     tsv->end = atoi(tsv->string.s + tsv->fields[2]);
+    return 0;
+
+  failed_convert:
+    return 1;
 }
 void beds_anno_tsv_destroy(struct beds_anno_tsv *tsv)
 {
@@ -163,7 +180,9 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
 	if ( tbx_itr_next(file->fp, file->idx, itr, &tsv->string) < 0)
 	    break;
 
-	convert_string_tsv(tsv);
+	if ( convert_string_tsv(tsv) ) 
+	    continue;
+	    
         // Skip if variant located outside of region.
         
         if (line->pos < tsv->start || line->pos >= tsv->end)
