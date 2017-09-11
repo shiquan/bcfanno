@@ -42,7 +42,7 @@ void anno_stack_destroy(struct anno_stack *stack)
 }
 char * get_col_tsv(struct beds_anno_tsv *tsv, int icol)
 {
-    if (icol > tsv->nfields) {
+    if (icol >= tsv->nfields) {
 	warnings("out of columns");
 	return NULL;
     }
