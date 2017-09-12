@@ -33,6 +33,14 @@ Supported VarTypes are summaried below.
 For any other variants not annotated with bcfanno (empty or no VarType tag) could be interpret as intergenic type.
 
 
+###Impact order
+bcfanno predict variants in order of severity.
+* *Complex*
+* *Nonsense*, *StopLost*, *StopRetained*, *SpliceDonor*, *SpliceAcceptor*, *SpliceSite*, *Frameshift*
+* *InframeDelins*, *InframeDeletion*, *InframeInsertion*, *Missense*
+* *Synonymous*
+* *Utr5*, *Utr3*, *NoCall*, *Intron*, *Noncoding*
+* *Unknown*
 
 ##HGVS nomenclature
 
