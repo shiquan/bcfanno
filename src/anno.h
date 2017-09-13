@@ -71,7 +71,7 @@ struct anno_col {
     // setter function
     setter_func setter;
     // point to chromosome name and position, do NOT free it.
-    char *curr_name;
+    const char *curr_name;
     int curr_line;
 };
 

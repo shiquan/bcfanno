@@ -803,10 +803,10 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     int start = (cds_pos-1)/3*3 + line->utr5_length;
 
     // retrieve affected sequences and downstream    
-    int l = 0;
+    int transcript_retrieve_length = 0;
     char *name = line->name1;
-    char *ori_seq = faidx_fetch_seq(spec.data->fai, name, start, start + 1000, &l);
-    if ( ori_seq == NULL || l == 0 )
+    char *ori_seq = faidx_fetch_seq(spec.data->fai, name, start, start + 1000, &transcript_retrieve_length);
+    if ( ori_seq == NULL || transcript_retrieve_length == 0 )
         goto failed_check;
     
     char *ref_seq = ref == NULL ? NULL : strdup(ref);
@@ -840,10 +840,10 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             offset += alt_length;
         }
         if ( offset > 0 ) {
-            if ( l <= offset )
+            if ( transcript_retrieve_length <= offset )
                 goto failed_check;
-            l -= offset;
-            char *offset_seq = strndup(ori_seq+offset, l);
+            transcript_retrieve_length -= offset;
+            char *offset_seq = strndup(ori_seq+offset, transcript_retrieve_length);
             // point ori_seq to new memory address, this is not safe!
             free(ori_seq);
             ori_seq = offset_seq;
@@ -924,6 +924,11 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
         } 
         // Deletion
         else if ( alt_length == 0 ) {
+	    // for an exon-span deletion, the transcript has been trimmed, complex type will be report
+	    if ( ref_length >= transcript_retrieve_length ) {
+                type->vartype = var_is_complex;		   
+	    }
+		
             if ( ref_length%3 || cod != 2)
                 goto delins;
 
@@ -995,11 +1000,14 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 type->ori_end_amino = codon2aminoid(codon);                
                 if (cod > 0 )
                     memcpy(codon, ori_seq, cod);
-                memcpy(codon+cod, ori_seq+ref_length+cod, 3-cod);                
-                //type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int));
-                type->n = 1;
-                type->aminos = (int*)malloc(sizeof(int));
-                type->aminos[0] = codon2aminoid(codon);
+		// check complex type
+		if ( ref_length < transcript_retrieve_length - cod ) {
+		    memcpy(codon+cod, ori_seq+ref_length+cod, 3-cod);                
+		    //type->aminos = (int*)bcfanno_realloc(type->aminos, sizeof(int));
+		    type->n = 1;
+		    type->aminos = (int*)malloc(sizeof(int));
+		    type->aminos[0] = codon2aminoid(codon);
+		} 
             }
             // frameshift
             else {                
@@ -1030,16 +1038,18 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                     //l += alt_length;
                     //for ( i = 0, j = cod; i < alt_length; ++i )
                     //buffer[j++] = alt[i];
-                kputsn(ori_seq+cod+ref_length, l-cod-ref_length, &str);
-                for ( i = 0; i < str.l/3; ++i )
-                    if ( check_is_stop(str.s+i*3) )
-                        break;
-                type->fs = ori_stop == i +1 ? -1 : i+1;
-                assert(str.l > 3);
-                memcpy(codon, str.s, 3);
-                type->mut_amino = codon2aminoid(codon);
-                if ( str.m )
-                    free(str.s);
+		if ( ref_length < transcript_retrieve_length ) {
+		    kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
+		    for ( i = 0; i < str.l/3; ++i )
+			if ( check_is_stop(str.s+i*3) )
+			    break;
+		    type->fs = ori_stop == i +1 ? -1 : i+1;
+		    assert(str.l > 3);
+		    memcpy(codon, str.s, 3);
+		    type->mut_amino = codon2aminoid(codon);
+		    if ( str.m )
+			free(str.s);
+		}
             }
         }
     }

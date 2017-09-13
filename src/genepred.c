@@ -371,7 +371,7 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
     BRANCH(line->cdsend, type->cdsend, str2int);
 
     // Convert 0 based cdsstart to 1 based. Only for coding transcript.
-    if ( line->cdsstart != line->cdsend )
+    if ( line->cdsstart < line->cdsend )
         line->cdsstart++;
 
     // Parse exon number.
@@ -440,11 +440,16 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
 int parse_line(kstring_t *string, struct genepred_line *line)
 {
     char *temp = strdup(string->s);
-    if ( parse_line_core(string, line) == 1 )
-        error("Format error. Failed to parse line, %s", temp);
+    int ret = 0;
+    if ( temp == NULL || temp[0] == '#' )
+	ret = 1;
+    else if ( parse_line_core(string, line) == 1 ) {
+        error_print("Format error. Failed to parse line, %s", temp);
+	ret = 1;
+    }
     // Release memory.
     free(temp);
-    return 0;
+    return ret;
 }
 int parse_line_locs(struct genepred_line *line)
 {
@@ -524,7 +529,7 @@ int parse_line_locs(struct genepred_line *line)
     // Check the strand.
     int is_strand = line->strand == '+';
     // Check the transcript type, for noncoding RNA cdsstart == cdsend.
-    int is_coding = line->cdsstart == line->cdsend ? 0 : 1;
+    int is_coding = line->cdsstart < line->cdsend ? 0 : 1;
     
     for ( i = 0; i < 2; i++ ) {
         line->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
@@ -706,7 +711,8 @@ int genepred_read_line(struct genepred_spec *spec, struct genepred_line *line)
     for ( ;; ) {
         if ( read_line(spec, &string) == 1)
             break;
-        parse_line(&string, line);
+        if ( parse_line(&string, line))
+	    continue;
         if ( check_gene_trans(spec, line) == 1 )
             continue;
         if ( string.m ) 
@@ -848,7 +854,8 @@ struct genepred_line *genepred_retrieve_gene(struct genepred_spec *spec, const c
     for ( ;; ) {
         if ( read_line(spec, &string) )
             break;
-        parse_line(&string, &node);
+        if ( parse_line(&string, &node) )
+	    continue;
         if ( strcasecmp(node.name2, name) == 0 ) {
             struct genepred_line *temp1 = genepred_line_copy(&node);
             if ( head == NULL )
@@ -892,7 +899,8 @@ struct genepred_line *genepred_retrieve_trans(struct genepred_spec *spec, const 
     for ( ;; ) {
         if ( read_line(spec, &string) )
             break;
-        parse_line(&string, &node);
+        if ( parse_line(&string, &node) )
+	    continue;
 
         if ( check_version == 0 ) {
             char *ss;
@@ -946,7 +954,8 @@ struct genepred_line *genepred_retrieve_region(struct genepred_spec *spec, char 
     struct genepred_line *temp = NULL;
     while ( tbx_itr_next(spec->fp, spec->idx, itr, &string) >= 0 ) {
         struct genepred_line *line = genepred_line_create();
-        parse_line(&string, line);
+        if ( parse_line(&string, line) )
+	    continue;
 
         if ( check_gene_trans(spec, line) == 1 )
             continue;

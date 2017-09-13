@@ -60,7 +60,7 @@ static char *generate_funcreg_string (struct beds_anno_file *file, struct anno_c
 	struct beds_anno_tsv *tsv = file->buffer[i];
         char *name = get_col_tsv(tsv, col->icol);
         if (name == NULL) {
-            warnings("Failed to retrieve record. %s, %s, %d", file->fname, col->hdr_key,  col->curr_name, col->curr_line);
+            warnings("Failed to retrieve record. %s, %s, %s, %d", file->fname, col->hdr_key,  col->curr_name, col->curr_line);
             // name = ".";
         }
         else 
