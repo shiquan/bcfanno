@@ -529,7 +529,7 @@ int parse_line_locs(struct genepred_line *line)
     // Check the strand.
     int is_strand = line->strand == '+';
     // Check the transcript type, for noncoding RNA cdsstart == cdsend.
-    int is_coding = line->cdsstart < line->cdsend ? 0 : 1;
+    int is_coding = line->cdsstart >= line->cdsend ? 0 : 1;
     
     for ( i = 0; i < 2; i++ ) {
         line->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
