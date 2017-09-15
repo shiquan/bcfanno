@@ -58,14 +58,14 @@ Please notice that one gene may encode more than one transcript, bcfanno will an
 
 ### Reference
 
-[http://varnomen.hgvs.org/](http://varnomen.hgvs.org/)
-[https://mutalyzer.nl/](https://mutalyzer.nl/)
+* [http://varnomen.hgvs.org/](http://varnomen.hgvs.org/)
+* [https://mutalyzer.nl/](https://mutalyzer.nl/)
 
 
 
 ## Generate HGVSnom and VarType with bcfanno.
 
-For GRCh37 (hg19), please refer to section [build databases for hg19]().
+* For GRCh37 (hg19), please refer to section [build databases for hg19]().
 
-For GRCh38 (hg38), please refer to section [build databases for hg38]().
+* For GRCh38 (hg38), please refer to section [build databases for hg38]().
 
