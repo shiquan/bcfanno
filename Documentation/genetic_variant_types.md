@@ -1,8 +1,8 @@
-#Generate VarType and HGVSnom.
+# Generate VarType and HGVSnom.
 
 
 
-##Variant types
+## Variant types
 
 For genetic variants located in the transcript regions, bcfanno will interpret the amino acid changes and the variant types (**VarType**). One major challange encountered with interpreting VarType is multi transcripts may be encoded by one gene, several VarTypes will be exported and separated with "|" in such a record. Beside VarType, any other transcription-related tags (records), like **HGVSnom**, will also be generated in such a format, which multi transcription-related information seperated with "|" and exported in order.
 
@@ -33,7 +33,7 @@ Supported VarTypes are summaried below.
 For any other variants not annotated with bcfanno (empty or no VarType tag) could be interpret as intergenic type.
 
 
-###Impact order
+### Impact order
 bcfanno predict variants in order of severity.
 * *Complex*
 * *Nonsense*, *StopLost*, *StopRetained*, *SpliceDonor*, *SpliceAcceptor*, *SpliceSite*, *Frameshift*
@@ -42,7 +42,7 @@ bcfanno predict variants in order of severity.
 * *Utr5*, *Utr3*, *NoCall*, *Intron*, *Noncoding*
 * *Unknown*
 
-##HGVS nomenclature
+## HGVS nomenclature
 
 HGVS is short for Human Genome Variation Society. Nowadays, HGVS nomenclature (**HGVSnom**) is recommended to report and describe sequence variants found in DNA, RNA and protein. bcfanno generate three kinds of HGVS tags to describe the variants in gene regions, **HGVSnom** is the standard HGVS nomenclature, **Oldnom** descibe the variant location in gene without count the UTR regions, **IVSnom** describe the variants in intron. **Oldnom** and **IVSnom** only used to check the record published several years ago. It is recommend to descibe and publish genetic variants in standard format.
 
@@ -56,14 +56,14 @@ Please notice that one gene may encode more than one transcript, bcfanno will an
 
 
 
-###Reference
+### Reference
 
 [http://varnomen.hgvs.org/](http://varnomen.hgvs.org/)
 [https://mutalyzer.nl/](https://mutalyzer.nl/)
 
 
 
-##Generate HGVSnom and VarType with bcfanno.
+## Generate HGVSnom and VarType with bcfanno.
 
 For GRCh37 (hg19), please refer to section [build databases for hg19]().
 
