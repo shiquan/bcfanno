@@ -1,4 +1,4 @@
-/*  vcfanno - a core program to annotate vcf/bcf by using current stat databases
+/*  bcfanno - annotate and interpret genetic variants with VCF, BED, and online databases
  *
  */
 
@@ -16,7 +16,6 @@
 #include "hgvs_vcf.h"
 #include "genepred.h"
 
-// const char *vcfanno_version = "version 0.0.5";
 // cache ANNOCORE_BUFFER_LINES lines into buffers; for each buffer pool all lines come from one chromosome,
 // if no enough lines, just put as much as possible
 #define ANNOCORE_BUFFER_LINES 1000
@@ -50,34 +49,46 @@ int usage()
 }
 
 struct args {
+    // TODO: test mode
     int test_databases_only;
+    
     // input vcf path
     const char *fname_input;
+    
     // output vcf path, stdout in default
     const char *fname_output;
+    
     // configure path in json format
     const char *fname_json;
+    
     // vcf header of input
     bcf_hdr_t *hdr;
+    
     // vcf header of output, hdr_out should also kept by beds_options, vcfs_options, and refgene_options
     bcf_hdr_t *hdr_out;
+    
     // file handler of input vcf
-    htsFile *fp_input; 
+    htsFile *fp_input;
+    
     // file handler of output vcf
     htsFile *fp_out;
+    
     // output directory, default is "-" for stdout
     const char *out_fname;
+    
     // output format, default is vcf
     int output_type;
+    
     // cache all arguments
     kstring_t commands;
+
     // options for annotate bed format databases, usually with four columns, and suggest to put the header
     // of tags in the comment regions
     struct beds_options bed_opts;
     struct vcfs_options vcf_opts;
     // struct refgene_options hgvs_opts;
 
-    // warning instead of abortion flag
+    // give warnings instead of abortion 
     int tol;
 };
 
@@ -119,7 +130,7 @@ static int quiet_mode = 0;
 
 int test_databases_framework()
 {
-    
+    // TODO: check all databases, check the format, check the chromosome names, check the header information
     // test success
     return 0;
 }
@@ -130,25 +141,30 @@ int parse_args(int argc, char **argv)
 	if ( i ) kputc(' ', &args.commands);
 	kputs(argv[i], &args.commands);
     }
+    
     const char *output_fname_type = 0;
     for (i = 0; i < argc; ) {
 	const char *a = argv[i++];
 	if ( strcmp(a, "-h") == 0 || strcmp(a, "--help") == 0)
 	    return usage();
+
 	// quiet mode
 	if ( strcmp(a, "-q") == 0 || strcmp(a, "--quiet") == 0 ) {
 	    quiet_mode = 1;
 	    continue;
 	}
-	if ( strcmp(a, "--test_only") == 0 ) {
+
+        if ( strcmp(a, "--test_only") == 0 ) {
 	    args.test_databases_only = 1;
 	    continue;
 	}
+
         if ( strcmp(a, "-t") == 0 ) {
             args.tol = 1;
             continue;
         }
-	const char **var = 0;
+
+        const char **var = 0;
 	if ( strcmp(a, "-c") == 0 || strcmp(a, "--config") == 0 ) 
 	    var = &args.fname_json;
 	else if ( strcmp(a, "-o") == 0 || strcmp(a, "--output") == 0)
@@ -275,10 +291,10 @@ int parse_args(int argc, char **argv)
     }
 
     kstring_t str = { 0, 0, 0};
-    ksprintf(&str, "##vcfannoVersion=%s+htslib-%s\n", VCFANNO_VERSION, hts_version());
+    ksprintf(&str, "##bcfannoVersion=%s+htslib-%s\n", VCFANNO_VERSION, hts_version());
     bcf_hdr_append(args.hdr_out, str.s);
     str.l = 0;
-    ksprintf(&str, "##vcfannoCommand=%s\n", args.commands.s);
+    ksprintf(&str, "##bcfannoCommand=%s\n", args.commands.s);
     bcf_hdr_append(args.hdr_out, str.s);
     free(str.s);
     // write header to output    
