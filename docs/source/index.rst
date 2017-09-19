@@ -1,12 +1,13 @@
 BCFANNO Documentation
 ===================================
 
-## Release note:
+Release note:
+-------------
 
 *release v1.0 :  first stable version, renamed vcfanno to bcfanno.*
 
-## **Introduction**
-
+**Introduction**
+----------------
 Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-state-of-the-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants in different labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure and combine more than 20 databases to interpret the pathogenic variants. However, to efficient annotate large scale data like genetic variants in WGS samples is still a challange. Cloud based tools like vcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, implement from personal PC to cloud-based server, a fast, flexible annotation tool to interpret genetic variants with very low computer resource. 
 
 ***Fast : High Speed, Small Memory***
@@ -19,17 +20,14 @@ VCF is well supported and extensively used in a lot of projects. With the advanc
 
 
 
-## Bechmark
-
+Bechmark
+--------
 bcfanno annotate a WGS vcf with specified 22 databases in 6 CPU hours. 
 
 bcfanno usually do not parse the *FORMAT* of VCFs, and all the *tags* will be put into the INFO region, it is strongly suggested to merge multiple samples by `bcftools merge` before annotation.
 
-## **How to build the programs**
-
-*prerequisite:*
-
-* zlib
+**How to build the programs**
+-----------------------------
 
 ```
 git clone https://github.com/shiquan/vcfanno.git
@@ -50,7 +48,8 @@ Following execute programs should be compiled after several miniters.
 * [tabix](http://www.htslib.org/download/) (tabix is now a part of HTSlib, so download the htslib and complier it, and you will find tabix then)
 
 
-## **Databases**
+**Databases**
+-------------
 
 bcfanno support THREE kinds of databases,
 
@@ -63,8 +62,8 @@ I think most of database could be classsified into above three kinds. Please ema
 Before you try to use any database, please try to classify the data and follow the below instruction to check or convert the database for bcfanno.
 
 
-## **Generate databases for bcfanno**
-
+**Generate databases for bcfanno**
+----------------------------------
 Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at section [Generate databases](https://github.com/shiquan/vcfanno/blob/master/Documentation/database/more_details.md).
 
 
@@ -136,12 +135,12 @@ After annotation.
 ```
 
 
+Write configure file.
+---------------------
 
-##Write configure file.
+Configure file should be wrote in JSON format. I usually suggest my colleagues to edit the belowed copy of conifgure file and change the database path and tags accordingly.
 
-Configure file should be wrote in json format, which may not user-friendly for clinical researchers. The easier way is copy belowed json and edit your own configure file from it. 
-
-Please do not change the reserved keywords : *id*, *author*, *ref*, *hgvs*, *vcfs*, and *beds*.
+Please notice that do not change the reserved keywords : *id*, *author*, *ref*, *hgvs*, *vcfs*, and *beds*.
 
 ```json
 {
@@ -173,7 +172,8 @@ Please do not change the reserved keywords : *id*, *author*, *ref*, *hgvs*, *vcf
 }
 ```
 
-## **Convert annotated vcf file to other formats.**
+**Convert annotated vcf file to other formats.**
+-----------------------------------------------
 
 **vcf2tsv** is a part of bcfanno package, convert selected tags from VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md).
 
@@ -189,10 +189,10 @@ vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag exampl
 17	41258503	41258504	A	C	0/1	demo	BRCA1|BRCA1|BRCA1|BRCA1|BRCA1|BRCA1	NM_007294.3:c.181T>G(p.Cys61Gly/p.C61G)|NM_007297.3:c.40T>G(p.Cys14Gly/p.C14G)|NM_007298.3:c.181T>G(p.Cys61Gly/p.C61G)|NM_007299.3:c.181T>G(p.Cys61Gly/p.C61G)|NM_007300.3:c.181T>G(p.Cys61Gly/p.C61G)|NR_027676.1:n.342T>G	E4/C3|E3/C1|E3/C3|E4/C3|E4/C3|E4/C4	missense|missense|missense|missense|missense|noncoding	DM
 ```
 
+**Interpret the annotations.**
+-------------------------------
 
-## **Interpret the annotations.**
-
-###For human genetic variants
++ For human genetic variants
 
 The American College of Medical Genetics and Genomics (ACMG) supply a decision-tree roadmap and recommend using 28 criteria to help the clinical researcher to interpret genetic variants, however no computation approach could interpret the genetic variants directly, that's because gathering information for all the criteria is quite complicated and no specific algorithms for implementing this guidelines specified. See details, please refer to  [ACMG guideline](https://www.acmg.net/docs/standards_guidelines_for_the_interpretation_of_sequence_variants.pdf).
 
@@ -204,17 +204,18 @@ Section [ACMG interpretation]() introduce how to use bcfanno and open distribute
 
 
 
-### For other species
++ For other species
 
 bcfanno designed to annotate VCFs with suitable databases, not restrict to human variants. However the interpret rules may vary from different labs, there is no recommended strategy.
 
 
 
-## **Bug report or suggestions**.
-
+**Bug report or suggestions**.
+------------------------------
 Currently, you could report bugs from GitHub or email me directly. Please be kind to specify which exactly version you test in the report message.
 
 
 
-## Reference
+Reference
+----------
 
