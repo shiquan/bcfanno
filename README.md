@@ -5,11 +5,11 @@ BCFANNO manual
 
 ## Release note:
 
-*release v1.0 :  first stable version, renamed vcfanno to bcfanno.*
+*release v1.0 :  first stable version, renamed bcfanno to bcfanno.*
 
 ## **Introduction**
 
-Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-state-of-the-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants in different labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure and combine more than 20 databases to interpret the pathogenic variants. However, to efficient annotate large scale data like genetic variants in WGS samples is still a challange. Cloud based tools like vcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, implement from personal PC to cloud-based server, a fast, flexible annotation tool to interpret genetic variants with very low computer resource. 
+Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-state-of-the-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants in different labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure and combine more than 20 databases to interpret the pathogenic variants. However, to efficient annotate large scale data like genetic variants in WGS samples is still a challange. Cloud based tools like bcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, implement from personal PC to cloud-based server, a fast, flexible annotation tool to interpret genetic variants with very low computer resource. 
 
 ***Fast : High Speed, Small Memory***
 
@@ -34,17 +34,17 @@ bcfanno usually do not parse the *FORMAT* of VCFs, and all the *tags* will be pu
 * zlib
 
 ```
-git clone https://github.com/shiquan/vcfanno.git
-cd vcfanno
+git clone https://github.com/shiquan/bcfanno.git
+cd bcfanno
 make
 ```
 
 Following execute programs should be compiled after several miniters.
 
-* ***vcfanno*** , core program to annotate genetic variants
-* [***tsv2vcf***](https://github.com/shiquan/vcfanno/blob/master/documents/tsv2vcf_manual.md) ,  generate VCF databases from tab-seperated file
-* [***vcf2tsv***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
-* [***vcf_rename_tags***](https://github.com/shiquan/vcfanno/blob/master/documents/vcf_rename_tags_manual.md), rename tags or contig names in the VCF file, usually used to format the databases
+* ***bcfanno*** , core program to annotate genetic variants
+* [***tsv2vcf***](https://github.com/shiquan/bcfanno/blob/master/documents/tsv2vcf_manual.md) ,  generate VCF databases from tab-seperated file
+* [***vcf2tsv***](https://github.com/shiquan/bcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
+* [***vcf_rename_tags***](https://github.com/shiquan/bcfanno/blob/master/documents/vcf_rename_tags_manual.md), rename tags or contig names in the VCF file, usually used to format the databases
 
 *Some other programs should also be install for ongoing test.*
 
@@ -67,7 +67,7 @@ Before you try to use any database, please try to classify the data and follow t
 
 ## **Generate databases for bcfanno**
 
-Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at section [Generate databases](https://github.com/shiquan/vcfanno/blob/master/Documentation/database/more_details.md).
+Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at section [Generate databases](https://github.com/shiquan/bcfanno/blob/master/Documentation/database/more_details.md).
 
 
 *Instruction to build dbsnp for bcfanno:*
@@ -97,7 +97,7 @@ Create *clinvar.json*, and this file should be looked like
 
 Step 4, annotation. (If you are in the example directory now you can just run this command)
 
-`../vcfanno -c clinvar.json demo.vcf`
+`../bcfanno -c clinvar.json demo.vcf`
 
 The demo.vcf file would be annotated with clinvar databases. Try to compare the raw vcf and annotated vcf, see what's happened.
 
@@ -127,8 +127,8 @@ After annotation.
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##INFO=<ID=RS,Number=1,Type=Integer,Description="dbSNP ID (i.e. rs number)">
 ##INFO=<ID=CLNSIG,Number=.,Type=String,Description="Variant Clinical Significance, 0 - Uncertain significance, 1 - not provided, 2 - Benign, 3 - Likely benign, 4 - Likely pathogenic, 5 - Pathogenic, 6 - drug response, 7 - histocompatibility, 255 - other">
-##vcfannoVersion=v1.0-2-gb803b9f+htslib-1.3
-##vcfannoCommand=-c example/clinvar.json example/demo.vcf
+##bcfannoVersion=v1.0-2-gb803b9f+htslib-1.3
+##bcfannoCommand=-c example/clinvar.json example/demo.vcf
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	demo
 17	41222826	.	A	C	.	.	.	GT	0/1
 17	41223242	.	G	C	.	.	RS=80357433;CLNSIG=5|5|5|5|5	GT	0/1
@@ -177,7 +177,7 @@ Please do not change the reserved keywords : *id*, *author*, *ref*, *hgvs*, *vcf
 
 ## **Convert annotated vcf file to other formats.**
 
-**vcf2tsv** is a part of bcfanno package, convert selected tags from VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual](https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md).
+**vcf2tsv** is a part of bcfanno package, convert selected tags from VCF/BCF to tab-seperated file.  For the usage of vcf2tsv please refer to [vcf2tsv manual](https://github.com/shiquan/bcfanno/blob/master/documents/vcf2tsv_manual.md).
 
 ```
 vcf2tsv -f BED,REF,ALT,GT,SAMPLE,Gene,HGVSnom,ExonIntron,VarType,HGMD_tag example/demo_anno.vcf
@@ -200,7 +200,7 @@ The American College of Medical Genetics and Genomics (ACMG) supply a decision-t
 
 
 
-Section  [VarType and HGVSnom](https://github.com/shiquan/vcfanno/blob/master/Documentation/genetic_variant_types.md) introduce the genetic variant types and HGVS nomenclature.
+Section  [VarType and HGVSnom](https://github.com/shiquan/bcfanno/blob/master/Documentation/genetic_variant_types.md) introduce the genetic variant types and HGVS nomenclature.
 
 Section [ACMG interpretation]() introduce how to use bcfanno and open distribute databases to interpret the pathogenic variants.
 
