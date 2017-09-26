@@ -151,7 +151,8 @@ int beds_fill_buffer(struct beds_anno_file *file, bcf_hdr_t *hdr_out, bcf1_t *li
     assert(file->idx);
     int tid = tbx_name2id(file->idx, bcf_seqname(hdr_out, line));
     // if cached this region already, just skip refill. this is different from vcfs_fill_buffer()
-    if ( tid == file->last_id && file->last_start <= line->pos + 1 && file->last_end > line->pos)
+    // check if only one record in this buffer, if 
+    if ( file->overlapped == 0 && tid == file->last_id && file->last_start <= line->pos + 1 && file->last_end > line->pos )
 	return -1;
 
     if ( tid == -1 ) {
@@ -277,6 +278,10 @@ int beds_database_add(struct beds_options *opts, const char *fname, char *column
     if ( file->idx == NULL)
 	error("Failed to load index of %s.", fname);
     opts->n_files++;
+
+    // todo : update overlap parameter
+    file->overlapped = 1;
+
     
     file->last_id = -1;
     file->last_start = -1;

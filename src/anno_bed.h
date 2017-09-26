@@ -44,7 +44,9 @@ struct beds_anno_file {
     // memory pool    
     int cached, max;
     struct beds_anno_tsv **buffer;
-    // struct bed_anno_line **buffer;
+
+    // set to 0 if records are NOT overlapped, buffer will only be refreshed when record out of range
+    int overlapped;
 };
 
 struct beds_options {

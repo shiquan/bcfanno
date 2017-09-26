@@ -1103,7 +1103,7 @@ int retrieve_bed()
     return 0;
 }
 int main(int argc, char **argv)
-v{
+{
     if ( parse_args(argc, argv) )
         return 1;
 
