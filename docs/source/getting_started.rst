@@ -9,16 +9,16 @@ build the program
 ------------------
 Download source codes from github::
 
-  $git clone https://github.com/shiquan/vcfanno.git
-  $cd vcfanno
+  $git clone https://github.com/shiquan/bcfanno.git
+  $cd bcfanno
   $make
 
 Following execute programs should be compiled after several miniters.
 
-* **vcfanno** , core program to annotate genetic variants
-* **tsv2vcf** (https://github.com/shiquan/vcfanno/blob/master/documents/tsv2vcf_manual.md) ,  generate VCF databases from tab-seperated file
-* **vcf2tsv** (https://github.com/shiquan/vcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
-* **vcf_rename_tags** (https://github.com/shiquan/vcfanno/blob/master/documents/vcf_rename_tags_manual.md), rename tags or contig names in the VCF file, usually used to format the databases
+* **bcfanno** , core program to annotate genetic variants
+* **tsv2vcf** (https://github.com/shiquan/bcfanno/blob/master/documents/tsv2vcf_manual.md) ,  generate VCF databases from tab-seperated file
+* **vcf2tsv** (https://github.com/shiquan/bcfanno/blob/master/documents/vcf2tsv_manual.md), convert VCF file to tab-separated file with selected tags
+* **vcf_rename_tags** (https://github.com/shiquan/bcfanno/blob/master/documents/vcf_rename_tags_manual.md), rename tags or contig names in the VCF file, usually used to format the databases
 
 *Some other programs should also be install for ongoing test.*
 
