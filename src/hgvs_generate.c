@@ -29,26 +29,16 @@ static struct refseq_cache {
     int start;
     int end;
     int l_seq;
-    //htsFile *fp;
     faidx_t *idx;
     char *seq;
 } refseq_cache = {
     .name = NULL,
     .start = 0,
     .end = 0,
-    // .fp = NULL,
     .l_seq = 0,
     .idx = NULL,
     .seq = NULL,
 };
-                      
-// export flank sequence arount target variant
-static int flank_size = 2;
-void set_flksize(int size)
-{
-    assert(flank_size > 0);
-    flank_size = size;
-}
                       
 static void hgvs_core_clear(struct hgvs_core *c)
 {
@@ -71,20 +61,7 @@ static void hgvs_cache_clear(struct hgvs_cache *cache)
 	hgvs_clear(&cache->a[i]);
     cache->l = 0;
 }
-/* static void hgvs_cache_destroy(struct hgvs_cache *cache) */
-/* { */
-/*     int i, j; */
-/*     for ( i = 0; i < cache->i; ++i ) { */
-/* 	struct hgvs *name = &cache->a[i]; */
-/* 	for ( j = 0; j < name->i; ++j ) { */
-/* 	    kstring_t *str = &name->a[j].str; */
-/* 	    if ( str->m )  */
-/* 		free(str->s);	     */
-/* 	} */
-/* 	free(name->a);	     */
-/*     } */
-/* } */
-// 
+
 static namehash_type *init_gene_name(const char *name)
 {
     int i, n = 0;
@@ -152,17 +129,6 @@ int hgvs_bcf_header_add_exid(bcf_hdr_t *hdr)
 	bcf_hdr_append(hdr, "##INFO=<ID=ExIn_id,Number=1,Type=String,Description=\"Exon or intron id on transcripts.\">");
 	bcf_hdr_sync(hdr);
 	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "ExIn_id");
-	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
-    }
-    return id;
-}
-int hgvs_bcf_header_add_flankseq(bcf_hdr_t *hdr)
-{
-    int id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FLKSEQ");
-    if (id == -1) {
-	bcf_hdr_append(hdr, "##INFO=<ID=FLKSEQ,Number=1,Type=String,Description=\"Three nearby bases of current position.\">");
-	bcf_hdr_sync(hdr);
-	id = bcf_hdr_id2int(hdr, BCF_DT_ID, "FLKSEQ");
 	assert(bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, id));
     }
     return id;
@@ -424,6 +390,7 @@ static char *retrieve_refseq_block(char *name, int start, int end)
     
   update_name:
     refseq_cache.name = strdup(name);
+
   update_block:
     if ( refseq_cache.seq )
         free(refseq_cache.seq);        
@@ -467,8 +434,10 @@ static int describe_vartype(struct genepred *line, int l1, int l2, struct hgvs_d
         loc_start  = read_end(line->loc, l2/2);
         loc_end  = read_start(line->loc, l1/2);
     }    
+
     assert(upstream_offset>=0 && downstream_offset >= 0);
     assert(loc_end > loc_start);
+
     // for intron block
     if ( type->start_flag & 1) {
         if ( upstream_offset < 3)
@@ -639,7 +608,7 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                         } else if ( right_type & REG_UTR3 ) {
                             // all the cds region enclosed in one exon, closed with UTRs
                             int loc1 = right_loc - right_offset;
-                            if ( loc1 <= 0 ) {
+v                            if ( loc1 <= 0 ) {
                                 loc = 1 - loc;
                                 type = REG_CODING;
                             } else {
@@ -918,10 +887,10 @@ static void setter1_vartype(bcf_hdr_t *hdr, bcf1_t *line, char *string)
 {
     bcf_update_info_string(hdr, line, "VarType", string);
 }
-static void setter1_flankseq(bcf_hdr_t *hdr, bcf1_t *line, char *string)
-{
-    bcf_update_info_string(hdr, line, "FLKSEQ", string);
-}
+//static void setter1_flankseq(bcf_hdr_t *hdr, bcf1_t *line, char *string)
+//{
+//    bcf_update_info_string(hdr, line, "FLKSEQ", string);
+//}
 static void setter_hgvs_string(bcf_hdr_t *hdr, bcf1_t *line, const char *key, char *string)
 {
     if (key == NULL)
@@ -936,8 +905,8 @@ static void setter_hgvs_string(bcf_hdr_t *hdr, bcf1_t *line, const char *key, ch
         setter1_exin_id(hdr, line, string);
     } else if (strcmp(key, "VarType") == 0 ) {
         setter1_vartype(hdr, line, string);
-    } else if (strcmp(key, "FLKSEQ") == 0 ) {
-        setter1_flankseq(hdr, line, string);
+        //  } else if (strcmp(key, "FLKSEQ") == 0 ) {
+//        setter1_flankseq(hdr, line, string);
     } else {
 	error("Unrecongnized tag %s, only Gene, HGVSDNA, and Transcript are supported for now.", key);
     }
@@ -1083,7 +1052,7 @@ int anno_refgene_core(struct refgene_options *opts, bcf1_t *line)
     // cached positions. just skip if the variant type of line is a ref.    
     if ( line->pos < 0 )
 	return 1;
-    // skip reference positions, usually vcfanno will check the type of position in the first step, get error if see ref here
+    // skip reference positions, usually bcfanno will check the type of position in the first step, get error if see ref here
     if ( bcf_get_variant_types(line) == VCF_REF )
 	error("This is a reference position. Should not come here. %s : %d", bcf_seqname(opts->hdr_out, line), line->pos+1);
 

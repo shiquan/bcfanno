@@ -21,7 +21,7 @@
 
 #define KSTRING_INIT {0, 0, 0}
 
-// vcfanno is designed to annotate vcf files by retrieving tags from different databases. For now, vcfanno only
+// bcfanno is designed to annotate vcf files by retrieving tags from different databases. For now, bcfanno only
 // accept three different format of databases.
 // for genotype databases, BCF/VCF format is required and should be preindexed by bcftools,
 // for function region databases, bed format is required and should be packed by bgzip and indexed by tabix,

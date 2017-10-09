@@ -489,10 +489,10 @@ int main(int argc, char **argv)
 	error("Unknown argument : %s.", a);
     }
 
-    struct vcfanno_config *con = vcfanno_config_init();
-    if ( vcfanno_load_config(con, json_fname) != 0 )
+    struct bcfanno_config *con = bcfanno_config_init();
+    if ( bcfanno_load_config(con, json_fname) != 0 )
 	error("Failed to load configure file. %s : %s", json_fname, strerror(errno));
-    vcfanno_config_debug(con);
+    bcfanno_config_debug(con);
     if ( con->beds.n_beds == 0)
 	error("No bed database specified.");
     if ( input_fname == 0 && (!isatty(fileno(stdin))) )

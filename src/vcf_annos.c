@@ -1303,10 +1303,10 @@ int main(int argc, char **argv)
 	error("Unknown argument : %s.", a);
     }
 
-    struct vcfanno_config *con = vcfanno_config_init();
-    if ( vcfanno_load_config(con, args.json_fname) != 0 )
+    struct bcfanno_config *con = bcfanno_config_init();
+    if ( bcfanno_load_config(con, args.json_fname) != 0 )
 	error("Failed to load configure file. %s : %s", args.json_fname, strerror(errno));
-    vcfanno_config_debug(con);
+    bcfanno_config_debug(con);
     if ( con->vcfs.n_vcfs == 0)
 	error("No BCF/VCF database specified.");
     if ( args.input_fname == 0 && (!isatty(fileno(stdin))) )
@@ -1349,7 +1349,7 @@ int main(int argc, char **argv)
     for ( i = 0; i < con->vcfs.n_vcfs; ++i ) {
 	vcfs_database_add(&opts, con->vcfs.files[i].fname, con->vcfs.files[i].columns);
     }
-    vcfanno_config_destroy(con);
+    bcfanno_config_destroy(con);
     bcf_hdr_write(fout, hdr_out);
     bcf1_t *line = bcf_init();
     while ( bcf_read(fp, hdr, line) == 0 ) {
