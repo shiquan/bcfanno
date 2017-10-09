@@ -27,7 +27,7 @@ DOC_DATE := $(shell date +'%Y-%m-%d %R %Z')
 version.h: $(if $(wildcard version.h),$(if $(findstring "$(PACKAGE_VERSION)",$(shell cat version.h)),,force))
 endif
 version.h:
-	echo '#define VCFANNO_VERSION "$(PACKAGE_VERSION)"' > $@
+	echo '#define BCFANNO_VERSION "$(PACKAGE_VERSION)"' > $@
 
 
 .SUFFIXES:.c .o
@@ -73,10 +73,10 @@ vcf_rename_tags: $(HTSLIB) version.h
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
 bcfanno: $(HTSLIB) version.h 
-	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/bcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c $(HTSLIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/bcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c src/flank_seq.c $(HTSLIB)
 
 bcfanno_debug: $(HTSLIB) version.h
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/bcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c $(HTSLIB)
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/bcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c src/flank_seq.c $(HTSLIB)
 
 test: $(HTSLIB) version.h vcfadd bedadd
 

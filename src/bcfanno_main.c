@@ -23,6 +23,13 @@
 // time stat
 #include <sys/time.h>
 
+extern int load_sequnce_index(const char *file);
+extern int bcf_header_add_flankseq(bcf_hdr_t *hdr);
+extern int bcf_add_flankseq(bcf_hdr_t *hdr, bcf1_t *line);
+extern void seqidx_destroy();
+
+static int flankseq_flag = 0;
+
 static const char *hts_bcf_wmode(int file_type)
 {
     if ( file_type == FT_BCF ) return "wbu";    // uncompressed BCF
@@ -35,15 +42,15 @@ int usage()
 {
     fprintf(stderr, "\n");
     fprintf(stderr, "About : Annotate VCF/BCF file.\n");
-    fprintf(stderr, "Version : %s, build with htslib version : %s\n", VCFANNO_VERSION, hts_version());
-    fprintf(stderr, "Usage : vcfanno -c config.json in.vcf.gz\n");
+    fprintf(stderr, "Version : %s, build with htslib version : %s\n", BCFANNO_VERSION, hts_version());
+    fprintf(stderr, "Usage : bcfanno -c config.json in.vcf.gz\n");
     fprintf(stderr, "   -c, --config <file>            configure file, include annotations and tags, see man page for details\n");
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
     fprintf(stderr, "   -t                             warning instead of abortion for inconsistant position\n");
     fprintf(stderr, "\n");
-    fprintf(stderr, "Homepage: https://github.com/shiquan/vcfanno\n");
+    fprintf(stderr, "Homepage: https://github.com/shiquan/bcfanno\n");
     fprintf(stderr, "\n");
     return 1;
 }
@@ -117,7 +124,9 @@ void args_destroy(){
     // debug_print("close commands");
     if (args.commands.m)
 	free(args.commands.s);
-    // debug_print("close vcfs");
+    if ( flankseq_flag == 1 ) 
+        seqidx_destroy();
+    
     vcfs_options_destroy(&args.vcf_opts);
     // debug_print("close beds");
     beds_options_destroy(&args.bed_opts);
@@ -186,8 +195,8 @@ int parse_args(int argc, char **argv)
     }
     
     if ( quiet_mode == 0 ) {
-        LOG_print("Version: %s + htslib-%s", VCFANNO_VERSION, hts_version());
-        LOG_print("Homepage: https://github.com/shiquan/vcfanno");
+        LOG_print("Version: %s + htslib-%s", BCFANNO_VERSION, hts_version());
+        LOG_print("Homepage: https://github.com/shiquan/bcfanno");
 	LOG_print("Args: %s", args.commands.s);
     }
     
@@ -197,14 +206,14 @@ int parse_args(int argc, char **argv)
 	return 1;
     }
 
-    struct vcfanno_config *con = vcfanno_config_init();
-    if ( vcfanno_load_config(con, args.fname_json) != 0 ) {
+    struct bcfanno_config *con = bcfanno_config_init();
+    if ( bcfanno_load_config(con, args.fname_json) != 0 ) {
 	error("Failed to load configure file. %s : %s", args.fname_json, strerror(errno));
     }
     
     if ( quiet_mode == 0 ) {
 	LOG_print("Load configure file success.");
-	vcfanno_config_debug(con);
+	bcfanno_config_debug(con);
     }
     
     if ( args.test_databases_only == 1)
@@ -215,7 +224,7 @@ int parse_args(int argc, char **argv)
 	args.fname_input = "-";
     // if no detect stdin, go error
     if ( args.fname_input == 0)
-	error("No input file! vcfanno only accept one BCF/VCF input file. Use -h for more informations.");
+	error("No input file! bcfanno only accept one BCF/VCF input file. Use -h for more informations.");
     // read input file
     args.fp_input = hts_open(args.fname_input, "r");
     if ( args.fp_input == NULL )
@@ -265,7 +274,6 @@ int parse_args(int argc, char **argv)
     // args.hgvs_opts.hdr_out = args.hdr_out;
     
     if ( con->refgene.refgene_is_set == 1) {
-
         if ( init_hgvs_anno(con->refgene.genepred_fname, con->refgene.refseq_fname, args.hdr_out) )
             return 1;
 
@@ -281,7 +289,17 @@ int parse_args(int argc, char **argv)
             }
         }
     }    
-
+    // Check reference genome is accessible 
+    if ( con->reference_path ) {
+        if ( load_sequnce_index(con->reference_path) ) {
+            error_return("Failed to load reference sequence.");
+        }
+        else {
+            bcf_header_add_flankseq(args.hdr_out);
+            flankseq_flag = 1;
+        }
+    }
+    
     for ( i = 0; i < con->vcfs.n_vcfs; ++i ) {
 	vcfs_database_add(&args.vcf_opts, con->vcfs.files[i].fname, con->vcfs.files[i].columns);
     }
@@ -291,7 +309,7 @@ int parse_args(int argc, char **argv)
     }
 
     kstring_t str = { 0, 0, 0};
-    ksprintf(&str, "##bcfannoVersion=%s+htslib-%s\n", VCFANNO_VERSION, hts_version());
+    ksprintf(&str, "##bcfannoVersion=%s+htslib-%s\n", BCFANNO_VERSION, hts_version());
     bcf_hdr_append(args.hdr_out, str.s);
     str.l = 0;
     ksprintf(&str, "##bcfannoCommand=%s\n", args.commands.s);
@@ -300,7 +318,7 @@ int parse_args(int argc, char **argv)
     // write header to output    
     bcf_hdr_write(args.fp_out, args.hdr_out);
     
-    vcfanno_config_destroy(con);
+    bcfanno_config_destroy(con);
     return 0;
 }
 
@@ -333,6 +351,11 @@ int anno_core(bcf1_t *line)
     if ( bcf_get_variant_types(line) == VCF_REF )
 	return 0;
 
+    // Annotate FLKSEQ tag.
+    if ( flankseq_flag == 1 ) {
+        bcf_add_flankseq(args.hdr_out, line);
+    }
+    
     // Annotate hgvs name
     // anno_refgene_core(&args.hgvs_opts, line);
     if ( setter_hgvs_vcf(args.hdr_out, line) == 1) {

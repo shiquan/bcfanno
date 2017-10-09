@@ -1,5 +1,5 @@
-#ifndef VCFANNO_CONFIG_H
-#define VCFANNO_CONFIG_H
+#ifndef BCFANNO_CONFIG_H
+#define BCFANNO_CONFIG_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,17 +32,19 @@ struct beds_config {
 };
 
 // skip other keys except author, config_id and reference_version
-struct vcfanno_config {
+struct bcfanno_config {
     char *author;
     char *config_id;
     char *reference_version;
+    char *reference_path;
     struct vcfs_config vcfs;
     struct beds_config beds;
     struct refgene_config refgene;
 };
 
-extern struct vcfanno_config *vcfanno_config_init(void);
-extern void vcfanno_config_destroy(struct vcfanno_config *);
-extern int vcfanno_load_config(struct vcfanno_config *, const char *);
-extern int vcfanno_config_debug(struct vcfanno_config *config);
+extern struct bcfanno_config *bcfanno_config_init(void);
+extern void bcfanno_config_destroy(struct bcfanno_config *);
+extern int bcfanno_load_config(struct bcfanno_config *, const char *);
+extern int bcfanno_config_debug(struct bcfanno_config *config);
+
 #endif

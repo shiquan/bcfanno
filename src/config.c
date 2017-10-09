@@ -17,7 +17,7 @@
 #define KSTRING_INIT { 0, 0, 0}
 #endif
 
-struct vcfanno_config temp_config_init = {
+struct bcfanno_config temp_config_init = {
     .author = 0,
     .config_id = 0,
     .reference_version = 0,
@@ -26,14 +26,14 @@ struct vcfanno_config temp_config_init = {
     .refgene = { 0, 0, 0, 0, 0},
 };
 
-struct vcfanno_config *vcfanno_config_init()
+struct bcfanno_config *bcfanno_config_init()
 {
-    struct vcfanno_config *config = (struct vcfanno_config*)malloc(sizeof(struct vcfanno_config));
-    memset(config, 0, sizeof(struct vcfanno_config));
+    struct bcfanno_config *config = (struct bcfanno_config*)malloc(sizeof(struct bcfanno_config));
+    memset(config, 0, sizeof(struct bcfanno_config));
     return config;
 }
 
-void vcfanno_config_destroy(struct vcfanno_config *config)
+void bcfanno_config_destroy(struct bcfanno_config *config)
 {
     if ( config->author )
 	free (config->author );
@@ -41,6 +41,9 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
 	free (config->config_id );
     if ( config->reference_version )
 	free (config->reference_version);
+    if ( config->reference_path )
+        free (config->reference_path);
+
     int i;
     for (i = 0; i < config->vcfs.n_vcfs; ++i ) {
 	free(config->vcfs.files[i].fname);
@@ -48,6 +51,7 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
     }
     if ( i )
 	free(config->vcfs.files);
+
     for (i = 0; i < config->beds.n_beds; ++i ) {
 	free(config->beds.files[i].fname);
 	if (config->beds.files[i].columns)
@@ -69,7 +73,7 @@ void vcfanno_config_destroy(struct vcfanno_config *config)
 }
 
 
-static int load_config_core(struct vcfanno_config *config, kson_t *json)
+static int load_config_core(struct bcfanno_config *config, kson_t *json)
 {
     const kson_node_t *root = json->root;
     if (root == NULL)
@@ -92,7 +96,7 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
 	} else if ( strcmp(node->key, "ID") == 0 || strcmp(node->key, "id") == 0) {
 	    config->config_id = BRANCH_INIT(node);
 	} else if ( strcmp(node->key, "ref") == 0 || strcmp(node->key, "reference") == 0) {
-	    config->reference_version = BRANCH_INIT(node);
+	    config->reference_path = BRANCH_INIT(node);
 	} else if ( strcmp(node->key, "HGVS") == 0 || strcmp(node->key, "hgvs") == 0) {
 	    if ( node->type != KSON_TYPE_BRACE)
 		error("Format error. Configure for HGVS format should looks like :\n"
@@ -228,7 +232,7 @@ static int load_config_core(struct vcfanno_config *config, kson_t *json)
     return 0;
 }
 
-int vcfanno_load_config(struct vcfanno_config *config, const char * config_fname)
+int bcfanno_load_config(struct bcfanno_config *config, const char * config_fname)
 {
     // char *string = skip_comments(config_fname);
     char *string = json_config_open(config_fname);
@@ -243,12 +247,12 @@ int vcfanno_load_config(struct vcfanno_config *config, const char * config_fname
     return ret;
 }
 
-int vcfanno_config_debug(struct vcfanno_config *config)
+int bcfanno_config_debug(struct bcfanno_config *config)
 {
     int i;
     LOG_print("configure file writer : %s", config->author == NULL ? "Unknown" : config->author);
     LOG_print("configure file ID : %s", config->config_id == NULL ? "Unknown" : config->config_id);
-    LOG_print("reference sequence : %s", config->reference_version == NULL ? "Unknown" : config->reference_version);    
+    LOG_print("reference sequence : %s", config->reference_path == NULL ? "Unknown" : config->reference_path);    
 
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
@@ -285,10 +289,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "%s input.json\n", argv[0]);
 	return 1;
     }
-    struct vcfanno_config *con = vcfanno_config_init();
-    vcfanno_load_config(con, argv[1]);
-    vcfanno_config_debug(con);
-    vcfanno_config_destroy(con);
+    struct bcfanno_config *con = bcfanno_config_init();
+    bcfanno_load_config(con, argv[1]);
+    bcfanno_config_debug(con);
+    bcfanno_config_destroy(con);
     return 0;
 }
 #endif
