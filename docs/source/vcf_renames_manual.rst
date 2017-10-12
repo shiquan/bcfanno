@@ -4,6 +4,7 @@ vcf_rename_tags manual
 *vcf_rename_tags* is designed to update the INFO tags or Contig names in the VCF/BCF file.
 
 ::
+   
    vcf_renames_tags  input_file
    Options:
      -list tags.txt     This file include two columns, they are old and new tags.
