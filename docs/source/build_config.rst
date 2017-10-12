@@ -9,9 +9,9 @@ Please notice that do not change the reserved keywords : *id*, *author*, *ref*, 
 ::
    
    {
-        "id":"configure ID and version",
-        "author":"author of this configure file",
-        "ref":"hg19",  // hg19 or hg38
+        "id":"configure ID and version", // optional
+        "author":"author of this configure file", // optional
+        "ref":"path to reference",  // fasta format and be indexed with samtools faidx, FLKSEQ tag will be generated if ref is set
         "hgvs":{
            "gene_data":"/opt/databases/refgene/hg19_refgene.tsv.gz",
            "refseq":"/opt/databases/refgene/refMrna.fa.gz",
