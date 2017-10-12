@@ -37,6 +37,7 @@ The main documentation for the site is organized into a couple sections:
    build_config
    interpret
    convert
+   vcf_renames_manual
    generate_dbsnp
    generate_dbnsfp
    generate_omim

@@ -1,5 +1,5 @@
-**Interpret the annotations.**
-==============================
+Interpret the annotations.
+==========================
 
 Interpret human genetic variants
 --------------------------------

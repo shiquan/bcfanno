@@ -1,4 +1,4 @@
-**Generate databases for bcfanno**
+Generate databases for bcfanno
 ===============================
 
 Databases should be convert to VCF/BCF and BED-like region format. Good thing is the most databases were released in VCF or BED-like format, so we just need download them and do some updates for these kind of files, like dbsnp, EXAC and ClinVar etc. However, there are still some databases like dbNSFP were released in plain text format or other format, and we should convert them manually. For this section, we are only trying to build *clinvar* for getting start. All the details about build and convert databases could be find at section [Generate databases](https://github.com/shiquan/vcfanno/blob/master/Documentation/database/more_details.md).
