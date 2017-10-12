@@ -13,11 +13,6 @@ VCF is well supported and extensively used in a lot of projects. With the advanc
 
 
 
-  
-  
-**Databases could be classified into three types**
--------------
-
 bcfanno support three kinds of databases:
 
 * *Allele Specific Databases (ASD)*, like allele frequency or any other allele related databases;
