@@ -2,11 +2,6 @@
 BCFANNO manual
 ==========
 
-
-## Release note:
-
-*release v1.0 :  first stable version, renamed bcfanno to bcfanno.*
-
 ## **Introduction**
 
 Flood of DNA data sequenced and the majority of the challange encounter with understanding these data is anaysis and interpret the genetic variants. Current-state-of-the-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants in different labs around the world. A number of annotation tools, like ANNOVAR, VAAST, SettleSeq, SNPeff, VEP, and InterVar, can predict the genetic variants affect transcript structure and combine more than 20 databases to interpret the pathogenic variants. However, to efficient annotate large scale data like genetic variants in WGS samples is still a challange. Cloud based tools like bcfanno, highly accelerate the annotation but required large clusters, huge computer memory and CPU, which is another bottleneck for small labs. Here I designed bcfanno, implement from personal PC to cloud-based server, a fast, flexible annotation tool to interpret genetic variants with very low computer resource. 
