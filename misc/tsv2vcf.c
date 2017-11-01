@@ -183,6 +183,7 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
     if (chrom == NULL)
         error("no chrom column found.");
     chrom = table_convert_name(chrom);
+
     int id = bcf_hdr_id2int(hdr, BCF_DT_CTG, chrom);
     if ( id == -1 ) {
         warnings("Chromosome %s not found in reference.", chrom);
@@ -190,6 +191,7 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
     }
     rec->rid = id;
     clear_spec(spec);
+
     char *start_s = get_col_string(line, spec->pos_col);
     if ( check_is_number(start_s) == 0 ) {
         rec->pos = -1;
@@ -199,8 +201,8 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
     int start = atoi(start_s);
     if ( pos_is_set )
         start --;
-
     assert(start >= 0);
+    
     int end = 0;    
     if ( end_is_set ) {
         assert(spec->end_col >= 0);
@@ -208,7 +210,7 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
         if ( check_is_number(end_s) ) {
             end = atoi(end_s);           
         }
-    }    
+    }
     char *alt = NULL;
     char *ref = NULL;
     int n;
@@ -232,7 +234,8 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
                 }
                 bcf_update_info_int32(hdr, rec, "END", &end, 1);
             }
-        } else {
+        }
+        else {
             ref = faidx_fetch_seq(fai, chrom, start, start+ref_length-1, &n);
             alt = get_col_string(line, spec->alt_col);
             alt_length = strlen(alt);
@@ -242,8 +245,14 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
             if (alt_length == 1 && *alt == '.')
                 goto update_alleles;
             kputc(',', &spec->string);
-            for ( i = 0; i < alt_length; i++)
-                kputc(seqs[seq2num(alt[i])], &spec->string);
+            for ( i = 0; i < alt_length; i++) {
+                if ( alt[i] == ',' ) {
+                    kputc(',', &spec->string);
+                }
+                else {
+                    kputc(seqs[seq2num(alt[i])], &spec->string);
+                }
+            }
         }
         goto update_alleles;
     } 
@@ -270,37 +279,45 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
         // assume plus strand
         if ( is_capped == 0 ) {
             kputc(seqs[seq2num(seq[0])], &spec->string);
-        } else {
+        }
+        else {
             if ( seq2num(ref[0]) == seq2num(seq[0]) ) {
                 kputc(seqs[seq2num(ref[0])], &spec->string);
-            } else if ( seq2num(ref[0]) + seq2num(seq[ref_length-i-1]) == 3 ) {
+            }
+            else if ( seq2num(ref[0]) + seq2num(seq[ref_length-i-1]) == 3 ) {
                 kputc(seqs[3-seq2num(ref[0])], &spec->string);
                 strand = 1;
-            } else {
+            }
+            else {
                 if ( args.force ) {
                     warnings("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                     kputc(seqs[seq2num(ref[0])], &spec->string);
-                } else {
+                }
+                else {
                     error("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                 }
             }
         }
-    } else {
+    }
+    else {
         for ( i = 0; i < ref_length;  i++) {
             if ( seq2num(ref[i]) == 4 )  {
                 if ( args.force ) {
                     warnings("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);                    
-                } else {
+                }
+                else {
                     error("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                 }
             }
             if ( seq2num(ref[i]) != seq2num(seq[i]) ) {
                 if (seq2num(ref[ref_length-i-1]) + seq2num(seq[i]) == 3) {
                     strand = 1;
-                } else {
+                }
+                else {
                     if ( args.force ) {
                         warnings("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);                        
-                    } else {
+                    }
+                    else {
                         error("bad seq at %s:%d %s vs %s", chrom, start+1, ref, seq);
                     }
                 }
@@ -309,7 +326,8 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
         if ( strand ) {
             for ( i = 0; i < ref_length; i++) 
                 kputc(seqs[seq2num(ref[ref_length-i-1])], &spec->string);
-        } else {
+        }
+        else {
             for ( i = 0; i < ref_length; i++)
                 kputc(seqs[seq2num(ref[i])], &spec->string);     
         }        
@@ -326,11 +344,20 @@ int construct_basic_inf(faidx_t *fai, struct ref_alt_spec *spec, bcf_hdr_t *hdr,
         kputc(seqs[seq2num(seq[0])], &spec->string);
 
     if ( strand ) {
-        for ( i = 0; i < alt_length; ++i )
-            kputc(seqs[seq2num(alt[alt_length-i-1])], &spec->string);
-    } else {
-        for ( i = 0; i < alt_length; ++i )
-            kputc(seqs[seq2num(alt[i])], &spec->string);
+        for ( i = 0; i < alt_length; ++i ) {
+            if ( alt[alt_length-i-1] == ',' )
+                kputc(',', &spec->string);
+            else 
+                kputc(seqs[seq2num(alt[alt_length-i-1])], &spec->string);
+        }
+    }
+    else {
+        for ( i = 0; i < alt_length; ++i ) {
+            if ( alt[i] == ',' )
+                kputc(',', &spec->string);
+            else 
+                kputc(seqs[seq2num(alt[i])], &spec->string);
+        }
     }
 
   update_alleles:
@@ -352,30 +379,6 @@ int setter_chrom( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line 
 
     return 0;
 }
-/* int setter_pos( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line) */
-/* { */
-/*     char *name = get_col_string(line, col->col); */
-/*     if (name == NULL || (int)name[0] == '.') */
-/*         return 0; */
-/*     if (name[0] == '.') */
-/*         return 0; */
-/*     int pos = atoi(name); */
-/*     if (pos < 0) */
-/*         return 0; */
-/*     rec->pos = pos-1; */
-/*     return 0; */
-/* } */
-/* int setter_start( bcf_hdr_t *hdr, struct tsv_col *col, bcf1_t *rec, struct line *line) */
-/* { */
-/*     char *name = get_col_string(line, col->col); */
-/*     if (name == NULL || (int)name[0] == '.') */
-/*         return 0; */
-/*     int pos = atoi(name); */
-/*     if (pos < 0) */
-/*         return 0; */
-/*     rec->pos = pos; */
-/*     return 0; */
-/* } */
 
 int vcf_setter_alleles( bcf_hdr_t *hdr, bcf1_t *rec,  char *allele_string)
 {
@@ -412,7 +415,7 @@ void *split_string(char *string, int *n, int type)
         return (void*)a;    
     }
     
-    if ( type == BCF_HT_STR || type == BCF_HT_FLAG) {
+    if ( type == BCF_HT_STR || type == BCF_HT_FLAG ) {
         //char **s = (char**)calloc(*n, sizeof(char*));
         //for ( i = 0; i < *n; ++i )
         //   s[i] = strdup(tmp.s+splits[i]);
@@ -461,18 +464,6 @@ int tsv_register( bcf_hdr_t *hdr, char *name, struct tsv_col *col)
         col->key = strdup("CHR"); // should allocate memory for name
         return 0;
     }
-
-    /* if ( strcasecmp("pos", name ) == 0 ) { */
-    /*     col->setter = setter_pos; */
-    /*     col->key = strdup("POS"); */
-    /*     return 0; */
-    /* } */
-
-    /* if ( strcasecmp("start", name ) == 0 ) { */
-    /*     col->setter = setter_start; */
-    /*     col->key = strdup("START"); */
-    /*     return 0; */
-    /* } */
 
     if ( strcasecmp("end", name) == 0 && end_is_set) {
         // append END tag in the header, this is mandontary
@@ -597,9 +588,10 @@ int parse_args(int argc, char **argv)
 
         error("Unknown argument %s.", a);        
     }
-    if ( args.header_fname == 0 )
-        error("No header file; use -header / -h to specify a header.txt file.");
-    
+    if ( args.header_fname == 0 ) {
+        // error("No header file; use -header / -h to specify a header.txt file.");
+        warnings("No header file specified, generate a VCF file without INFO.");
+    }
     if ( args.input_fname == 0 && !isatty(fileno(stdin)) )
         args.input_fname = "-";
     
@@ -648,10 +640,10 @@ int parse_args(int argc, char **argv)
     
     if ( check_end )
         args.end_column = atoi(end_column);
+
     if ( pos_is_set == 0 && start_is_set == 0)
         error("No position column is set.");
-    /* if ( start_is_set == 1 && end_is_set == 0) */
-    /*     warnings("End column is not set, treat start position zero based."); */
+
     if ( pos_is_set == 1 && start_is_set == 1) {
         warnings("Redundancy columns, pos column and start column both set. Skip pos column..");
         pos_is_set = 0;        
@@ -668,27 +660,30 @@ int parse_args(int argc, char **argv)
 }
 
 int init_columns(bcf_hdr_t *hdr)
-{    
-    // init header.txt
-    htsFile *fp = hts_open(args.header_fname, "rb");
-    if ( fp == 0)
-        error("Failed to open %s.",args.header_fname);
+{
     kstring_t str = KSTRING_INIT;
-    while ( hts_getline(fp, KS_SEP_LINE, &str) > 0 ) {
-        if ( strncmp(str.s,"##INFO=", 7) ) {
-            warnings("Unknown format, check the line %s : %s.", args.header_fname, str.s);
-            continue;
-        }
-        if ( bcf_hdr_append(hdr, str.s) )
-            error("Could not parse %s : %s.", args.header_fname, str.s);        
-        str.l = 0;
-    } 
-    bcf_hdr_sync(hdr);
-    hts_close(fp);
+    kstring_t head = KSTRING_INIT;
+    
+    // init header.txt
+    if ( args.header_fname != NULL ) {
+        htsFile *fp = hts_open(args.header_fname, "rb");
+        if ( fp == 0)
+            error("Failed to open %s.",args.header_fname);
+        while ( hts_getline(fp, KS_SEP_LINE, &str) > 0 ) {
+            if ( strncmp(str.s,"##INFO=", 7) ) {
+                warnings("Unknown format, check the line %s : %s.", args.header_fname, str.s);
+                continue;
+            }
+            if ( bcf_hdr_append(hdr, str.s) )
+                error("Could not parse %s : %s.", args.header_fname, str.s);        
+            str.l = 0;
+        } 
+        bcf_hdr_sync(hdr);
+        hts_close(fp);
+    }
     
     htsFile *fp_input = hts_open(args.input_fname, "r");
 
-    kstring_t head = KSTRING_INIT;
     do {
         if ( hts_getline(fp_input, KS_SEP_LINE, &str) == 0 )
             break;
@@ -708,7 +703,10 @@ int init_columns(bcf_hdr_t *hdr)
     int n;
     int *splits = ksplit(&head, '\t', &n);
     if ( strcasecmp("#chr", head.s + splits[0]) && strcasecmp("#chrom", head.s + splits[0]) )  {
-        error("Failed to parse title of %s, %s.", args.input_fname, head.s);        
+        error("Failed to parse title of %s, %s."
+              "The title usually looks like this:\n"
+              "#chr\tpos\tref\talt\ttag_1\t..."
+              , args.input_fname, head.s);        
     }
 
     for ( i = 0; i < n; ++i ) {
@@ -733,13 +731,11 @@ int init_columns(bcf_hdr_t *hdr)
         
         if (args.pos_column == i + 1) {
             args.alleles.pos_col = i;
-            // tsv_register(hdr, "POS", &args.cols[args.n_cols]);
             continue;
         }
 
         if (args.start_column == i+1) {
             args.alleles.pos_col = i;
-            // tsv_register(hdr, "start", &args.cols[args.n_cols]);
             continue;
         }
         
@@ -751,9 +747,10 @@ int init_columns(bcf_hdr_t *hdr)
 
         if ( tsv_register(hdr, head.s+splits[i], &args.cols[args.n_cols]) )
             continue;
+
       col_increase:
         args.cols[args.n_cols].col = i;
-        args.n_cols++;        
+        args.n_cols++;
     }
 
     if ( args.alleles.ref_col == -1 ) {
@@ -772,7 +769,7 @@ int convert_tsv_vcf()
 {
     bcf_hdr_t *hdr = bcf_hdr_init("w");
     bcf_hdr_set_chrs(hdr, args.fai);
-    if (init_columns(hdr) )
+    if ( init_columns(hdr) )
         error("Empty columns.");
 
     htsFile *fp_output = args.output_fname == 0 ? hts_open("-", hts_bcf_wmode(args.output_type)) :
@@ -804,8 +801,8 @@ int convert_tsv_vcf()
         clear_line(&line);
         if (rec->rid == 0 && rec->pos == 0)
             continue;
-        if ( n )
-            bcf_write(fp_output, hdr, rec);
+        // if ( n )
+        bcf_write(fp_output, hdr, rec);
     }
 
     if ( hts_close(fp_output))

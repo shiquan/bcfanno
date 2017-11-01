@@ -1,0 +1,8 @@
+{
+    "vcfs":[
+	{
+	    "file":"./example/clinvar.vcf.gz",
+	    "columns":"RS,CLNSIG",
+	},
+    ],
+}

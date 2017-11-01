@@ -170,11 +170,14 @@ static int parse_position(char *ss, char *se, struct genepred_line *line)
     // Convert functional location to gene location.
     if ( pos_type == func_region_cds ) {
         position += line->utr5_length;
-    } else if ( pos_type == func_region_utr5 ) {
+    }
+    else if ( pos_type == func_region_utr5 ) {
         position = line->utr5_length - position + 1;
-    } else if ( pos_type == func_region_utr3 ) {
+    }
+    else if ( pos_type == func_region_utr3 ) {
         position = line->cds_length + position;    
-    } else {
+    }
+    else {
         error("Impossible situation.");
     }
     return convert_loc2position(line, position, offset);
@@ -558,13 +561,15 @@ static int find_locate(struct genepred_line *line, int *pos, int *offset, int st
             *pos = line->loc[BLOCK_END][block1] + ( line->exons[BLOCK_END][block1] - start);
         }
         *offset = 0;
-    } else {
+    }
+    else {
         int upstream =  start - line->exons[BLOCK_END][block1];
         int downstream = line->exons[BLOCK_START][block2]-start;
         if ( upstream > downstream ) {
             *pos = line->loc[BLOCK_START][block2];
             *offset = line->strand == '+' ? -downstream : downstream;
-        } else {
+        }
+        else {
             *pos = line->loc[BLOCK_END][block1];
             *offset = line->strand == '+' ? upstream : -upstream;
         }
@@ -733,30 +738,6 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( line->cdsstart == line->cdsend ) {
         // no cds count for noncoding transcript
         type->count2 = 0;
-        /* if ( line->strand == '+') { */
-        /*     for ( i = 0; i < line->exon_count; ++i ) { */
-        /*         if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i]) { */
-        /*             if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) { */
-        /*                 type->vartype = var_is_splice_site; */
-        /*             } else { */
-        /*                 type->vartype = var_is_noncoding; */
-        /*             } */
-        /*             goto no_amino_code; */
-        /*         } */
-        /*     } */
-        /* } else { */
-        /*     for ( i = 0; i < line->exon_count; ++i ) { */
-        /*         if ( pos <= line->loc[BLOCK_START][i] && pos >= line->loc[BLOCK_END][i]) { */
-        /*             if ( pos <= line->loc[BLOCK_END][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][i] -SPLICE_SITE_EXON_RANGE ) { */
-        /*                 type->vartype = var_is_splice_site; */
-        /*             } else { */
-        /*                 type->vartype = var_is_noncoding; */
-        /*             } */
-        /*             goto no_amino_code; */
-        /*         } */
-        /*     } */
-        /* } */
-        /* type->vartype = var_is_noncoding; */
         BRANCH(var_is_noncoding);
         goto no_amino_code;
     }
@@ -786,13 +767,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     if ( offset != 0 )
         goto no_amino_code;
 
-
-    
-
-    
     // For variants in coding region, check the amino acid changes.
-
-
    
     cds_pos = pos - line->utr5_length;
 
@@ -808,6 +783,12 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     char *ori_seq = faidx_fetch_seq(spec.data->fai, name, start, start + 1000, &transcript_retrieve_length);
     if ( ori_seq == NULL || transcript_retrieve_length == 0 )
         goto failed_check;
+
+    // Sometime UCSC may generate trancated records. These bugs may disturb downstream analysis.
+    if ( transcript_retrieve_length < 3 ) {
+        warnings("Record %s probably trancated.", name);
+        goto failed_check;
+    }
     
     char *ref_seq = ref == NULL ? NULL : strdup(ref);
     char *alt_seq = alt == NULL ? NULL : strdup(alt);
