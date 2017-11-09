@@ -282,6 +282,22 @@ static struct genepred_format genepred_formats = {
     .exon_count = 7,
     .exonstarts = 8,
     .exonends = 9,
+    .name2 = 11,
+    .name_version = 12,
+    .realn = 13,
+};
+
+static struct genepred_format genepredPlus_formats = {    
+    .name1 = 0,
+    .chrom = 1,
+    .strand = 2,
+    .txstart = 3,
+    .txend = 4,
+    .cdsstart = 5,
+    .cdsend = 6,
+    .exon_count = 7,
+    .exonstarts = 8,
+    .exonends = 9,
     .name2 = 10,
     .name_version = 11,
     .realn = 12,
@@ -305,7 +321,7 @@ static struct genepred_format refflat_formats = {
 
 // The type defined the format of database. Default is genepred format. Access genepred files of
 // species from UCSC table browsers.
-static struct genepred_format *type = &genepred_formats;
+static struct genepred_format *type = &genepredPlus_formats;
 
 void set_format_refgene()
 {
