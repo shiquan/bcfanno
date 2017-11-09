@@ -283,8 +283,8 @@ static struct genepred_format genepred_formats = {
     .exonstarts = 8,
     .exonends = 9,
     .name2 = 11,
-    .name_version = 12,
-    .realn = 13,
+    //.name_version = 12,
+    //.realn = 13,
 };
 
 static struct genepred_format genepredPlus_formats = {    
