@@ -1,4 +1,4 @@
-Generate databases for bcfanno
+Preparing Clinvar database for bcfanno
 ===============================
 
 Current-state-of-the-art bioinformatic tools like BWA, GATK, samtools accelerated scientific research and generated high quality genetic variants in different labs around the world. VCF is the most well supported format to store and
