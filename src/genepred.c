@@ -1,3 +1,5 @@
+
+
 #include "utils.h"
 #include "genepred.h"
 #include "number.h"
@@ -330,6 +332,11 @@ void set_format_refgene()
 void set_format_genepred()
 {
     type = &genepred_formats;
+}
+
+void set_format_genepredPlus()
+{
+    type = &genepredPlus_formats;
 }
 void set_format_refflat()
 {

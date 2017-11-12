@@ -153,7 +153,7 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
         ksprintf(&string, "%s",name->name1);
         char *ss = name->name1;
         while ( ss != NULL ) {
-            if ( ss == '.')
+            if ( *ss == '.')
                 break;
         }
         if ( ss == NULL && name->name_version > 0 ) {

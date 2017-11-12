@@ -118,6 +118,7 @@ struct genepred_spec {
 
 extern void set_format_refgene();
 extern void set_format_genepred();
+extern void set_format_genepredPlus();
 extern void set_format_refflat();
 
 extern struct genepred_line *genepred_line_create();

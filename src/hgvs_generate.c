@@ -1311,7 +1311,7 @@ int main(int argc, char **argv)
     // assuming output is stdout in Vcf format in default. 
     htsFile *fout = out_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(out_fname, hts_bcf_wmode(out_type));
     opts.hdr_out = bcf_hdr_dup(hdr);
-    set_format_genepred();
+    set_format_genepredPlus();
     // parse configure columns
     refgene_columns_parse(&opts, (char*)columns);   
     bcf_hdr_write(fout, opts.hdr_out);    
