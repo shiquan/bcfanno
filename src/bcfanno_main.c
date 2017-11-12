@@ -257,7 +257,7 @@ int parse_args(int argc, char **argv)
     args.vcf_opts.vcfs_is_inited = 0;
     // args.hgvs_opts.refgene_is_inited = 0;
     // set genepred format
-    set_format_genepred();
+    set_format_genepredPlus();
     beds_options_init( &args.bed_opts );
     vcfs_options_init( &args.vcf_opts );
     // refgene_options_init( &args.hgvs_opts );

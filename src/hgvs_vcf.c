@@ -151,14 +151,17 @@ static char *retrieve_hgvs_des(struct hgvs_des *des)
         struct var_func_type *type = &des->a[i].type;
         if ( i ) kputc('|', &string);
         ksprintf(&string, "%s",name->name1);
-        char *ss = name->name1;
-        while ( ss != NULL ) {
-            if ( *ss == '.')
-                break;
-        }
-        if ( ss == NULL && name->name_version > 0 ) {
-            ksprintf(&string, ".%d",name->name_version);
-        }
+        //char *ss = name->name1;
+            {
+                int l = strlen(name->name1);
+                int k;
+                for ( k = 0; k < l; ++k )                    
+                    if ( name->name1[k] == '.')
+                        break;
+                if ( k == l && name->name_version > 0 ) {
+                    ksprintf(&string, ".%d",name->name_version);
+                }
+            }
         kputc(':', &string);
         if ( type->func == func_region_noncoding ) {
             kputs("n.", &string);

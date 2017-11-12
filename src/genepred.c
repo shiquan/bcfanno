@@ -257,6 +257,21 @@ void genepred_line_destroy(void *line)
     }
 }
 
+static struct genepred_format notset_formats = {
+    .chrom = -1,
+    .name1 = -1,
+    .name2 = -1,
+    .strand = -1,
+    .txstart = -1,
+    .txend = -1,
+    .cdsstart = -1,
+    .cdsend = -1,
+    .exon_count = -1,
+    .exonstarts = -1,
+    .exonends = -1,
+    .name_version = -1,
+    .realn = -1,
+};
 static struct genepred_format refgene_formats = {
     .chrom = 2,
     .name1 = 1,
@@ -321,9 +336,8 @@ static struct genepred_format refflat_formats = {
     .realn = -1,
 };
 
-// The type defined the format of database. Default is genepred format. Access genepred files of
-// species from UCSC table browsers.
-static struct genepred_format *type = &genepredPlus_formats;
+// The type defined the format of database. Default is genepredPlus format.
+static struct genepred_format *type = &notset_formats;
 
 void set_format_refgene()
 {
@@ -333,7 +347,6 @@ void set_format_genepred()
 {
     type = &genepred_formats;
 }
-
 void set_format_genepredPlus()
 {
     type = &genepredPlus_formats;
@@ -462,6 +475,17 @@ static int parse_line_core(kstring_t *string, struct genepred_line *line)
 }
 int parse_line(kstring_t *string, struct genepred_line *line)
 {
+    if ( type->chrom == -1 && type->txstart == -1 ) {
+        error_print("Type is not set. Please try ...\n"
+                    "void set_format_refgene()\n"
+                    "void set_format_genepred()\n"
+                    "void set_format_genepredPlus()\n"
+                    "void set_format_refflat()\n"
+            );
+
+        return 1;
+    }
+        
     char *temp = strdup(string->s);
     int ret = 0;
     if ( temp == NULL || temp[0] == '#' )
@@ -474,6 +498,7 @@ int parse_line(kstring_t *string, struct genepred_line *line)
     free(temp);
     return ret;
 }
+
 int parse_line_locs(struct genepred_line *line)
 {
     if (line->loc_parsed == 1 )
