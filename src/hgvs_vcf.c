@@ -135,9 +135,16 @@ static char *retrieve_trans_des(struct hgvs_des *des)
         struct hgvs_name *name = &des->a[i].name;
         if ( i ) kputc('|', &string);
         kputs(name->name1, &string);
-        if ( name->name_version > 0 ) {
-            ksprintf(&string, ".%d",name->name_version);
-        }        
+            {
+                int l = strlen(name->name1);
+                int k;
+                for ( k = 0; k < l; ++k )                    
+                    if ( name->name1[k] == '.')
+                        break;
+                if ( k == l && name->name_version > 0 ) {
+                    ksprintf(&string, ".%d",name->name_version);
+                }                
+            }
     }
     return string.s;
 }
