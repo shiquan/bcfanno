@@ -1,5 +1,6 @@
-// vcf_annos.c - define annotate functions for each tag type
-//
+// This file include APIs to annotate vcf tags, main APIs adapt from vcfannotate.c
+// Copyright (C) 2013-2016 Genome Research Ltd. Author : Petr Danecek <pd3@sanger.ac.uk>
+
 #include "utils.h"
 #include "anno.h"
 #include "anno_vcf.h"

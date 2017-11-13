@@ -1,3 +1,27 @@
+/*  
+    Copyright (C) 2016,2017  BGI Research
+
+    Author: Shi Quan (shiquan@genomics.cn)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE. 
+*/
+
 #include "anno.h"
 #include "vcmp.h"
 #include "plugin.h"
@@ -6,9 +30,9 @@
 anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *header_out, int *ncols, enum anno_type type)
 {
     assert(rules != NULL);
-    if (type == anno_is_vcf && header_in == NULL) {
+    if (type == anno_is_vcf && header_in == NULL) 
 	error("Inconsistent file type!");
-    }
+    
     char *ss = (char*)rules, *se = ss;
     int nc = 0;
     anno_col_t *cols = NULL;
@@ -22,10 +46,11 @@ anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *hea
 	    continue;
 	}
 	int replace = REPLACE_ALL;
-	if ( *ss=='+') {
+	if ( *ss == '+') {
 	    replace = REPLACE_MISSING;
 	    ss++;
-	} else if (*ss=='-') {
+	}
+        else if (*ss == '-') {
 	    replace = REPLACE_EXISTING;
 	    ss++;
 	}
@@ -34,9 +59,19 @@ anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *hea
 	kputsn(ss, se-ss, &str); 
 	if ( !str.s[0] ) {
 	    warnings("Empty tag in %s", rules);
-	} else if ( !strcasecmp("CHROM", str.s) || !strcasecmp("POS", str.s) || !strcasecmp("FROM", str.s) || !strcasecmp("TO", str.s) || !strcasecmp("REF", str.s) || !strcasecmp("ALT", str.s) || !strcasecmp("FILTER", str.s) || !strcasecmp("QUAL", str.s)) {
+	}
+        // skip build-in tags
+        else if ( !strcasecmp("CHROM", str.s) ||
+                  !strcasecmp("POS", str.s) ||
+                  !strcasecmp("FROM", str.s) ||
+                  !strcasecmp("TO", str.s) ||
+                  !strcasecmp("REF", str.s) ||
+                  !strcasecmp("ALT", str.s) ||
+                  !strcasecmp("FILTER", str.s) ||
+                  !strcasecmp("QUAL", str.s)) {
 	    warnings("Skip tag %s", str.s);
-	} else if ( !strcasecmp("ID", str.s) ) {
+	}
+        else if ( !strcasecmp("ID", str.s) ) {
 	    nc++;
             cols = (struct anno_col*) realloc(cols, sizeof(struct anno_col)* (nc));
             struct anno_col *col = &cols[nc-1];
@@ -44,9 +79,11 @@ anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *hea
             col->replace = replace;
             col->setter = type == anno_is_vcf ? vcf_setter_id : setter_id;
             col->hdr_key = strdup(str.s);
-        } else if (!strcasecmp("INFO", str.s) || !strcasecmp("FORMAT", str.s) ) {
+        }
+        else if (!strcasecmp("INFO", str.s) || !strcasecmp("FORMAT", str.s) ) {
 	    error("do not support annotate all INFO,FORMAT fields. todo INFO/TAG instead\n");
-	} else if (!strncasecmp("FORMAT/", str.s, 7) || !strncasecmp("FMT/", str.s, 4)) {
+	}
+        else if (!strncasecmp("FORMAT/", str.s, 7) || !strncasecmp("FMT/", str.s, 4)) {
             char *key = str.s + (!strncasecmp("FMT", str.s, 4) ? 4 : 7);
             if (!strcasecmp("GT", key)) 
 		error("It is not allowed to change GT tag.");
@@ -65,7 +102,9 @@ anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *hea
 		    bcf_hdr_sync(header_out);
 		    hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
 		    assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_FMT, hdr_id) );
-		} else {
+		}
+
+                else {
 		    error("The tag \"%s\" is not defined in header: %s\n", str.s, rules);
 		}
 	    }
@@ -96,7 +135,8 @@ anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *hea
 		    error("The type of %s not recognised (%d)\n", str.s, bcf_hdr_id2type(header_out, BCF_HL_FMT, hdr_id));
             }
 
-	} else if ( !strncasecmp("INFO/", str.s, 5) ) {
+	}
+        else if ( !strncasecmp("INFO/", str.s, 5) ) {
 	    memmove(str.s, str.s+5, str.l-4);
 	    str.l -= 4;
 
@@ -115,7 +155,8 @@ anno_col_t *init_columns(const char *rules, bcf_hdr_t *header_in, bcf_hdr_t *hea
 		    bcf_hdr_sync(header_out);
 		    hdr_id = bcf_hdr_id2int(header_out, BCF_DT_ID, str.s);
 		    assert( bcf_hdr_idinfo_exists(header_out, BCF_HL_INFO, hdr_id) );
-		} else {
+		}
+                else {
 		    error("The tag \"%s\" is not defined in header: %s\n", str.s, rules);
 		}
 	    }

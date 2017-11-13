@@ -1,3 +1,27 @@
+/*  
+    Copyright (C) 2016,2017  BGI Research
+
+    Author: Shi Quan (shiquan@genomics.cn)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE. 
+*/
+
 // TODO: frameshift, document
 //
 #include "utils.h"
@@ -150,7 +174,8 @@ static int parse_position(char *ss, char *se, struct genepred_line *line)
     if ( *s1 == '*' ) {
         pos_type = func_region_utr3;
         ++s1;
-    } else if ( *s1 == '-') {
+    }
+    else if ( *s1 == '-') {
         pos_type = func_region_utr5;
         ++s1;
     }
@@ -162,7 +187,8 @@ static int parse_position(char *ss, char *se, struct genepred_line *line)
         for ( i = 0, s1 = s2; s2 != se; ++s2, ++i);
         if ( check_num_likely_l(s1, i) ) {
             offset = str2int_l(s1, i);
-        } else {
+        }
+        else {
             error("Failed to parse offset. %s.", s1);
         }
     }
@@ -1075,7 +1101,7 @@ int generate_hgvs_core(struct genepred_line *line, struct hgvs_core *core, int s
     
     if ( line->loc_parsed == 0 ) {
         if ( parse_line_locs(line) ) {
-            error_print("Failed to parse locs of line:. %s", line->name1);
+            error_print("Failed to parse locs of line: %s", line->name1);
             return 1;
         }
     }
