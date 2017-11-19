@@ -1,4 +1,4 @@
-PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags
+PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags annobed
 DEBUG_PROG= bcfanno_debug
 
 all: $(PROG)
@@ -56,6 +56,9 @@ force:
 
 hgvs_vcf: $(HTSLIB)
 	$(CC) -DHGVS_VCF_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/hgvs_vcf.c src/hgvs.c src/sequence.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
+
+annobed: $(HTSLIB)
+	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/annobed.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
 
 vcfadd: $(HTSLIB) 
 	$(CC) -D_VCF_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/vcf_annos.c src/json_config.c src/config.c src/kson.c src/vcmp.c $(HTSLIB)

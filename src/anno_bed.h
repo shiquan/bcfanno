@@ -54,14 +54,17 @@ struct beds_options {
     bcf_hdr_t *hdr_out;
     int n_files;
     int m_files;    
-    struct beds_anno_file *files;
-    
+    struct beds_anno_file *files;    
 };
+
 // bed format function annotation
 // extern int setter_func_region(struct beds_options *opts, bcf1_t *line
 extern int beds_options_init(struct beds_options *opts);
+
 extern int beds_options_destroy(struct beds_options *opts);
+
 extern int anno_beds_core(struct beds_options *opts, bcf1_t *line);
+
 extern int beds_database_add(struct beds_options *opts, const char *fname, char *columns);
 
 #endif

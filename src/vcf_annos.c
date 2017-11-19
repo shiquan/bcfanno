@@ -1,6 +1,11 @@
-// This file include APIs to annotate vcf tags, main APIs adapt from vcfannotate.c
+// This file include APIs to annotate vcf tags.
+//
+// For APIs adapt from vcfannotate.c
 // Copyright (C) 2013-2016 Genome Research Ltd. Author : Petr Danecek <pd3@sanger.ac.uk>
-
+//
+// For other APIs developed by Shi Quan <shiquan@genomics.cn>
+// Copyright (C) 2016,2017 BGI Research.
+//
 #include "utils.h"
 #include "anno.h"
 #include "anno_vcf.h"
@@ -478,8 +483,8 @@ int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_co
     if ( !(line->unpacked & BCF_UN_FMT) ) bcf_unpack(line, BCF_UN_FMT);
     if ( !(rec->unpacked & BCF_UN_FMT) ) bcf_unpack(rec, BCF_UN_FMT);
     int nsrc = bcf_get_genotypes(header, rec, &opts->tmpi, &opts->mtmpi);
-    if ( nsrc==-3 ) return 0;    // the tag is not present
-    if ( nsrc<=0 ) return 1;     // error
+    if ( nsrc == -3 ) return 0;    // the tag is not present
+    if ( nsrc <=  0 ) return 1;     // error
 
     if ( !opts->sample_map )
         return bcf_update_genotypes(opts->hdr_out,line,opts->tmpi,nsrc);
@@ -538,20 +543,20 @@ int vcf_setter_format_gt(struct vcfs_options *opts, bcf1_t *line, struct anno_co
 int count_vals(struct anno_line *tab, int icol_beg, int icol_end)
 {
     int i, nmax = 0;
-    for (i=icol_beg; i<icol_end; i++) {
+    for ( i = icol_beg; i < icol_end; i++) {
         char *str = tab->cols[i], *end = str;
-        if ( str[0]=='.' && !str[1] ) {
+        if ( str[0] == '.' && !str[1] ) {
             // missing value
             if ( !nmax ) nmax = 1;
             continue;
         }
         int n = 1;
         while ( *end ) {
-            if ( *end==',' )
+            if ( *end == ',' )
                 n++;
             end++;
         }
-        if ( nmax<n )
+        if ( nmax < n )
             nmax = n;
     }
     return nmax;
@@ -893,6 +898,7 @@ int vcfs_options_destroy(struct vcfs_options *opts)
     free(opts->sample_map);
     return 0;
 }
+
 int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *columns)
 {
     kstring_t string = KSTRING_INIT;
@@ -912,7 +918,8 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	if ( *ss == '+') {
 	    col->replace = REPLACE_MISSING;
 	    ss++;
-	} else if ( *ss == '-' ) {
+	}
+        else if ( *ss == '-' ) {
 	    col->replace = REPLACE_EXISTING;
 	    ss++;
 	}
@@ -920,18 +927,27 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    warnings("Empty tag.");
 	    continue;
 	}
-	if ( strcasecmp("CHROM", ss) == 0 || strcasecmp("POS", ss) == 0 || strcasecmp("REF", ss) == 0 ||
-	     strcasecmp("ALT", ss) == 0 || strcasecmp("FILTER", ss) == 0 || strcasecmp("QUAL", ss) == 0 ) {
+
+        // Skip build-in tags
+	if ( strcasecmp("CHROM", ss) == 0 ||
+             strcasecmp("POS", ss) == 0 ||
+             strcasecmp("REF", ss) == 0 ||
+	     strcasecmp("ALT", ss) == 0 ||
+             strcasecmp("FILTER", ss) == 0 ||
+             strcasecmp("QUAL", ss) == 0 ) {
 	    warnings("Skip %s", ss);
 	    continue;
-	}	
+	}
+        
 	if ( strcasecmp("INFO", ss) == 0 || strcasecmp("FORMAT", ss) == 0 ) {
 	    warnings("Do not support annotate all INFO or FORMAT fields. todo INFO/TAGS instead.");
 	    continue;
 	}
-	if ( strcasecmp("ID", ss) == 0 ) {	    
+
+        if ( strcasecmp("ID", ss) == 0 ) {	    
 	    col->setter.vcf = vcf_setter_id;	    
-	} else if ( strncasecmp("FORMAT/", ss, 7) == 0 || strncasecmp("FMT/", ss, 4) == 0) {
+	}
+        else if ( strncasecmp("FORMAT/", ss, 7) == 0 || strncasecmp("FMT/", ss, 4) == 0) {
 	    ss += (strncasecmp("FORMAT/", ss, 7) == 0 ? 7 : 4);
 	    if ( strcasecmp("GT", ss) == 0 ) {
 		warnings("It is not allowed to change GT tag.");
@@ -966,9 +982,11 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    }
 	    col->number = bcf_hdr_id2length(hdr_out, BCF_HL_FMT, hdr_id);
 	    // col->icol = hdr_id;
-	} else {
+	}
+        else {
 	    if ( strncasecmp("INFO/", ss, 5) == 0 )
 		ss += 5;
+
 	    int hdr_id = bcf_hdr_id2int(hdr_out, BCF_DT_ID, ss);
 	    if ( !bcf_hdr_idinfo_exists(hdr_out, BCF_HL_INFO, hdr_id) ) {
 		bcf_hrec_t *hrec = bcf_hdr_get_hrec(file->hdr, BCF_HL_INFO, "ID", ss, NULL);
@@ -985,10 +1003,12 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	    }
 	    
 	    switch ( bcf_hdr_id2type(hdr_out, BCF_HL_INFO, hdr_id) ) {
-		case BCF_HT_FLAG:
+
+                case BCF_HT_FLAG:
 		    col->setter.vcf = vcf_setter_info_flag;
 		    break;
-		case BCF_HT_INT:
+
+                case BCF_HT_INT:
 		    col->setter.vcf = vcf_setter_info_int;
 		    break;
 
@@ -1020,6 +1040,7 @@ int vcfs_columns_init(struct anno_vcf_file *file, bcf_hdr_t *hdr_out, char *colu
 	return 1;
     return 0;    
 }
+
 int vcfs_database_add(struct vcfs_options *opts, const char *fname, char *columns)
 {
     if ( opts->n_files == opts->m_files ) {

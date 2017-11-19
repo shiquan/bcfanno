@@ -244,7 +244,8 @@ static int stack_push(int c, int start, int pos, int line)
                 fprintf(stderr, "Unknown complenment type.");
                 break;
         }
-    } else {
+    }
+    else {
         if ( stack.nodes[0].type == rev_braces || stack.nodes[0].type == rev_bracket)
             return 1;
     }
@@ -317,13 +318,13 @@ static int check_complement(kstring_t *string)
                 
             case ',' :
                 // check the key value pair
-                if ( stack_check_quote() == 0) {
-                    if ( check_key_pair() == 0) {
-                        format_error(string, start, i, line);
-                        return 1;
-                    }
-                }
-                break;
+                /* if ( stack_check_quote() == 0) { */
+                /*     if ( check_key_pair() == 0) { */
+                /*         format_error(string, start, i, line); */
+                /*         return 1; */
+                /*     } */
+                /* } */
+                /* break; */
 
             case '\t':
             case ' ': // blank in key or value string

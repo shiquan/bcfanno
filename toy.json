@@ -5,4 +5,8 @@
 	    "columns":"RS,CLNSIG",
 	},
     ],
+    "modules":[
+        "test.so",
+        "test1.so",
+    ],
 }

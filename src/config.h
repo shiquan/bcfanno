@@ -35,14 +35,14 @@ struct refgene_config {
     char *refseq_fname;
     char *trans_list_fname;
     char *gene_list_fname;
-//    char *columns;
+    // char *columns;
 };
 
 struct file_config {
     // file path
-     char *fname;
+    char *fname;
     // columns string
-     char *columns;
+    char *columns;
 };
 struct vcfs_config {
     // vcf files number
@@ -55,6 +55,11 @@ struct beds_config {
     struct file_config *files;
 };
 
+struct modules_config {
+    int n_modules;
+    struct file_config *files;
+};
+
 // skip other keys except author, config_id and reference_version
 struct bcfanno_config {
     char *author;
@@ -64,11 +69,15 @@ struct bcfanno_config {
     struct vcfs_config vcfs;
     struct beds_config beds;
     struct refgene_config refgene;
+    struct modules_config modules;
 };
 
 extern struct bcfanno_config *bcfanno_config_init(void);
+
 extern void bcfanno_config_destroy(struct bcfanno_config *);
+
 extern int bcfanno_load_config(struct bcfanno_config *, const char *);
+
 extern int bcfanno_config_debug(struct bcfanno_config *config);
 
 #endif

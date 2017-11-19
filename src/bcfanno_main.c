@@ -34,7 +34,6 @@
 #include "htslib/vcf.h"
 #include "anno_bed.h"
 #include "anno_vcf.h"
-//#include "anno_hgvs.h"
 #include "version.h"
 #include "hgvs.h"
 #include "hgvs_vcf.h"
@@ -48,8 +47,11 @@
 #include <sys/time.h>
 
 extern int load_sequnce_index(const char *file);
+
 extern int bcf_header_add_flankseq(bcf_hdr_t *hdr);
+
 extern int bcf_add_flankseq(bcf_hdr_t *hdr, bcf1_t *line);
+
 extern void seqidx_destroy();
 
 static int flankseq_flag = 0;
@@ -279,23 +281,24 @@ int parse_args(int argc, char **argv)
 
     args.bed_opts.beds_is_inited = 0;
     args.vcf_opts.vcfs_is_inited = 0;
-    // args.hgvs_opts.refgene_is_inited = 0;
-    // set genepred format
+
+    // set genepredPlus format
     set_format_genepredPlus();
+    
     beds_options_init( &args.bed_opts );
     vcfs_options_init( &args.vcf_opts );
-    // refgene_options_init( &args.hgvs_opts );
 
     // read bcf header from input bcf/vcf
     args.hdr = bcf_hdr_read(args.fp_input);
     if ( args.hdr == NULL)
 	error("Failed to parse header of input.");
+
     // duplicate input header to generate output header
     args.hdr_out = bcf_hdr_dup(args.hdr);
+
     // alias hdr_out
     args.vcf_opts.hdr_out = args.hdr_out;
     args.bed_opts.hdr_out = args.hdr_out;
-    // args.hgvs_opts.hdr_out = args.hdr_out;
     
     if ( con->refgene.refgene_is_set == 1) {
         if ( init_hgvs_anno(con->refgene.genepred_fname, con->refgene.refseq_fname, args.hdr_out) )

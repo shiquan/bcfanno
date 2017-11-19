@@ -48,6 +48,7 @@ struct bcfanno_config temp_config_init = {
     .vcfs = { 0, 0 },
     .beds = { 0, 0 },
     .refgene = { 0, 0, 0, 0, 0},
+    .modules = { 0, 0 },
 };
 
 struct bcfanno_config *bcfanno_config_init()
@@ -69,14 +70,14 @@ void bcfanno_config_destroy(struct bcfanno_config *config)
         free (config->reference_path);
 
     int i;
-    for (i = 0; i < config->vcfs.n_vcfs; ++i ) {
+    for ( i = 0; i < config->vcfs.n_vcfs; ++i ) {
 	free(config->vcfs.files[i].fname);
 	free(config->vcfs.files[i].columns);
     }
     if ( i )
 	free(config->vcfs.files);
 
-    for (i = 0; i < config->beds.n_beds; ++i ) {
+    for ( i = 0; i < config->beds.n_beds; ++i ) {
 	free(config->beds.files[i].fname);
 	if (config->beds.files[i].columns)
 	    free(config->beds.files[i].columns);
@@ -84,6 +85,9 @@ void bcfanno_config_destroy(struct bcfanno_config *config)
     if ( i )
 	free(config->beds.files);
 
+    for ( i = 0; i < config->modules.n_modules; ++i ) 
+        free(config->modules.files[i].fname);
+    
     if ( config->refgene.genepred_fname )
         free(config->refgene.genepred_fname);
     if ( config->refgene.refseq_fname )
@@ -96,7 +100,6 @@ void bcfanno_config_destroy(struct bcfanno_config *config)
     free(config);    
 }
 
-
 static int load_config_core(struct bcfanno_config *config, kson_t *json)
 {
     const kson_node_t *root = json->root;
@@ -106,22 +109,25 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 
 #define BRANCH_INIT(_node) ( (_node)->v.str == NULL ? NULL : strdup((_node)->v.str) )
     int i;
-    for (i = 0; i < root->n; ++i ) {
+    for ( i = 0; i < root->n; ++i ) {
 	const kson_node_t *node = kson_by_index(root, i);
 	if ( node == NULL )
 	    continue;
 	if ( node->key == NULL) {
-	    warnings("Foramt error. Node key is empty. skip..");
+	    warnings("Format error. Node key is empty. skip..");
 	    continue;
 	}
 	// the summary informations should in the top level
 	if ( strcmp(node->key, "Author") == 0 || strcmp(node->key, "author") == 0) {
 	    config->author = BRANCH_INIT(node);
-	} else if ( strcmp(node->key, "ID") == 0 || strcmp(node->key, "id") == 0) {
+	}
+        else if ( strcmp(node->key, "ID") == 0 || strcmp(node->key, "id") == 0) {
 	    config->config_id = BRANCH_INIT(node);
-	} else if ( strcmp(node->key, "ref") == 0 || strcmp(node->key, "reference") == 0) {
+	}
+        else if ( strcmp(node->key, "ref") == 0 || strcmp(node->key, "reference") == 0) {
 	    config->reference_path = BRANCH_INIT(node);
-	} else if ( strcmp(node->key, "HGVS") == 0 || strcmp(node->key, "hgvs") == 0) {
+	}
+        else if ( strcmp(node->key, "HGVS") == 0 || strcmp(node->key, "hgvs") == 0) {
 	    if ( node->type != KSON_TYPE_BRACE)
 		error("Format error. Configure for HGVS format should looks like :\n"
 		      "\"hgvs\":{\n \"gene_data\":\"genepred.txt.gz\",\n}"
@@ -152,7 +158,8 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 		error("No refseq.fa specified in HGVS configure.");
             
 	    refgene_config->refgene_is_set = 1;
-	} else if ( strcmp(node->key, "vcfs") == 0) {
+	}
+        else if ( strcmp(node->key, "vcfs") == 0) {
 	    if ( node->type != KSON_TYPE_BRACKET )
 		error("Format error, configure for vcf databases should looks like :\n"
 		      "\"vcfs\":[\n{\n\"file\":\"file.vcf.gz\",\"columns\":\"TAGS,TAGS\",\n},\n{},\n]"
@@ -201,7 +208,8 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 	    if (n_files == 0 && vcfs_config->n_vcfs)
 		free(vcfs_config->files);
 	    vcfs_config->n_vcfs = n_files;
-	} else if ( strcmp(node->key, "beds") == 0 ) {
+	}
+        else if ( strcmp(node->key, "beds") == 0 ) {
 	    if ( node->type != KSON_TYPE_BRACKET )
 		error("Format error, configure for vcf databases should looks like :\n"
 		      "\"beds\":[\n{\n\"file\":\"file.bed.gz\",\"header\":\"TAGS,TAGS\",\n},\n{},\n]"
@@ -248,7 +256,35 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 	    if ( n_files == 0 && beds_config->n_beds )
 		free(beds_config->files);
 	    beds_config->n_beds = n_files;	    
-	} else {
+	}
+        else if ( strcmp(node->key, "module") == 0 || strcmp(node->key, "modules") == 0 || strcmp(node->key, "plugins") == 0 || strcmp(node->key, "plugin") == 0 ) {
+	    if ( node->type != KSON_TYPE_BRACKET )
+		error("Format error, configure for vcf databases should looks like :\n"
+		      "\"modules\":[\n\"api1\",\"api2\",\n]"
+		    );
+	    if ( node->n == 0) {
+		warnings("Empty modules configure. Skip ..");
+		continue;
+	    }
+            struct modules_config *modules_config = &config->modules;
+            modules_config->n_modules = (int)node->n;
+            modules_config->files = (struct file_config*)malloc(modules_config->n_modules*sizeof(struct file_config));
+            int n_files = 0;
+            int j;
+            for ( j = 0; j < node->n; ++j) {
+                const kson_node_t *node1 = node->v.child[j];
+                if ( node1 == NULL )
+                    continue;
+                
+                struct file_config *file_config = &modules_config->files[n_files];
+                file_config->fname = BRANCH_INIT(node1);
+                file_config->columns = NULL;
+                if ( file_config->fname == NULL )
+                    continue;
+                n_files++;
+            }
+        }
+        else {
 	    warnings("Unknown key : %s. skip ..", node->key);
 	}
     }

@@ -608,7 +608,7 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
                         } else if ( right_type & REG_UTR3 ) {
                             // all the cds region enclosed in one exon, closed with UTRs
                             int loc1 = right_loc - right_offset;
-v                            if ( loc1 <= 0 ) {
+                            if ( loc1 <= 0 ) {
                                 loc = 1 - loc;
                                 type = REG_CODING;
                             } else {

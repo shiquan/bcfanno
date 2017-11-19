@@ -22,70 +22,57 @@
     DEALINGS IN THE SOFTWARE. 
 */
 
-#ifndef VCFANNO_PLUGIN_HEADER
-#define VCFANNO_PLUGIN_HEADER
+#ifndef BCFANNO_PLUGIN_HEADER
+#define BCFANNO_PLUGIN_HEADER
 
 #include <stdio.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <string.h>
-#include <errno.h>
-#include <htslib/vcf.h>
-#include <dlfcn.h>
-#include "anno.h"
+#include <stdlib.h>
 
-struct header_cols {
-    const char *key;
-    int col; // column number in the process() returned
-    const char *hdr_line;
+struct pl_header {
+    int n_records;
+    char **records;
 };
 
-// process function only return a point to the results structure. Do NOT free it anyway.
-// To free this structure, just refer to final() at the last.
-struct process_results {
-    int num_fields;
-    int n_row, m_row;
-    char **data;
+// replace mark for VCF tag
+#ifndef REPLACE_MISSING
+#define REPLACE_MISSING  0 // replace only missing values
+#endif
+
+#ifndef REPLACE_ALL
+#define REPLACE_ALL      1 // replace both missing and existing values
+#endif
+
+#ifndef REPLACE_EXISTING
+#define REPLACE_EXISTING 2 // replace only if tgt is not missing
+#endif
+
+#ifndef SET_OR_APPEND
+#define SET_OR_APPEND    3 // set new value if missing or non-existent, append otherwise
+#endif
+
+enum info_type {
+    info_val_is_flag = 0,
+    info_val_is_float,
+    info_val_is_int,
+    info_val_is_str,
 };
 
-// init function 
-// input: columns, column number
-// output: column struct
-// return state
-typedef void* (*dl_init_func)(char*, int *); 
-// about function
-// return short description
-typedef char * (*dl_about_func)(void);
-// test function
-// only test the plugion works
-typedef int (*dl_test_func)(void);
-// process function
-// return information on this position
-typedef void *(*dl_process_func)(char *chrom, int start, int end);
-// final function
-// close and release memory
-typedef int (*dl_final_func)(void);
-
-struct plugin_funcs {
-    dl_init_func init;
-    dl_about_func about;
-    dl_process_func process;
-    dl_final_func final;
+struct pl_column {
+    int number;
+    int replace;
+    char *key;
+    enum info_type type;
+    int n;
+    union {
+        int32_t *i;
+        float *f;
+        char *str;
+    } value;
 };
 
-struct plugin_spec {
-    int ncols;
-    struct anno_col *cols;
-    struct plugin_funcs funcs;
+struct module_data {
+    int n_cols;
+    struct pl_column *data;
 };
-
-struct plugin_specs {
-    int n, m;
-    struct plugin_spec *specs;
-};
-
-extern int plugins_init(const char *name, struct plugin_spec *spec);
-extern bcf1_t* plugins_process(bcf_hdr_t *hdr, bcf1_t *line);
-extern void close_plugins();
 
 #endif

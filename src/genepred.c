@@ -1,11 +1,32 @@
+/*  
+    Copyright (C) 2016,2017  BGI Research
 
+    Author: Shi Quan (shiquan@genomics.cn)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE. 
+*/
 
 #include "utils.h"
 #include "genepred.h"
 #include "number.h"
 #include "sort_list.h"
 #include "zlib.h"
-//#include "file.h"
 #include "htslib/tbx.h"
 #include "htslib/khash.h"
 #include "htslib/hfile.h"
@@ -51,24 +72,6 @@ int file_seek(htsFile *fp, long offset, int where)
 }
 
 #endif
-
-#define GENEPRED_CIGAR_UNKNOWN_BASE '*'
-#define GENEPRED_CIGAR_MATCH_BASE   'M'
-#define GENEPRED_CIGAR_DELETE_BASE  'D'
-#define GENEPRED_CIGAR_INSERT_BASE  'I'
-
-// The fields cigar packed counts and cigar type, as follows:
-//
-//   offset   bits  value
-//   0        3     cigar_type
-//   4        32    cigar_counts
-//
-#define GENEPRED_CIGAR_PACKED_FIELD 3
-#define GENEPRED_CIGAR_UNKNOWN_TYPE 0
-#define GENEPRED_CIGAR_MATCH_TYPE   1
-#define GENEPRED_CIGAR_DELETE_TYPE  2
-#define GENEPRED_CIGAR_INSERT_TYPE  4
-#define GENEPRED_CIGAR_MASK_TYPE    7
 
 struct list *init_list(const char *fn)
 {
