@@ -111,6 +111,7 @@ void clean_IDdata(struct IDdata *IDdata)
 
     if ( IDdata->extra )
         free(IDdata->extra);
+    memset(IDdata, 0, sizeof(struct IDdata));    
 }
 static int parse_IDdata(char *str, int l, struct IDdata *IDdata)
 {
@@ -365,12 +366,17 @@ void clean_handler()
     if ( handler.itr )
         tbx_itr_destroy(handler.itr);
 
+    handler.itr = NULL;
+    
     if ( handler.start )
         list_lite_del(&handler.start, genepred_line_destroy);
 
+    handler.start = NULL;
+    
     if ( handler.end )
         list_lite_del(&handler.end, genepred_line_destroy);
-
+    handler.end = NULL;
+    
 }
 int fill_handler()
 {
@@ -470,7 +476,12 @@ void output_handler()
         for ( ;; ) {
             if ( line == NULL ) break;
             convert_transLite(bed->start, line, &transLite);
-            ksprintf(&des, "%s(%s):n.%d,%d|", line->name1, line->name2, transLite.loc, transLite.offset);
+            if ( transLite.offset > 0 )
+                ksprintf(&des, "%s(%s):n.%d+%d,EX%d|", line->name1, line->name2, transLite.pos, transLite.offset, transLite.exon_id+1);
+            else if ( transLite.offset < 0 )
+                ksprintf(&des, "%s(%s):n.%d%d,EX%d|", line->name1, line->name2, transLite.pos, transLite.offset, transLite.exon_id+1);
+            else
+                ksprintf(&des, "%s(%s):n.%d,EX%d|", line->name1, line->name2, transLite.pos, transLite.exon_id+1);
             line = line->next;
         }
         kputc(';', &des);
@@ -485,7 +496,13 @@ void output_handler()
         for ( ;; ) {
             if ( line == NULL ) break;
             convert_transLite(bed->end, line, &transLite);
-            ksprintf(&des, "%s(%s):n.%d,%d|", line->name1, line->name2, transLite.loc, transLite.offset);
+            if ( transLite.offset > 0 )
+                ksprintf(&des, "%s(%s):n.%d+%d,EX%d|", line->name1, line->name2, transLite.pos, transLite.offset, transLite.exon_id+1);
+            else if ( transLite.offset < 0 )
+                ksprintf(&des, "%s(%s):n.%d%d,EX%d|", line->name1, line->name2, transLite.pos, transLite.offset, transLite.exon_id+1);
+            else
+                ksprintf(&des, "%s(%s):n.%d,EX%d|", line->name1, line->name2, transLite.pos, transLite.exon_id+1);
+
             line = line->next;
         }
         kputc(';', &des);        
