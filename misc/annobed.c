@@ -59,6 +59,9 @@ struct args {
 
     // if set , output standard bedDetail format with track name
     int         UCSC_bedDetails_flag;
+    // default output name when name region covered target region.
+    // if set, output name when target region covered name region
+    int         inc_flag;
     
     htsFile    *fp_data;
     htsFile    *fp_name;
@@ -76,6 +79,8 @@ struct args {
     .fp_name     = NULL,
     .idx_data    = NULL,
     .idx_name    = NULL,
+    .UCSC_bedDetails_flag = 0,
+    .inc_flag    = 0,
 };
 
 int usage()
@@ -84,6 +89,7 @@ int usage()
             "-data  <FILE>   genepredPlus database\n"
             "-name  <FILE>   database for annotate name column\n"
             "-ucsc           output UCSC bedDatail format flag\n"
+            "-inc            report name if target region covered name region\n"
             "Version : %s\n"
             "https://github.com/shiquan/bcfanno\n", 
             annobed_version);
@@ -462,10 +468,18 @@ void output_handler()
                 break;
             
             parse_IDdata(str.s, str.l, &handler.IDdata);
-            
-            if ( bed->start >= handler.IDdata.start && bed->end <= handler.IDdata.end ) {
-                if ( name.l ) kputc(',', &name);
-                kputs(handler.IDdata.extra, &name);
+
+            if ( args.inc_flag == 0 ) {
+                if ( bed->start >= handler.IDdata.start && bed->end <= handler.IDdata.end ) {
+                    if ( name.l ) kputc(',', &name);
+                    kputs(handler.IDdata.extra, &name);
+                }
+            }
+            else {
+                if ( bed->start <= handler.IDdata.start && bed->end >= handler.IDdata.end ) {
+                    if ( name.l ) kputc(',', &name);
+                    kputs(handler.IDdata.extra, &name);
+                }                
             }
         }
     }
@@ -555,6 +569,15 @@ int parse_args(int argc, char **argv)
             continue;
         }
 
+        if ( strcmp(a, "-ucsc") == 0 ) {
+            args.UCSC_bedDetails_flag = 1;
+            continue;
+        }
+        else if ( strcmp(a, "-inc") == 0 ) {
+            args.inc_flag = 1;
+            continue;
+        }
+        
         error("Unknown argument, %s.", a);
     }
 
