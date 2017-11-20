@@ -84,7 +84,10 @@ int usage()
             "-data  <FILE>   genepredPlus database\n"
             "-name  <FILE>   database for annotate name column\n"
             "-ucsc           output UCSC bedDatail format flag\n"
-        );    
+            "Version : %s\n"
+            "https://github.com/shiquan/bcfanno\n", 
+            annobed_version);
+            
     return 1;
 }
 struct bedDetail {
