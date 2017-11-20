@@ -37,6 +37,13 @@ const char *annobed_version = "1.0";
 // History:
 // v1.0   - init version, simple annotate simple 3 columns bed file with genepred and id databases
 
+enum name_mode {
+    default_mode,
+    include_mode,
+    exclude_mode,
+    overlap_mode,
+};
+
 struct args {
 
     // input file, force to be 3 column BED format
@@ -59,9 +66,8 @@ struct args {
 
     // if set , output standard bedDetail format with track name
     int         UCSC_bedDetails_flag;
-    // default output name when name region covered target region.
-    // if set, output name when target region covered name region
-    int         inc_flag;
+
+    enum name_mode mode;
     
     htsFile    *fp_data;
     htsFile    *fp_name;
@@ -80,16 +86,16 @@ struct args {
     .idx_data    = NULL,
     .idx_name    = NULL,
     .UCSC_bedDetails_flag = 0,
-    .inc_flag    = 0,
+    .mode        = default_mode,
 };
 
 int usage()
 {
     fprintf(stderr, "annobed [options] [input.bed]\n"
-            "-data  <FILE>   genepredPlus database\n"
-            "-name  <FILE>   database for annotate name column\n"
-            "-ucsc           output UCSC bedDatail format flag\n"
-            "-inc            report name if target region covered name region\n"
+            "-data  <FILE>     genepredPlus database\n"
+            "-name  <FILE>     database for annotate name column\n"
+            "-ucsc             output UCSC bedDatail format flag\n"
+            "-mode [in|ex|ov]  rules to annotate names\n"
             "Version : %s\n"
             "https://github.com/shiquan/bcfanno\n", 
             annobed_version);
@@ -469,17 +475,21 @@ void output_handler()
             
             parse_IDdata(str.s, str.l, &handler.IDdata);
 
-            if ( args.inc_flag == 0 ) {
+            if ( args.mode == default_mode || args.mode  == exclude_mode ) {
                 if ( bed->start >= handler.IDdata.start && bed->end <= handler.IDdata.end ) {
                     if ( name.l ) kputc(',', &name);
                     kputs(handler.IDdata.extra, &name);
                 }
             }
-            else {
+            else if ( args.mode == include_mode ) {
                 if ( bed->start <= handler.IDdata.start && bed->end >= handler.IDdata.end ) {
                     if ( name.l ) kputc(',', &name);
                     kputs(handler.IDdata.extra, &name);
                 }                
+            }
+            else {
+                if ( name.l ) kputc(',', &name);
+                kputs(handler.IDdata.extra, &name);
             }
         }
     }
@@ -547,6 +557,7 @@ int parse_args(int argc, char **argv)
     if ( argc == 1 )
         return usage();
 
+    const char *mode = 0;
     int i;
     for ( i = 1; i < argc; ) {
         const char *a = argv[i++];
@@ -556,7 +567,9 @@ int parse_args(int argc, char **argv)
             var = & args.data_fname;
         else if ( strcmp(a, "-name") == 0 )
             var = & args.name_fname;
-
+        else if ( strcmp(a, "-mode") == 0 )
+            var = & mode;
+        
         if ( var != 0 ) {
             if ( argc == i )
                 error("Missing argument after %s.", a);
@@ -571,10 +584,6 @@ int parse_args(int argc, char **argv)
 
         if ( strcmp(a, "-ucsc") == 0 ) {
             args.UCSC_bedDetails_flag = 1;
-            continue;
-        }
-        else if ( strcmp(a, "-inc") == 0 ) {
-            args.inc_flag = 1;
             continue;
         }
         
@@ -609,7 +618,18 @@ int parse_args(int argc, char **argv)
     args.idx_data = tbx_index_load(args.data_fname);
     if ( args.idx_data == NULL )
         error("Failed to load index file of %s.", args.data_fname);
-    
+
+    if ( mode != NULL ) {
+        if (strcmp(mode, "in") == 0 )
+            args.mode = include_mode;
+        else if ( strcmp(mode, "ex") == 0 )
+            args.mode = exclude_mode;
+        else if ( strcmp(mode, "ov") == 0 )
+            args.mode = overlap_mode;
+        else
+            error("Unknown mode to annotate names, %s.", mode);
+    }
+
     return 0;
 }
 
