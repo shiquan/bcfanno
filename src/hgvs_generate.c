@@ -441,11 +441,11 @@ static int describe_vartype(struct genepred *line, int l1, int l2, struct hgvs_d
     // for intron block
     if ( type->start_flag & 1) {
         if ( upstream_offset < 3)
-            type->vartype = var_is_splice_donor;
+            type->vartype2 = var_is_splice_donor;
         else if ( downstream_offset < 3)
-            type->vartype = var_is_splice_acceptor;
-        else
-            type->vartype = var_is_intron;
+            type->vartype2 = var_is_splice_acceptor;
+        //else
+        type->vartype = var_is_intron;
         return 0;
     }
    
@@ -567,7 +567,7 @@ static int generate_hgvs_location(struct genepred *line, struct hgvs_des *des, s
             if ( left_offset > right_offset ) {
                 loc = right_loc;
                 type = right_type;                
-                offset = line->strand == '+' ? -1 * right_offset : right_offset;            
+                offset = line->strand == '+' ? -1 * right_offset : right_offset;
             } else {
                 loc = left_loc;
                 type = left_type;                
@@ -749,7 +749,7 @@ static int set_empty_hgvs(struct hgvs *name )
     return 0;
 }
 // return 0 on success, including ref pos, 1 on failure
-static int generate_hgvs_core(struct genepred *line, struct hgvs_des *des, struct hgvs_core *c)
+static int generate_hgvsname1(struct genepred *line, struct hgvs_des *des, struct hgvs_core *c)
 {
     hgvs_core_clear(c);
     kstring_t *string = &c->str;
@@ -853,7 +853,7 @@ static void generate_hgvs(struct refgene_options *opts, bcf1_t *line)
             if ( des->type != var_type_snp )
                 indel2repeat(des, gl, opts->refseq_fai, opts->fp);
             
-	    if ( generate_hgvs_core(gl, des, core) != 0)
+	    if ( generate_hgvsname1(gl, des, core) != 0)
 		continue;
             
 	    name->l++;
@@ -1271,9 +1271,9 @@ int main(int argc, char **argv)
 	error("No input file ! Use -h for more informations.");
  
     if (opts.genepred_fname == 0)
-	error("Gene preditions database is needed. Download refGene.txt.gz or ensGene.txt.gz from UCSC websites and sort and indexed by tabix.");
+	error("genepredPlus database is required.");
     if ( opts.refseq_fname == 0 )
-        error("Refseq databases is need.");
+        error("Refseq databases is required.");
     
     refgene_set_refgene_fname(&opts, opts.genepred_fname);
     refgene_set_refseq_fname(&opts, opts.refseq_fname);

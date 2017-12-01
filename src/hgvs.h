@@ -51,6 +51,9 @@ enum func_region_type {
 struct var_func_type {
     enum func_region_type func;
     enum var_type vartype;
+    // update:2017/12/01
+    // another type to mark splice site, in case lost variants type in splice sites
+    enum var_type_splice vartype2;
     // Exon or intron count. Start from 1.
     int count;
     // CDS count, for noncoding transcript always be 0.

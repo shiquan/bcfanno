@@ -674,7 +674,10 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     int i;    // Exon or intron id.
     int h;    // CDS id.
     int cds_pos;
-    type->vartype = var_is_unknown;
+    type->vartype  = var_is_unknown;
+    
+    type->vartype2 = var_is_not_splice;
+    
     // check the splice sites
 #define BRANCH(_type) do {                              \
         if ( type->vartype == var_is_unknown ) {        \
@@ -690,11 +693,12 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             // block found
             if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i] ) {
                 if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE) {
-                    type->vartype = var_is_splice_site;
+                    //type->vartype = var_is_splice_site;
+                    type->vartype2 = var_is_splice_site;
                 }
                 // in case indels cover splice site
                 else if ( pos + ref_length <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) {
-                    type->vartype = var_is_splice_site;
+                    type->vartype2 = var_is_splice_site;
                 }
                 break;
             }
@@ -717,11 +721,11 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
 
             if ( pos >= line->loc[BLOCK_END][j] && pos <= line->loc[BLOCK_START][j] ) {
                 if (pos <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE) {
-                    type->vartype = var_is_splice_site;
+                    type->vartype2 = var_is_splice_site;
                 }
                 // in case indels cover splice site
                 else if ( pos + ref_length <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE ) {
-                    type->vartype = var_is_splice_site;
+                    type->vartype2 = var_is_splice_site;
                 }
                 break;
             }
@@ -739,25 +743,28 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
 
     // check if variantion located in the splice sites around the edge of utr and cds regions    
     if ( offset < 0 ) {
+        type->vartype = var_is_intron;
         if ( offset > -SPLICE_SITE_EXON_RANGE )
-            type->vartype = var_is_splice_acceptor;
-        else
-            type->vartype = var_is_intron;
+            type->vartype2 = var_is_splice_acceptor;
+        //else
+        //   type->vartype = var_is_intron;
         
         goto no_amino_code;
     }
     else if ( offset > 0 ) {
+        type->vartype = var_is_intron;
+        
         if ( offset < SPLICE_SITE_EXON_RANGE )
-            type->vartype = var_is_splice_donor;
-        else
-            type->vartype = var_is_intron;
+            type->vartype2 = var_is_splice_donor;
+        //else
+        //type->vartype = var_is_intron;
         goto no_amino_code;
     }
     else if ( pos > line->utr5_length - SPLICE_SITE_EXON_RANGE && pos < line->utr5_length + SPLICE_SITE_EXON_RANGE ) {
-        type->vartype = var_is_splice_site;
+        type->vartype2 = var_is_splice_site;
     }
     else if ( pos > line->cds_length - SPLICE_SITE_EXON_RANGE && pos < line->cds_length + SPLICE_SITE_EXON_RANGE ) {
-        type->vartype = var_is_splice_site;
+        type->vartype2 = var_is_splice_site;
     }
     
     // Check if noncoding transcript.
@@ -775,7 +782,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     }
 
     if ( pos <= line->utr5_length ) {
-        type->vartype = var_is_splice_site;
+        type->vartype2 = var_is_splice_site;
         goto no_amino_code;
     }
 
@@ -787,7 +794,7 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
     }
 
     if ( pos >= line->cds_length ) {
-        type->vartype = var_is_splice_site;
+        type->vartype2 = var_is_splice_site;
         goto no_amino_code;
     }
     if ( offset != 0 )

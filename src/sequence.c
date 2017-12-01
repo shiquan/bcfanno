@@ -124,11 +124,11 @@ enum var_type check_var_type(char *block, int block_length, int start, char *ref
 //    if ( block_length%3 )
     //      error("transcript block is incomplete. %d.", block_length);
 
-    int codon_start = start/3;
-    int codon_length = block_length/3;
+    //int codon_start = start/3;
+    //int codon_length = block_length/3;
 
-    if ( codon_start == 0 || codon_start == codon_length -1 )
-        return var_is_splice_site;
+    //if ( codon_start == 0 || codon_start == codon_length -1 )
+    //return var_is_splice_site;
     
     // deletion
     if ( ref_length > alt_length ) {

@@ -5,15 +5,15 @@ all: $(PROG)
 
 debug: $(DEBUG_PROG)
 
-HTSDIR = htslib-1.3
+HTSDIR = htslib-1.6
 include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
 
 CC       = gcc
-CFLAGS   = -Wall -O3 -DHTS3
-DEBUG_CFLAGS   = -g -Wall -O0 -DHTS3 -DDEBUG_MODE
+CFLAGS   = -Wall -O3 
+DEBUG_CFLAGS   = -g -Wall -O0 -DDEBUG_MODE
 DFLAGS   =
-INCLUDES = -I src/ -I. -I$(HTSDIR)/
+INCLUDES = -I src/ -I. -I$(HTSDIR)/ -I misc/
 
 
 all:$(PROG)
@@ -51,14 +51,15 @@ force:
 
 #plugins: $(PLUGINS)
 
-#hgvs_generate: $(HTSLIB) 
-#	$(CC) -D_HGVS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ sequence.c genepred.c hgvs_generate.c $(HTSLIB)
 
 hgvs_vcf: $(HTSLIB)
 	$(CC) -DHGVS_VCF_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/hgvs_vcf.c src/hgvs.c src/sequence.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
 
 annobed: $(HTSLIB)
 	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/annobed.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
+
+genepredPlus_convertor: $(HTSLIB)
+	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/genepredPlus_convertor.c misc/kthread.c misc/ksw.c src/genepred.c src/number.c src/faidx_def.c $(HTSLIB)
 
 vcfadd: $(HTSLIB) 
 	$(CC) -D_VCF_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/vcf_annos.c src/json_config.c src/config.c src/kson.c src/vcmp.c $(HTSLIB)
