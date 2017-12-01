@@ -5,7 +5,7 @@ all: $(PROG)
 
 debug: $(DEBUG_PROG)
 
-HTSDIR = htslib-1.3
+HTSDIR = htslib-1.6
 include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
 
