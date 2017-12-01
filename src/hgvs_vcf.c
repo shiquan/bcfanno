@@ -493,11 +493,16 @@ static char *retrieve_vartype_des(struct hgvs_des *des)
         struct var_func_type *type = &des->a[i].type;
         if ( i ) kputc('|', &string);
         // update 2017/12/01: splice site nomencluture
-        if ( type->vartype2 != var_is_not_splice ) 
+        if ( type->vartype2 != var_is_not_splice )  {
             kputs(var_type_splice_string(type->vartype2), &string);
         
-        if ( type->vartype != var_is_intron && type->vartype != var_is_reference)
-            ksprintf(&string, "(%s)", var_type_string(type->vartype));;
+            if ( type->vartype != var_is_intron && type->vartype != var_is_reference)
+                ksprintf(&string, "(%s)", var_type_string(type->vartype));
+        }
+        else {
+            kputs(var_type_string(type->vartype), &string);
+        }
+            
     }
     return string.s;
 }

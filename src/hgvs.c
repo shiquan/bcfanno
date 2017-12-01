@@ -692,13 +692,15 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
                 h++;
             // block found
             if ( pos >= line->loc[BLOCK_START][i] && pos <= line->loc[BLOCK_END][i] ) {
-                if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE) {
+                if ( offset == 0 ) {
+                    if ( pos <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE) {
                     //type->vartype = var_is_splice_site;
-                    type->vartype2 = var_is_splice_site;
-                }
-                // in case indels cover splice site
-                else if ( pos + ref_length <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) {
-                    type->vartype2 = var_is_splice_site;
+                        type->vartype2 = var_is_splice_site;
+                    }
+                    // in case indels cover splice site
+                    else if ( pos + ref_length <= line->loc[BLOCK_START][i] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_END][i] - SPLICE_SITE_EXON_RANGE ) {
+                        type->vartype2 = var_is_splice_site;
+                    }
                 }
                 break;
             }
@@ -713,19 +715,22 @@ static int check_func_vartype(struct genepred_line *line, int pos, int offset, i
             // for intron, cds count should be 0
             type->count2 = 0;
         }
-    } else {
+    }
+    else {
         for ( i = 0, h = 0; i < line->exon_count; ) {
             int j = line->exon_count - i - 1;
             if ( line->loc[BLOCK_START][j] > line->utr5_length && pos > line->utr5_length && pos <= line->cds_length)
                 h++;
 
             if ( pos >= line->loc[BLOCK_END][j] && pos <= line->loc[BLOCK_START][j] ) {
-                if (pos <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE) {
-                    type->vartype2 = var_is_splice_site;
-                }
-                // in case indels cover splice site
-                else if ( pos + ref_length <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE ) {
-                    type->vartype2 = var_is_splice_site;
+                if ( offset == 0 ) {
+                    if (pos <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE) {
+                        type->vartype2 = var_is_splice_site;
+                    }
+                    // in case indels cover splice site
+                    else if ( pos + ref_length <= line->loc[BLOCK_END][j] + SPLICE_SITE_EXON_RANGE || pos + ref_length >= line->loc[BLOCK_START][j] - SPLICE_SITE_EXON_RANGE ) {
+                        type->vartype2 = var_is_splice_site;
+                    }
                 }
                 break;
             }
