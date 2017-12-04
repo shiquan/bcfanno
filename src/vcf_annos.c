@@ -107,6 +107,7 @@ int bcf_update_info_fixed(const bcf_hdr_t *hdr, bcf1_t *line, const char *key, c
         else
         {
             //assert( !inf->vptr_free );  // fix the caller or improve here: this has been modified before
+
             bcf_unpack_info_core1((uint8_t*)str.s, inf);
             inf->vptr_free = 1;
             line->d.shared_dirty |= BCF1_DIRTY_INF;
@@ -313,7 +314,7 @@ int setter_ARinfo_int32(struct vcfs_options *opts, bcf1_t *line, struct anno_col
 
         opts->tmpi2[i] = opts->tmpi[ map[i] ];
     }
-    return bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi2,ndst);
+    return bcf_update_info_int32_fixed(opts->hdr_out,line,col->hdr_key,opts->tmpi2,ndst);
 
 }
 int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
@@ -342,7 +343,7 @@ int setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *co
             return 0;
     }
 
-    return bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
+    return bcf_update_info_int32_fixed(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
 }
 int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -365,7 +366,7 @@ int vcf_setter_info_int(struct vcfs_options *opts, bcf1_t *line, struct anno_col
         if ( ret>0 && opts->tmpi2[0]!=bcf_int32_missing ) return 0;
     }
 
-    return bcf_update_info_int32(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
+    return bcf_update_info_int32_fixed(opts->hdr_out,line,col->hdr_key,opts->tmpi,ntmpi);
 }
 int setter_ARinfo_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpf)
 {
@@ -399,7 +400,7 @@ int setter_ARinfo_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col 
 
         opts->tmpf2[i] = opts->tmpf[ map[i] ];
     }
-    return bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf2,ndst);
+    return bcf_update_info_float_fixed(opts->hdr_out,line,col->hdr_key,opts->tmpf2,ndst);
 }
 int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
 {
@@ -429,7 +430,7 @@ int setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *c
             return 0;
     }
 
-    return bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
+    return bcf_update_info_float_fixed(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
 
 }
 int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_col *col, void *data)
@@ -453,7 +454,7 @@ int vcf_setter_info_real(struct vcfs_options *opts, bcf1_t *line, struct anno_co
         if ( ret>0 && !bcf_float_is_missing(opts->tmpf2[0]) ) return 0;
     }
 
-    return bcf_update_info_float(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
+    return bcf_update_info_float_fixed(opts->hdr_out,line,col->hdr_key,opts->tmpf,ntmpf);
 }
 
 int copy_string_field(char *src, int isrc, int src_len, kstring_t *dst, int idst)
