@@ -74,7 +74,7 @@ static namehash_type *init_gene_name(const char *name)
 	return NULL;
     hash = kh_init(name);
 
-    for ( i = 0; i < n; ++n ) {
+    for ( i = 0; i < n; ++i ) {
        k = kh_put(name, hash, names[i], &ret);
     }
     return hash;
@@ -147,7 +147,6 @@ int hgvs_bcf_header_add_vartype(bcf_hdr_t *hdr)
     }
     return id;
 }
-
 char *describe_description(struct hgvs_des *des)
 {
     kstring_t string = KSTRING_INIT;

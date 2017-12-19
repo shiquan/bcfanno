@@ -488,6 +488,7 @@ int main(int argc, char **argv)
 {
     if ( argc == 1 )
 	error("Usage : bed_annos -c config.json -O z -o output.vcf.gz input.vcf.gz");
+
     int i;
     for ( i = 1; i < argc; ) {
 	const char *a = argv[i++];
@@ -517,11 +518,15 @@ int main(int argc, char **argv)
     struct bcfanno_config *con = bcfanno_config_init();
     if ( bcfanno_load_config(con, json_fname) != 0 )
 	error("Failed to load configure file. %s : %s", json_fname, strerror(errno));
-    bcfanno_config_debug(con);
+
+    //bcfanno_config_debug(con);
+
     if ( con->beds.n_beds == 0)
 	error("No bed database specified.");
+
     if ( input_fname == 0 && (!isatty(fileno(stdin))) )
 	input_fname = "-";
+
     if ( input_fname == 0 )
 	error("No input file.");
 
@@ -551,8 +556,10 @@ int main(int argc, char **argv)
     bcf_hdr_t *hdr = bcf_hdr_read(fp);
     if ( hdr == NULL )
 	error("Failed to parse header.");	
+
     bcf_hdr_t *hdr_out = bcf_hdr_dup(hdr);    
     htsFile *fout = output_fname == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(output_fname, hts_bcf_wmode(out_type));
+
     struct beds_options opts = { .beds_is_inited = 0,};
     beds_options_init(&opts);
     opts.hdr_out = hdr_out;

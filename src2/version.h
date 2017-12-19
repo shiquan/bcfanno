@@ -1,0 +1,1 @@
+#define BCFANNO_VERSION "0.01"

@@ -8,18 +8,6 @@
 #include <htslib/tbx.h>
 #include "anno.h"
 
-/* struct bed_anno_file_col { */
-/*     int hdr_id; */
-/*     int icol; // column number in bed file */
-/*     char *a; */
-/* }; */
-
-/* struct bed_anno_line { */
-/*     int rid; */
-/*     int start; // 0based start */
-/*     int end; // 1based end */
-/*     struct bed_anno_col *cols; */
-/* }; */
 struct beds_anno_tsv {
     int nfields;
     int *fields;
