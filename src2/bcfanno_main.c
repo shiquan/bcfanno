@@ -411,6 +411,9 @@ int annotate()
     // lightweight mode
     if ( args.n_thread == 1 ) return annotate_light();
 
+    // keep 1 thread to maintain main stream    
+    args.n_thread = args.n_thread-1;
+    
     // multi thread mode
     struct thread_pool *p = thread_pool_init(args.n_thread);
     struct thread_pool_process *q = thread_pool_process_init(p, args.n_thread*2, 0);

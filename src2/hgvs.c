@@ -582,7 +582,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
 		    for ( i = 0; i < str.l/3; ++i )
 			if ( check_is_stop(str.s+i*3) ) break;
 		    type->fs = ori_stop == i +1 ? -1 : i+1;
-		    assert(str.l > 3);
+		    assert(str.l >= 3);
 		    memcpy(codon, str.s, 3);
 		    type->mut_amino = codon2aminoid(codon);
 		    if ( str.m ) free(str.s);

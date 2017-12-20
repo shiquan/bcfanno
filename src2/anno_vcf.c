@@ -129,10 +129,9 @@ static struct anno_vcf_buffer *anno_vcf_buffer_init()
 static void anno_vcf_buffer_destroy(struct anno_vcf_buffer *b)
 {
     int i;
-    for ( i = 0; i < b->max; ++i )
-        bcf_destroy(b->buffer[i]);
-    if ( b->vcmp )
-        vcmp_destroy(b->vcmp);
+    for ( i = 0; i < b->max; ++i ) bcf_destroy(b->buffer[i]);
+    if ( b->buffer ) free(b->buffer);
+    if ( b->vcmp ) vcmp_destroy(b->vcmp);        
     if ( b->tmpi )    free(b->tmpi);    
     if ( b->tmpi2 )   free(b->tmpi2);
     if ( b->tmpi3 )   free(b->tmpi3);
