@@ -218,7 +218,7 @@ int parse_args(int argc, char **argv)
 	    var = &args.fname_output;
 	else if ( strcmp(a, "-O") == 0 || strcmp(a, "--output-type") == 0 )
 	    var = &output_fname_type;
-        else if ( strcmp(a, "-t") == 0 || strcmp(a, "-thread") == 0 )            
+        else if ( strcmp(a, "-t") == 0 || strcmp(a, "-thread") == 0 )
             var = &thread;
         else if ( strcmp(a, "-r") == 0 || strcmp(a, "-record") == 0 )
             var = &record;

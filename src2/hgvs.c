@@ -582,7 +582,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
 		    for ( i = 0; i < str.l/3; ++i )
 			if ( check_is_stop(str.s+i*3) ) break;
 		    type->fs = ori_stop == i +1 ? -1 : i+1;
-		    assert(str.l >= 3);
+		    if (str.l < 3) error("Failed to predict variant type. %s %d %s %s", hgvs->chr, hgvs->start, hgvs->ref, hgvs->alt);
 		    memcpy(codon, str.s, 3);
 		    type->mut_amino = codon2aminoid(codon);
 		    if ( str.m ) free(str.s);

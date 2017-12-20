@@ -1,4 +1,4 @@
-PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags annobed
+PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags
 DEBUG_PROG= bcfanno_debug
 
 all: $(PROG)
@@ -19,13 +19,8 @@ INCLUDES = -I src/ -I. -I$(HTSDIR)/ -I misc/
 all:$(PROG)
 
 # See htslib/Makefile
-PACKAGE_VERSION = 0.01
-ifneq "$(wildcard .git)" ""
 PACKAGE_VERSION := $(shell git describe --tags)
-DOC_VERSION :=  $(shell git describe --tags)+
-DOC_DATE := $(shell date +'%Y-%m-%d %R %Z')
-version.h: $(if $(wildcard version.h),$(if $(findstring "$(PACKAGE_VERSION)",$(shell cat version.h)),,force))
-endif
+
 version.h:
 	echo '#define BCFANNO_VERSION "$(PACKAGE_VERSION)"' > $@
 
@@ -39,33 +34,8 @@ force:
 	$(CC) -c $(CFLAGS) $(DFLAGS) $(INCLUDES) $< -o $@
 
 
-# Plugin rules
-#PLUGINC = $(foreach dir, plugins, $(wildcard $(dir)/*.c))
-#PLUGINS = $(PLUGINC:.c=.so)
-#PLUGINM = $(PLUGINC:.c=.mk)
-
-#%.so: %.c version.h version.c $(HTSDIR)/libhts.so
-#	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -shared -o $@ version.c $< -L$(HTSDIR) -lhts
-
-#-include $(PLUGINM)
-
-#plugins: $(PLUGINS)
-
-
-hgvs_vcf: $(HTSLIB)
-	$(CC) -DHGVS_VCF_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/hgvs_vcf.c src/hgvs.c src/sequence.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
-
-annobed: $(HTSLIB)
-	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/annobed.c src/genepred.c src/number.c src/sort_list.c $(HTSLIB)
-
 genepredPlus_convertor: $(HTSLIB)
 	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/genepredPlus_convertor.c misc/kthread.c misc/ksw.c src/genepred.c src/number.c src/faidx_def.c $(HTSLIB)
-
-vcfadd: $(HTSLIB) 
-	$(CC) -D_VCF_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/vcf_annos.c src/json_config.c src/config.c src/kson.c src/vcmp.c $(HTSLIB)
-
-bedadd: $(HTSLIB) 
-	$(CC) -D_BED_ANNOS_MAIN $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ src/anno_bed.c src/json_config.c src/config.c src/kson.c $(HTSLIB)
 
 vcf2tsv: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
@@ -77,12 +47,13 @@ vcf_rename_tags: $(HTSLIB) version.h
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
 bcfanno: $(HTSLIB) version.h 
-	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/bcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c src/flank_seq.c $(HTSLIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ src2/anno_bed.c src2/anno_col.c src2/anno_hgvs.c src2/anno_pool.c src2/anno_thread_pool.c src2/anno_vcf.c src2/bcfanno_main.c src2/config.c src2/flank_seq.c src2/genepred.c src2/hgvs.c src2/json_config.c src2/kson.c src2/name_list.c src2/number.c src2/sort_list.c src2/variant_type.c src2/vcf_annos.c src2/vcmp.c $(HTSLIB)
 
 bcfanno_debug: $(HTSLIB) version.h
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ src/bcfanno_main.c src/vcf_annos.c src/anno_bed.c src/sequence.c src/genepred.c src/hgvs.c src/hgvs_vcf.c src/number.c src/vcmp.c src/json_config.c src/config.c src/kson.c src/file.c src/sort_list.c src/flank_seq.c $(HTSLIB)
+	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -lz -pthread -o $@ src2/anno_bed.c src2/anno_col.c src2/anno_hgvs.c src2/anno_pool.c src2/anno_thread_pool.c src2/anno_vcf.c src2/bcfanno_main.c src2/config.c src2/flank_seq.c src2/genepred.c src2/hgvs.c src2/json_config.c src2/kson.c src2/name_list.c src2/number.c src2/sort_list.c src2/variant_type.c src2/vcf_annos.c src2/vcmp.c $(HTSLIB)
 
-test: $(HTSLIB) version.h vcfadd bedadd
+
+test: $(HTSLIB) version.h
 
 clean: testclean
 	-rm -f gmon.out *.o *~ $(PROG) version.h 
