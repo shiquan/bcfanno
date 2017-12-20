@@ -3,7 +3,7 @@
 
 #include "utils.h"
 #include <pthread.h>
-#include <stdlib.h>
+#include <stdint.h>
 
 typedef struct thread_pool thread_pool_t;
 typedef struct thread_pool_process thread_pool_process_t;
