@@ -14,14 +14,14 @@ typedef struct thread_pool_worker thread_pool_worker_t;
 struct thread_pool_job {
     void *(*func)(void *arg, int idx);
     void *arg;
-    struct thread_pool_job *next;
-    struct thread_pool     *p;
-    struct thread_pool_process *q;
+    thread_pool_job_t *next;
+    thread_pool_t     *p;
+    thread_pool_process_t *q;
     uint64_t serial;
 };
 
 struct thread_pool_result {
-    struct thread_pool_result *next;
+    thread_pool_result_t *next;
     // sequential number for ordering
     uint64_t serial;
     // result itself
@@ -29,7 +29,7 @@ struct thread_pool_result {
 };
 
 struct thread_pool_worker {
-    struct thread_pool *p;
+    thread_pool_t *p;
     int idx;
     pthread_t tid;
     // when waiting for a job
@@ -43,13 +43,13 @@ struct thread_pool_worker {
 // The thread pool may have many hetergeneous tasks, each using its own io_queue mixed
 // into the sam thread pool.
 struct thread_pool_process {
-    struct thread_pool *p;
+    thread_pool_t *p;
     // input list
-    struct thread_pool_job     *input_head;
-    struct thread_pool_job     *input_tail;
+    thread_pool_job_t     *input_head;
+    thread_pool_job_t     *input_tail;
     // output list
-    struct thread_pool_result  *output_head;
-    struct thread_pool_result  *output_tail;
+    thread_pool_result_t  *output_head;
+    thread_pool_result_t  *output_tail;
     // max size of I/O queues
     int qsize;
     // next serial for output
@@ -84,7 +84,7 @@ struct thread_pool_process {
     pthread_cond_t non_processing_c;
 
     // to form circular linked list
-    struct thread_pool_process *next, *prev;    
+    thread_pool_process_t *next, *prev;    
 };
 
 
@@ -104,12 +104,12 @@ struct thread_pool {
     // I/O queues to check for jobs in and to put results.
     // Forms a circular linked list. (q_head may be amended to
     // point to the most recently updated.)
-    struct thread_pool_process *q_head;
+    thread_pool_process_t *q_head;
 
     // threads
     // maxinum number of jobs
     int tsize;
-    struct thread_pool_worker *t;
+    thread_pool_worker_t *t;
     // array of worker IDs free
     int *t_stack, t_stack_top;
 
