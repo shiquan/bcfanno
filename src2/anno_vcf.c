@@ -44,7 +44,7 @@ static int anno_vcf_update_buffer(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_
         hts_itr_destroy(f->itr);
         f->itr = NULL;
     }
-    int l, i;
+    int l = 0, i;
     for ( i = 1; i < line->n_allele; i++ )
         if ( l > line->d.var[i].n )
             l = line->d.var[i].n;

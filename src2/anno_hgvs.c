@@ -2,6 +2,7 @@
 #include "hgvs.h"
 #include "anno_hgvs.h"
 #include "anno_col.h"
+#include "variant_type.h"
 #include "htslib/vcf.h"
 #include "stack_lite.h"
 #include "name_list.h"
