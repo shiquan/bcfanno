@@ -5,11 +5,11 @@
 #include <pthread.h>
 #include <stdlib.h>
 
-struct thread_pool;
-struct thread_pool_process;
-struct thread_pool_job;
-struct thread_pool_result;
-struct thread_pool_worker;
+typedef struct thread_pool thread_pool_t;
+typedef struct thread_pool_process thread_pool_process_t;
+typedef struct thread_pool_job thread_pool_job_t;
+typedef struct thread_pool_result thread_pool_result_t;
+typedef struct thread_pool_worker thread_pool_worker_t;
 
 struct thread_pool_job {
     void *(*func)(void *arg, int idx);
