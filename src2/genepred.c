@@ -584,10 +584,7 @@ int parse_line_locs(struct genepred_line *line)
     
     for ( i = 0; i < 2; i++ ) {
         line->loc[i] = malloc(line->exon_count*sizeof(int));
-        if ( line->loc[i] == NULL )
-            line->loc[i] = malloc(line->exon_count*sizeof(int));
-        if ( line->loc[i] == NULL )
-            error("Failed to allocate memory.");
+        if ( line->loc[i] == NULL ) error("Failed to allocate memory.");
     }
     
             

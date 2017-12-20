@@ -12,9 +12,8 @@
 #include "genepred.h"
 #include "number.h"
 #include "anno_flank.h"
+#include "version.h"
 #include <unistd.h>
-
-#define BCFANNO_VERSION "v1.2"
 
 struct anno_index {
     // point to hdr_out, DO NOT free it

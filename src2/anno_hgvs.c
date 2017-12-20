@@ -388,7 +388,8 @@ void anno_hgvs_file_destroy(struct anno_hgvs_file *f)
     if ( f->n_allele ) free(f->files);
     hgvs_handler_destroy(f->h);
     //if ( f->tmps) free(f->tmps);
-    for ( i = 0; i < f->n_col; ++i ) free(f->cols[i].hdr_key);    
+    for ( i = 0; i < f->n_col; ++i ) free(f->cols[i].hdr_key);
+    free(f);
 }
 struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna)
 {

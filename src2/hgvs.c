@@ -44,6 +44,7 @@ void hgvs_handler_destroy(struct hgvs_handler *h)
     hts_close(h->fp_idx);
     int i;
     for ( i = 0; i < h->n_gene; ++i ) genepred_line_destroy(h->gls[i]);
+    if ( h->gls ) free(h->gls);
     free(h);
 }
 
