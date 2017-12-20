@@ -583,8 +583,13 @@ int parse_line_locs(struct genepred_line *line)
     int is_coding = line->cdsstart >= line->cdsend ? 0 : 1;
     
     for ( i = 0; i < 2; i++ ) {
-        line->loc[i] = (int*)calloc(line->exon_count, sizeof(int));
+        line->loc[i] = malloc(line->exon_count*sizeof(int));
+        if ( line->loc[i] == NULL )
+            line->loc[i] = malloc(line->exon_count*sizeof(int));
+        if ( line->loc[i] == NULL )
+            error("Failed to allocate memory.");
     }
+    
             
     // First loop. Purpose of this loop is trying to calculate the forward and backward length.
     // Meanwhile, the related location of the transcripts block edges will also be calculated.

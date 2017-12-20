@@ -203,9 +203,11 @@ static int find_the_block(struct genepred_line *l, int *s, int *e, int pos)
 static int find_locate(struct genepred_line *l, int *pos, int *offset, int start, int *id)
 {
     int b1 = -1, b2 = -1;
+    *pos = 0;
+    *offset = 0;
     // for location out of range set pos and offset to 0, annotate as '?'
     if ( find_the_block(l, &b1, &b2, start ) ) { *pos = 0, *offset = 0; return 1;}
-
+    
     if ( b1 == b2 ) {
         if ( l->strand == '+' ) *pos = l->loc[BLOCK_START][b1] + start - l->exons[BLOCK_START][b1];
         else *pos = l->loc[BLOCK_END][b1] + (l->exons[BLOCK_END][b1] - start);
@@ -271,6 +273,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     int alt_length = hgvs->alt == NULL ? 0 : strlen(hgvs->alt);
     char *ref_seq = hgvs->ref == NULL ? NULL : strdup(hgvs->ref);
     char *alt_seq = hgvs->alt == NULL ? NULL : strdup(hgvs->alt);
+    char *ori_seq = NULL;
     // for reverse strand, complent sequence
     if ( inf->strand == '-' ) {        
         if ( ref_seq ) compl_seq(ref_seq, ref_length);
@@ -400,7 +403,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     // retrieve affected sequences and downstream    
     int transcript_retrieve_length = 0;
     char *name = gl->name1;
-    char *ori_seq = faidx_fetch_seq(h->rna_fai, name, start, start + 1000, &transcript_retrieve_length);
+    ori_seq = faidx_fetch_seq(h->rna_fai, name, start, start + 1000, &transcript_retrieve_length);
     if ( ori_seq == NULL || transcript_retrieve_length == 0 ) goto failed_check;
 
     // Sometime UCSC may generate trancated records. These bugs may disturb downstream analysis.
@@ -597,6 +600,10 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     type->vartype = var_is_unknown;
     
   no_amino_code:
+    if ( ref_seq != NULL ) free(ref_seq);
+    if ( alt_seq != NULL ) free(alt_seq);
+    if ( ori_seq != NULL ) free(ori_seq);
+
     type->loc_amino = 0;
     type->ori_amino = 0;
     type->mut_amino = 0;

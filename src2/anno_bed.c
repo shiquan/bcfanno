@@ -390,7 +390,7 @@ void anno_bed_file_destroy(struct anno_bed_file *f)
     for ( i = 0; i < f->n_col; ++i ) free(f->cols[i].hdr_key);
     free(f->cols);
     struct anno_bed_buffer *b = f->buffer;
-    for ( i = 0; i < b->cached; ++i ) {
+    for ( i = 0; i < b->max; ++i ) {
         struct anno_bed_tsv *t = b->buffer[i];
         anno_bed_tsv_destroy(t);
     }

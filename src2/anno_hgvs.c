@@ -357,7 +357,7 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
     // update INFO
     for ( i = 0; i < file->n_col; ++i ) {
         struct anno_col *col = &file->cols[i];
-        if ( col->replace == REPLACE_EXISTING ) {
+        if ( col->replace == REPLACE_MISSING ) {
             int ret = bcf_get_info_string(hdr, line, col->hdr_key, &file->tmps, &file->mtmps);
             if ( ret > 0 && (file->tmps[0]!= '.' || file->tmps[1] != 0 ) ) continue;
         }
@@ -401,6 +401,7 @@ struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, c
       full_column:
         f->n_col = 8;
         f->cols = malloc(8*sizeof(struct anno_col));
+        memset(f->cols, 0, 8*sizeof(struct anno_col));
         f->cols[0].hdr_key = strdup("HGVSnom");
         f->cols[1].hdr_key = strdup("Gene");
         f->cols[2].hdr_key = strdup("Transcript");
