@@ -4,13 +4,15 @@
 #include "htslib/faidx.h"
 #include "htslib/vcf.h"
 
-struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname)
+struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname)
 {
     struct hgvs_handler *h = malloc(sizeof(*h));
     memset(h, 0, sizeof(*h));
+    h->reference_fname = reference_fname;
     h->rna_fname = rna_fname;
     h->data_fname = data_fname;
     h->rna_fai = fai_load(rna_fname);
+    
     if ( h->rna_fai == NULL ) error("Failed to load index of %s : %s.", rna_fname, strerror(errno));
 
     h->fp_idx = hts_open(data_fname, "r");
@@ -582,14 +584,38 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
 		    for ( i = 0; i < str.l/3; ++i )
 			if ( check_is_stop(str.s+i*3) ) break;
 		    type->fs = ori_stop == i +1 ? -1 : i+1;
-		    if (str.l < 3) error("Failed to predict variant type. %s %d %s %s", hgvs->chr, hgvs->start, hgvs->ref, hgvs->alt);
-		    memcpy(codon, str.s, 3);
-		    type->mut_amino = codon2aminoid(codon);
+
+                    // delins in stop codon
+		    if (str.l < 3) {
+                        faidx_t *fai = fai_load(h->reference_fname);
+                        if ( fai ) {
+                            char *refseq = NULL;
+                            int length = 0;
+                            if ( gl->strand == '+' ) 
+                                refseq = faidx_fetch_seq(fai, gl->chrom, gl->txend, gl->txend+10, &length);
+                            else {
+                                refseq = faidx_fetch_seq(fai, gl->chrom, gl->txstart - 10, gl->txstart, &length);
+                                compl_seq(refseq, length);
+                            }
+                            if ( length && refseq ) {
+                                kputs(refseq, &str);
+                                memcpy(codon, str.s, 3);
+                                type->mut_amino = codon2aminoid(codon);
+                            }
+                            fai_destroy(fai);
+                        }
+                    }
+                    else {
+                        memcpy(codon, str.s, 3);
+                        type->mut_amino = codon2aminoid(codon);
+                    }
 		    if ( str.m ) free(str.s);
 		}
             } // end of frameshift
         } // end of delins 
     } // end var type
+
+    
 #undef BRANCH
     
     if ( ref_seq != NULL ) free(ref_seq);

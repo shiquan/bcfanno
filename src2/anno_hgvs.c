@@ -391,7 +391,7 @@ void anno_hgvs_file_destroy(struct anno_hgvs_file *f)
     for ( i = 0; i < f->n_col; ++i ) free(f->cols[i].hdr_key);
     free(f);
 }
-struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna)
+struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna, const char *reference)
 {
     if ( data == NULL || rna == NULL ) return NULL;
         
@@ -476,7 +476,7 @@ struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, c
     }
 #undef BRANCH
 
-    f->h = hgvs_handler_init(rna, data);
+    f->h = hgvs_handler_init(rna, data, reference);
     return f;
 }
 void anno_hgvs_core(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf1_t *line)
@@ -518,6 +518,7 @@ struct args {
     const char *output_fname;
     const char *data_fname;
     const char *rna_fname;
+    const char *reference_fname;
     int n_thread;
     htsFile *fp_input;
     htsFile *fp_out;
@@ -531,6 +532,7 @@ struct args {
     .output_fname = NULL,
     .data_fname   = NULL,
     .rna_fname    = NULL,
+    .reference_fname = NULL,
     .n_thread     = 1,
     .files        = NULL,
     .fp_input     = NULL,
@@ -581,6 +583,7 @@ int parse_args(int argc, char **argv)
         else if ( strcmp(a, "-r") == 0 ) var = &record;
         else if ( strcmp(a, "-gene") == 0 || strcmp(a, "-data") == 0 ) var = &gene_list_fname;
         else if ( strcmp(a, "-trans") == 0 ) var = &trans_list_fname;
+        else if ( strcmp(a, "-ref") == 0 ) var = &args.reference_fname;
         if ( var != 0 ) {
             if ( i == argc) error("Missing an argument after %s", a);
             *var = argv[i++];
@@ -630,7 +633,7 @@ int parse_args(int argc, char **argv)
     }
     
     args.files = malloc(args.n_thread*sizeof(void*));
-    args.files[0] = anno_hgvs_file_init(args.hdr_out, tags, args.data_fname, args.rna_fname);
+    args.files[0] = anno_hgvs_file_init(args.hdr_out, tags, args.data_fname, args.rna_fname, args.reference_fname);
     //args.files[0]->gene_hash = args.gene_hash;
     //args.files[0]->trans_hash = args.trans_hash;
     
