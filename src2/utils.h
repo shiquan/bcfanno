@@ -26,6 +26,8 @@
 #define UTILS_COMMON_HEADER
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
 #include <errno.h>
 #include <assert.h>
 #include <time.h>

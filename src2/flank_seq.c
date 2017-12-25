@@ -51,6 +51,8 @@ struct seqidx* load_sequence_index(const char *file)
 }
 struct seqidx *sequence_index_duplicate(struct seqidx *idx)
 {
+    if ( idx == NULL ) return NULL;
+             
     struct seqidx *d = malloc(sizeof(*d));
     d->file = idx->file;
     d->idx = fai_load(d->file);
@@ -60,8 +62,10 @@ struct seqidx *sequence_index_duplicate(struct seqidx *idx)
 
 void sequence_index_destroy(struct seqidx *idx)
 {
-    fai_destroy(idx->idx);
-    free(idx);
+    if ( idx ) {
+        fai_destroy(idx->idx);
+        free(idx);
+    }
 }
 
 int bcf_header_add_flankseq(bcf_hdr_t *hdr)
@@ -77,6 +81,7 @@ int bcf_header_add_flankseq(bcf_hdr_t *hdr)
 }
 int bcf_add_flankseq(struct seqidx *idx, bcf_hdr_t *hdr, bcf1_t *line)
 {
+    assert(idx);
     const char *name = bcf_hdr_id2name(hdr, line->rid);
     int end = line->pos + line->rlen + flank_size;
     int start = line->pos + 1 - flank_size;

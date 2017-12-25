@@ -133,20 +133,25 @@ struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config
             idx->bed_files[i] = anno_bed_file_init(hdr, bed_config->files[i].fname, bed_config->files[i].columns);
         idx->n_bed = bed_config->n_bed;
     }
+    else idx->n_bed = 0;
+    
     if ( vcf_config->n_vcf > 0 ) {
         idx->vcf_files = malloc(vcf_config->n_vcf*sizeof(void*));
         for ( i = 0; i < vcf_config->n_vcf; ++i )
             idx->vcf_files[i] = anno_vcf_file_init(hdr, vcf_config->files[i].fname, vcf_config->files[i].columns);
         idx->n_vcf = vcf_config->n_vcf;
     }
+    else idx->n_vcf = 0;
     
     if ( refgene_config->genepred_fname && refgene_config->refseq_fname )
         idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path);
+    else idx->hgvs = NULL;
     
     if ( config->reference_path ) {
         idx->seqidx = load_sequence_index(config->reference_path);
         if ( idx->seqidx ) bcf_header_add_flankseq(hdr);
     }
+    else idx->seqidx = NULL;
     
     idx->hdr_out = hdr;
     
@@ -157,6 +162,7 @@ struct anno_index *anno_index_duplicate(struct anno_index *idx)
     extern struct seqidx *sequence_index_duplicate(struct seqidx *idx);
     
     struct anno_index *d = malloc(sizeof(*d));
+    memset(d, 0, sizeof(*d));
     int i;
     d->hdr_out = idx->hdr_out;
     d->n_vcf = idx->n_vcf;
@@ -373,7 +379,7 @@ void *anno_core(void *arg, int idx)
         for ( j = 0; j < index->n_bed; ++j )
             anno_bed_core(index->bed_files[j], index->hdr_out, line);
 
-        bcf_add_flankseq(index->seqidx, index->hdr_out, line);
+        if ( index->seqidx ) bcf_add_flankseq(index->seqidx, index->hdr_out, line);
         
     }
     
@@ -396,7 +402,7 @@ int annotate_light()
         for ( j = 0; j < idx->n_bed; ++j )
             anno_bed_core(idx->bed_files[j], idx->hdr_out, line);
 
-        bcf_add_flankseq(idx->seqidx, idx->hdr_out, line);
+        if ( idx->seqidx ) bcf_add_flankseq(idx->seqidx, idx->hdr_out, line);
       output_line:
         bcf_write1(args.fp_out, args.hdr, line);
     }

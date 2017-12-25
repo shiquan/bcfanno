@@ -147,6 +147,8 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 		    refgene_config->trans_list_fname = BRANCH_INIT(node1);
 		else if ( strcmp(node1->key, "genes_list") == 0 )
 		    refgene_config->gene_list_fname = BRANCH_INIT(node1);
+                else if ( strcmp(node1->key, "column") == 0 || strcmp(node1->key, "columns") == 0 )
+                    refgene_config->columns = BRANCH_INIT(node1);
 		else
 		    warnings("Unknown key : %s. skip ..", node1->key);		
 	    }
@@ -317,7 +319,7 @@ int bcfanno_config_debug(struct bcfanno_config *config)
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
 	LOG_print("[refgene] gene_data : %s", refgene->genepred_fname);	
-	// LOG_print("[refgene] columns : %s", refgene->columns);
+        LOG_print("[refgene] columns : %s", refgene->columns);
 	if ( refgene->refseq_fname )
 	    LOG_print("[refgene] refseq : %s", refgene->refseq_fname);
 	if ( refgene->trans_list_fname )

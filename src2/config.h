@@ -29,7 +29,7 @@
 #include <stdlib.h>
 
 struct refgene_config {
-    // if refgene_is_set == 1, genepred_fname and columns are mandatory.
+    // if refgene_is_set == 1, genepred_fname is mandatory.
     int refgene_is_set;
     char *genepred_fname;
     char *refseq_fname;
