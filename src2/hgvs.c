@@ -394,6 +394,8 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     if ( pos <= gl->utr5_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }  // init
     if ( pos >= gl->cds_length + SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr3); goto no_amino_code;}
     if ( pos >= gl->cds_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }
+
+    // next we will check amino acid changes
     if ( inf->offset != 0 ) goto no_amino_code;
     
     // For variants in coding region, check the amino acid changes.
@@ -431,6 +433,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     
     // Check if insert bases in tandam short repeats region, amino acids will be changed in the downstream;
     // Realign the alternative allele ..
+    // check if and only if in coding region !!!
     if ( ref_length == 0 && alt_length > 0) {
         int offset = 0;
         char *ss = ori_seq;
@@ -441,14 +444,21 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
 
         if ( offset > 0 ) {
             if ( transcript_retrieve_length <= offset ) goto failed_check;
-            transcript_retrieve_length -= offset;
-            char *offset_seq = strdup(ori_seq+offset);
+            // update dup_offset for original inf struct, check this value when output hgvs position
+            inf->dup_offset = offset;
+
+            cds_pos += offset;
+            cod = (cds_pos-1)%3;
+            int new_start = (cds_pos-1)/3*3 + gl->utr5_length;
+            assert(new_start >= start);
+            int start_offset = new_start -start;
+            char *offset_seq = strdup(ori_seq+start_offset);
+            transcript_retrieve_length -= start_offset;
             offset_seq[transcript_retrieve_length] = '\0';
             // point ori_seq to new memory address, this is not safe!
             free(ori_seq);
             ori_seq = offset_seq;
-            cds_pos += offset;
-            start = (cds_pos-1)/3*3 + gl->utr5_length;
+            start = new_start;
         }
     }
     
@@ -612,7 +622,14 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
 		    if ( str.m ) free(str.s);
 		}
             } // end of frameshift
-        } // end of delins 
+        } // end of delins
+
+        // check
+        // stop retain
+        // stop loss
+        // start loss
+       
+        
     } // end var type
 
     

@@ -24,8 +24,8 @@
 
 // init two columns table file, and convert first column name to second column
 // file format:  name_old\tname_new
+#include "utils.h"
 #include "table2hash.h"
-#include <errno.h>
 #include "htslib/khash.h"
 #include "htslib/kseq.h"
 #include "htslib/kstring.h"

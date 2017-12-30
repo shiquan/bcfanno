@@ -39,19 +39,22 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         else if ( type->func1 == func_region_utr5 ) kputs("c.-", &str);
         else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
 
-        if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc);
+        // for nondup, inf->dup_offset will always be 0
+        if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc+inf->dup_offset);
         else kputc('?', &str);
 
         if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
         else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
 
-        if ( h->start != h->end) {
+        while ( h->start != h->end) {
+            if ( inf->dup_offset && h->end - h->start == 1 ) break;
             kputc('_', &str);
             if ( type->func1 == func_region_utr5 ) kputc('-', &str);
             else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
             ksprintf(&str, "%d", inf->end_loc);
             if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
             else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
+            break;
         }
         char *ref, *alt;
         if ( inf->strand == '+' ) {
@@ -64,7 +67,11 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         }
         if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
         else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
-        else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);        
+        else if ( h->type == var_type_ins ) {
+            if ( inf->dup_offset == 0 ) ksprintf(&str, "ins%s", alt);
+            else kputs(&str, "dup");
+            //ksprintf(&str, "dup%s", alt);
+        }
         else if ( h->type == var_type_delins ) ksprintf(&str, "%s>%s", ref, alt);
         else {
             error("Failed to parse HGVS nom.");

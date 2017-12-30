@@ -13,7 +13,7 @@ CC       = gcc
 CFLAGS   = -Wall -O3 
 DEBUG_CFLAGS   = -g -Wall -O0 -DDEBUG_MODE
 DFLAGS   =
-INCLUDES = -I src/ -I. -I$(HTSDIR)/ -I misc/
+INCLUDES = -I src2/ -I. -I$(HTSDIR)/ -I misc/
 
 
 all:$(PROG)
@@ -34,14 +34,14 @@ force:
 	$(CC) -c $(CFLAGS) $(DFLAGS) $(INCLUDES) $< -o $@
 
 
-genepredPlus_convertor: $(HTSLIB)
-	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/genepredPlus_convertor.c misc/kthread.c misc/ksw.c src/genepred.c src/number.c src/faidx_def.c $(HTSLIB)
+GenePredExtGen: $(HTSLIB)
+	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/genepred_ext_gen.c misc/ksw.c src2/anno_thread_pool.c src2/genepred.c src2/number.c src2/faidx_def.c $(HTSLIB)
 
 vcf2tsv: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
 
 tsv2vcf: $(HTSLIB) version.h
-	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/tsv2vcf.c src/table2hash.c $(HTSLIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/tsv2vcf.c misc/table2hash.c $(HTSLIB)
 
 vcf_rename_tags: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
@@ -58,7 +58,7 @@ test: $(HTSLIB) version.h
 clean: testclean
 	-rm -f gmon.out *.o *~ $(PROG) version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
-	-rm -f anno_vcf bedadd vcfadd bcfanno anno_bed hgvs_generate hgvs_vcf
+	-rm -f anno_vcf bedadd vcfadd bcfanno anno_bed hgvs_generate hgvs_vcf GenePredExtGen
 	-rm -f config bcfanno_debug vcf2tsv tsv2vcf vcf_rename_tags
 
 testclean:

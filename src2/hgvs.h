@@ -38,7 +38,7 @@ struct hgvs_type {
     // Exon or intron count. Start from 1.
     int count;
     // CDS count, for noncoding transcript always be 0.
-    int count2;
+     int count2;
     // Location of amino first influenced. Sometime a indel may change the amino sequence after several condons.
     int loc_amino;
     // Original amino acid and mutated amino acid. Check amino type only if variants happed in cds region.
@@ -65,7 +65,7 @@ struct hgvs_inf {
     
     // Amino acid length, for noncoding transcript should always be 0.
     int aa_length;    
-
+    
     // position on gene coordinate, not account the function regions.
     int pos;
     int end_pos;
@@ -73,9 +73,12 @@ struct hgvs_inf {
     // location for function region.
     int loc;
     int end_loc;
-    
+    // offset in intron
     int offset;
     int end_offset;
+
+    // check if repeat sequences(duxp), only for insterion
+    int dup_offset;
     
     // If strand is '-', convert sequence to complement strand. Default is '+'.
     char strand;
