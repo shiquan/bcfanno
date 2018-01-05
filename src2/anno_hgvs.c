@@ -105,7 +105,6 @@ static char *generate_hgvsnom_string(struct hgvs *h)
             else if ( type->vartype == var_is_frameshift ) {
                 ksprintf(&str, "(p.%s%d%s",codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino]);
                 if ( type->fs > 0 ) ksprintf(&str, "fs*%d", type->fs);
-                //kputc('*', &str);
                 //else kputw(type->fs, &str);
                 kputc(')', &str);                                         
             }
