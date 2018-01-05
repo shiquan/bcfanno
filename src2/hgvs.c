@@ -672,7 +672,7 @@ int hgvs_anno_trans(struct hgvs *n, struct hgvs_handler *h)
             }
         }
         struct hgvs_core *trans = &n->trans[n->n_tran];
-        
+        memset(trans, 0, sizeof(*trans));
         // update hgvs locations
         struct hgvs_inf *inf = &trans->inf;
         struct hgvs_type *type = &trans->type;
