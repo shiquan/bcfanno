@@ -1,5 +1,5 @@
 /*  
-    Copyright (C) 2016,2017  BGI Research
+    Copyright (C) 2016,2017,2018  BGI Research
 
     Author: Shi Quan (shiquan@genomics.cn)
 

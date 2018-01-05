@@ -1,4 +1,4 @@
-/*  thread_pool.c -- A pool of generic worker threads
+/*  anno_thread_pool.c -- A pool of generic worker threads
 
 The original thread_pool.c was copyrighted :
 

@@ -123,6 +123,8 @@ enum var_func_type {
     var_is_stop_retained,
     var_is_complex,
     var_is_no_call,
+    var_is_transcript_ablation,
+    var_is_stop_gained,    
 };
 
 enum var_type_splice {
@@ -155,7 +157,9 @@ static inline const char *var_func_type_string(enum var_func_type type)
         //"SpliceAcceptor",
         "Complex",
         "NoCall",
-        NULL, NULL, NULL, NULL,
+        "TranscriptAblation",
+        "StopGained",
+        NULL, NULL,
     };
     assert(type >= 0);
     return vartypes[type];

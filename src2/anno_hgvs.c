@@ -69,7 +69,7 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
         else if ( h->type == var_type_ins ) {
             if ( inf->dup_offset == 0 ) ksprintf(&str, "ins%s", alt);
-            else kputs(&str, "dup");
+            else kputs("dup", &str);
             //ksprintf(&str, "dup%s", alt);
         }
         else if ( h->type == var_type_delins ) ksprintf(&str, "%s>%s", ref, alt);
