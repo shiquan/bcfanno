@@ -39,15 +39,23 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         else if ( type->func1 == func_region_utr5 ) kputs("c.-", &str);
         else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
 
+        // for dup 
+        if ( inf->dup_offset != 0 ) {           
+            assert(inf->loc != 0);
+            int len = strlen(h->alt);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
+            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
+            goto amino_acid_change;
+        }
         // for nondup, inf->dup_offset will always be 0
-        if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc+inf->dup_offset);
+        if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc);
         else kputc('?', &str);
 
         if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
         else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
 
         while ( h->start != h->end) {
-            if ( inf->dup_offset && h->end - h->start == 1 ) break;
+            //if ( inf->dup_offset && h->end - h->start == 1 ) break;
             kputc('_', &str);
             if ( type->func1 == func_region_utr5 ) kputc('-', &str);
             else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
@@ -68,8 +76,9 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
         else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
         else if ( h->type == var_type_ins ) {
-            if ( inf->dup_offset == 0 ) ksprintf(&str, "ins%s", alt);
-            else kputs("dup", &str);
+            //if ( inf->dup_offset == 0 )
+            ksprintf(&str, "ins%s", alt);
+            //else kputs("dup", &str);
             //ksprintf(&str, "dup%s", alt);
         }
         else if ( h->type == var_type_delins ) ksprintf(&str, "%s>%s", ref, alt);
@@ -79,6 +88,7 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         if ( ref ) free(ref);
         if ( alt ) free(alt);
 
+      amino_acid_change:
         // protein code
         if ( type->loc_amino > 0 && h->type == var_type_snp ) 
             ksprintf(&str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);

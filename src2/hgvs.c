@@ -593,6 +593,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
 		    kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
 		    for ( i = 0; i < str.l/3; ++i )
 			if ( check_is_stop(str.s+i*3) ) break;
+                    // frameshift -1 for no change,else for termination site
 		    type->fs = ori_stop == i +1 ? -1 : i+1;
 
                     // delins in stop codon
