@@ -75,16 +75,10 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         }
         if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
         else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
-        else if ( h->type == var_type_ins ) {
-            //if ( inf->dup_offset == 0 )
-            ksprintf(&str, "ins%s", alt);
-            //else kputs("dup", &str);
-            //ksprintf(&str, "dup%s", alt);
-        }
+        else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);
         else if ( h->type == var_type_delins ) ksprintf(&str, "%s>%s", ref, alt);
-        else {
-            error("Failed to parse HGVS nom.");
-        }
+        else error("Failed to parse HGVS nom.");
+
         if ( ref ) free(ref);
         if ( alt ) free(alt);
 

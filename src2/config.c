@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 
 #include "kson.h"
 #include "json_config.h"
@@ -41,6 +42,28 @@
 #define KSTRING_INIT { 0, 0, 0}
 #endif
 
+// return 0 for locate file
+//        1 for absolute directory
+int check_if_fullpath(char *file)
+{
+    char *dir = dirname(file);
+    if ( dir == NULL || (dir[0] == '.' && dir[1] == '\0')) return 0;
+    return 1;
+}
+char *get_dirpath(const char *file)
+{
+    char *dir = dirname((char*)file);
+    return dir == NULL ? NULL : strdup(dir);
+}
+char *generate_fullpath_file(char *file, char *dir)
+{
+    if ( dir == NULL ) return strdup(file);
+    kstring_t str = {0,0,0};
+    kputs(dir, &str);
+    if ( str.l > 0 && str.s[str.l-1] != '/') kputc('/', &str);
+    kputs(file, &str);
+    return str.s;
+}
 struct bcfanno_config temp_config_init = {
     .author = 0,
     .config_id = 0,
@@ -100,14 +123,22 @@ void bcfanno_config_destroy(struct bcfanno_config *config)
     free(config);    
 }
 
-static int load_config_core(struct bcfanno_config *config, kson_t *json)
+static int load_config_core(struct bcfanno_config *config, kson_t *json, char *dir)
 {
     const kson_node_t *root = json->root;
     if (root == NULL)
 	error("Format error. Root node is empty, check configure file.");
-    //kson_format(root);
+
 
 #define BRANCH_INIT(_node) ( (_node)->v.str == NULL ? NULL : strdup((_node)->v.str) )
+#define BRANCH(_f) do {\
+        if ( dir && check_if_fullpath(_f) == 0 ) {     \
+            char *new = generate_fullpath_file(_f, dir);\
+            free(_f);\
+            _f = new;\
+        }\
+    } while(0)
+    
     int i;
     for ( i = 0; i < root->n; ++i ) {
 	const kson_node_t *node = kson_by_index(root, i);
@@ -126,6 +157,7 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 	}
         else if ( strcmp(node->key, "ref") == 0 || strcmp(node->key, "reference") == 0) {
 	    config->reference_path = BRANCH_INIT(node);
+            BRANCH(config->reference_path);
 	}
         else if ( strcmp(node->key, "HGVS") == 0 || strcmp(node->key, "hgvs") == 0) {
 	    if ( node->type != KSON_TYPE_BRACE)
@@ -139,15 +171,28 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 		if (node1 == NULL)
 		    error("Format error. HGVS node is empty, check configure file.");
 
-		if ( strcmp(node1->key, "gene_data") == 0 || strcmp(node1->key, "refgene") == 0)
+		if ( strcmp(node1->key, "gene_data") == 0 || strcmp(node1->key, "refgene") == 0) {
 		    refgene_config->genepred_fname = BRANCH_INIT(node1);
-		else if ( strcmp(node1->key, "refseq") == 0 )
+                    BRANCH(refgene_config->genepred_fname);
+                    /* if ( check_if_fullpath(refgene_config->genepred_fname) ){ */
+                    /*     char *new = generate_fullpath_file(refgene_config->genepred_fname, dir); */
+                    /*     free(refgene_config->genepred_fname); */
+                    /*     refgene_config->genepred_fname = new; */
+                    /* } */
+                }
+		else if ( strcmp(node1->key, "refseq") == 0 || strcmp(node1->key, "transcript") == 0 || strcmp(node1->key, "trans") == 0) {
 		    refgene_config->refseq_fname = BRANCH_INIT(node1);
-		else if ( strcmp(node1->key, "transcripts_list") == 0 || strcmp(node1->key, "trans_list") == 0 )
+                    BRANCH(refgene_config->refseq_fname);
+                }
+		else if ( strcmp(node1->key, "transcripts_list") == 0 || strcmp(node1->key, "trans_list") == 0 ) {
 		    refgene_config->trans_list_fname = BRANCH_INIT(node1);
-		else if ( strcmp(node1->key, "genes_list") == 0 )
+                    BRANCH(refgene_config->trans_list_fname);
+                }
+		else if ( strcmp(node1->key, "genes_list") == 0 ) {
 		    refgene_config->gene_list_fname = BRANCH_INIT(node1);
-                else if ( strcmp(node1->key, "column") == 0 || strcmp(node1->key, "columns") == 0 )
+                    BRANCH(refgene_config->gene_list_fname);
+                }
+                else if ( strcmp(node1->key, "column") == 0 || strcmp(node1->key, "columns") == 0 ) 
                     refgene_config->columns = BRANCH_INIT(node1);
 		else
 		    warnings("Unknown key : %s. skip ..", node1->key);		
@@ -189,8 +234,10 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 		    if ( node2 == NULL || node2->key == NULL)
 			continue;
 
-		    if ( strcmp(node2->key, "file") == 0 )
+		    if ( strcmp(node2->key, "file") == 0 ) {
 			file_config->fname = BRANCH_INIT(node2);
+                        BRANCH(file_config->fname);
+                    }
 		    else if ( strcmp(node2->key, "columns") == 0 )
 			file_config->columns = BRANCH_INIT(node2);
 		    else
@@ -238,8 +285,10 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 		    const kson_node_t *node2 = kson_by_index(node1, k);
 		    if (node2 == NULL || node2->key == NULL)
 			continue;
-		    if ( strcmp(node2->key, "file") == 0 )
+		    if ( strcmp(node2->key, "file") == 0 ) {
 			file_config->fname = BRANCH_INIT(node2);
+                        BRANCH(file_config->fname);
+                    }
 		    else if ( strcmp(node2->key, "columns") == 0 )
 			file_config->columns = BRANCH_INIT(node2);
 		    else
@@ -280,6 +329,7 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
                 
                 struct file_config *file_config = &module_config->files[n_files];
                 file_config->fname = BRANCH_INIT(node1);
+                BRANCH(file_config->fname);
                 file_config->columns = NULL;
                 if ( file_config->fname == NULL )
                     continue;
@@ -290,13 +340,15 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json)
 	    warnings("Unknown key : %s. skip ..", node->key);
 	}
     }
+#undef BRANCH    
 #undef BRANCH_INIT
     return 0;
 }
 
-int bcfanno_load_config(struct bcfanno_config *config, const char * config_fname)
+int bcfanno_load_config(struct bcfanno_config *config, const char *config_fname)
 {
     // char *string = skip_comments(config_fname);
+    char *dir = get_dirpath(config_fname);
     char *string = json_config_open(config_fname);
     if (string == NULL)
 	error("Failed to parse configure file %s", config_fname);
@@ -304,7 +356,8 @@ int bcfanno_load_config(struct bcfanno_config *config, const char * config_fname
     kson_t *json = NULL;
     json = kson_parse(string);
     free(string);
-    int ret = load_config_core(config, json);
+    int ret = load_config_core(config, json, dir);
+    if (dir) free(dir);
     kson_destroy(json);
     return ret;
 }
@@ -318,10 +371,10 @@ int bcfanno_config_debug(struct bcfanno_config *config)
 
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
-	LOG_print("[refgene] gene_data : %s", refgene->genepred_fname);	
+	LOG_print("[refgene] GenePredPlus database: %s", refgene->genepred_fname);	
         LOG_print("[refgene] columns : %s", refgene->columns);
 	if ( refgene->refseq_fname )
-	    LOG_print("[refgene] refseq : %s", refgene->refseq_fname);
+	    LOG_print("[refgene] transcript fasta : %s", refgene->refseq_fname);
 	if ( refgene->trans_list_fname )
 	    LOG_print("[refgene] trans_list : %s", refgene->trans_list_fname);
 	if ( refgene->gene_list_fname )
