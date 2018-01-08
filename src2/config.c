@@ -46,14 +46,20 @@
 //        1 for absolute directory
 int check_if_fullpath(char *file)
 {
-    char *dir = dirname(file);
-    if ( dir == NULL || (dir[0] == '.' && dir[1] == '\0')) return 0;
-    return 1;
+    char *path = strdup(file);
+    char *dir = dirname(path);
+    int ret = 1;
+    if ( dir == NULL || (dir[0] == '.' && dir[1] == '\0')) ret = 0;
+    free(path);
+    return ret;
 }
 char *get_dirpath(const char *file)
 {
-    char *dir = dirname((char*)file);
-    return dir == NULL ? NULL : strdup(dir);
+    char *path = strdup(file);
+    char *dir = dirname(path);
+    char *p_dir = dir == NULL ? NULL : strdup(dir);
+    free(path);
+    return pdir;
 }
 char *generate_fullpath_file(char *file, char *dir)
 {
