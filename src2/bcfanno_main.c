@@ -394,7 +394,8 @@ int annotate_light()
     while ( bcf_read(args.fp_input, args.hdr, line) == 0 ) {
         if ( line->rid == -1 ) goto output_line;
         if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
-        anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
+        if ( idx->hgvs )
+            anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
 
         for ( j = 0; j < idx->n_vcf; ++j )
             anno_vcf_core(idx->vcf_files[j], idx->hdr_out, line);

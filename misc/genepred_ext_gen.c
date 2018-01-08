@@ -386,7 +386,9 @@ char *process(struct args *args, struct index *index, kstring_t *str)
     }
     
     int qlen = tmp.l;
+    //reference
     uint8_t *qseq = malloc(qlen *sizeof(*qseq));
+    //transcript
     uint8_t *rseq = malloc(rlen *sizeof(*rseq));
         
     for ( i = 0; i < tmp.l; ++i )
@@ -394,9 +396,9 @@ char *process(struct args *args, struct index *index, kstring_t *str)
     for ( i = 0; i < rlen; ++i )
         rseq[i] = (uint8_t)sntab[(int)trans[i]];
     if ( line->strand == '-' ) {
-        for ( i = 0; i < rlen/2; ++i ) {
-            int t = rseq[i] == 4 ? 4 : 3 - rseq[i]; rseq[i] = 3 - rseq[rlen-i-1]; rseq[rlen-i-1] = t;
-            if ( rlen & 1 ) rseq[rlen/2+1] = 3 - rseq[rlen/2+1];
+        for ( i = 0; i < qlen/2; ++i ) {
+            int t = qseq[i] == 4 ? 4 : 3 - qseq[i]; qseq[i] = 3 - qseq[qlen-i-1]; qseq[qlen-i-1] = t;
+            if ( qlen & 1 ) qseq[qlen/2+1] = 3 - qseq[qlen/2+1];
         }
     }
 
