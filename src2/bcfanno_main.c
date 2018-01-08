@@ -370,8 +370,9 @@ void *anno_core(void *arg, int idx)
         bcf1_t *line = pool->readers[i];
         if ( bcf_get_variant_types(line) == VCF_REF )
             continue;
-        
-        anno_hgvs_core(index->hgvs, index->hdr_out, line);
+
+        if ( index->hgvs ) 
+            anno_hgvs_core(index->hgvs, index->hdr_out, line);
 
         for ( j = 0; j < index->n_vcf; ++j )
             anno_vcf_core(index->vcf_files[j], index->hdr_out, line);
