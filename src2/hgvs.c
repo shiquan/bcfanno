@@ -46,7 +46,7 @@ void hgvs_handler_destroy(struct hgvs_handler *h)
     hts_close(h->fp_idx);
     int i;
     for ( i = 0; i < h->n_gene; ++i ) genepred_line_destroy(h->gls[i]);
-    if ( h->gls ) free(h->gls);
+    if ( h->n_gene) free(h->gls);
     free(h);
 }
 
@@ -141,6 +141,7 @@ static int hgvs_handler_fill_buffer(struct hgvs *n, struct hgvs_handler *h)
     if ( h->n_gene > 0 ) {
         for ( i = 0; i < h->n_gene; ++i ) genepred_line_destroy(h->gls[i]);
         free(h->gls);
+        h->gls = NULL;
     }
     h->n_gene = 0;
     
@@ -166,6 +167,7 @@ static int hgvs_handler_fill_buffer(struct hgvs *n, struct hgvs_handler *h)
     int l = count_list(head);
     if ( l == 0 || head == NULL ) return 0; // if no record retrieved    
     h->gls = malloc(l*sizeof(struct genepred_line));
+    memset(h->gls, 0, sizeof(struct genepred_line)*l);
     for ( i = 0; i < l; ++i ) {
         assert(head != NULL);
         
@@ -182,7 +184,7 @@ static int hgvs_handler_fill_buffer(struct hgvs *n, struct hgvs_handler *h)
         h->gls[h->n_gene++] = head;
         head = head->next;
     }
-    return l;
+    return h->n_gene;
 }
 static int find_the_block(struct genepred_line *l, int *s, int *e, int pos)
 {
@@ -388,7 +390,6 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         goto no_amino_code;
     }
 
-    
     //  Check if UTR regions.  
     if ( pos <= gl->utr5_length -SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr5); goto no_amino_code; }
     if ( pos <= gl->utr5_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }  // init
@@ -411,7 +412,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     ori_seq = faidx_fetch_seq(h->rna_fai, name, start, start + 1000, &transcript_retrieve_length);
     if ( ori_seq == NULL || transcript_retrieve_length == 0 ) goto failed_check;
 
-    // Sometime UCSC may generate trancated records. These bugs may disturb downstream analysis.
+    // Sometime trancated transcript records will disturb downstream analysis.
     if ( transcript_retrieve_length < 3 ) {
         warnings("Record %s probably trancated.", name);
         goto failed_check;
@@ -429,7 +430,6 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
             }
         }
     }
-
     
     // Check if insert bases in tandam short repeats region, amino acids will be changed in the downstream;
     // Realign the alternative allele ..

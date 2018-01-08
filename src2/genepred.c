@@ -583,6 +583,7 @@ int parse_line_locs(struct genepred_line *line)
     int is_coding = line->cdsstart >= line->cdsend ? 0 : 1;
     
     for ( i = 0; i < 2; i++ ) {
+        assert(line->exon_count>0);
         line->loc[i] = malloc(line->exon_count*sizeof(int));
         if ( line->loc[i] == NULL ) error("Failed to allocate memory.");
     }
