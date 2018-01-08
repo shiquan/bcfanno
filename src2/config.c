@@ -59,7 +59,7 @@ char *get_dirpath(const char *file)
     char *dir = dirname(path);
     char *p_dir = dir == NULL ? NULL : strdup(dir);
     free(path);
-    return pdir;
+    return p_dir;
 }
 char *generate_fullpath_file(char *file, char *dir)
 {
