@@ -51,7 +51,7 @@ int usage()
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
     fprintf(stderr, "   -r  [1000]                     records per thread\n");
-    fprintf(stderr, "   -p, --thread                   thread\n");
+    fprintf(stderr, "   -t, --thread                   thread\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/bcfanno\n");
     fprintf(stderr, "\n");
