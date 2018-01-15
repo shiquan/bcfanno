@@ -609,6 +609,7 @@ int usage()
     fprintf(stderr, "anno_hgvs [options] in.vcf\n");
     fprintf(stderr, " -data <genepred_plus.gz>   GenePredPlus database.\n");
     fprintf(stderr, " -rna  <rna.fa>             RNA sequence in fasta format.\n");
+    fprintf(stderr, " -ref  <reference.fa>       Genome reference sequence in fasta format.\n");
     fprintf(stderr, " -tag <tag,tag>             Specify tags.\n");    
     fprintf(stderr, " -t [1]                     Threads.\n");
     fprintf(stderr, " -O <u|v|b|z>               Output format.\n");
@@ -707,6 +708,8 @@ int parse_args(int argc, char **argv)
     }
     
     if ( args.data_fname == 0 ) error("Please specify bed database with -data.");
+    if ( args.reference_fname == 0 ) error("Please specify genome reference database with -ref.");
+    if ( args.rna_fname == 0 ) error("Please specify rna reference database with -rna.");
     if ( args.input_fname == 0 && (!isatty(fileno(stdin))) ) args.input_fname = "-";
     if ( args.input_fname == 0 ) error("No input file.");
     args.fp_input = hts_open(args.input_fname, "r");
