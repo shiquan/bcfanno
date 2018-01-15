@@ -53,35 +53,36 @@ static char *generate_annovar_name(struct hgvs *h)
             if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
             else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
         }
-        else if ( h->start != h->end ) {
-            if ( inf->loc != 0 ) ksprintf(&str,"%d", inf->loc);
-            else kputc('?', &str);
-
-            if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
-            else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
-
-            kputc('_', &str);
-
-            if ( type->func1 == func_region_utr5 ) kputc('-', &str);
-            else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
-            ksprintf(&str, "%d", inf->end_loc);
-            if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
-            else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
-            if ( h->type == var_type_del ) kputs("del", &str);
-            else if ( h->type == var_type_ins) ksprintf(&str, "ins%s", alt);
-            else if ( h->type == var_type_delins) ksprintf(&str, "%s>%s", ref,alt);
-            else error("Variant type inconsistant.");
-        }
         else {
-            if ( ref ) ksprintf(&str, "%s", ref);            
-            if ( inf->loc != 0 ) ksprintf(&str,"%d", inf->loc);
-            else kputc('?', &str);
+            if ( h->type == var_type_snp ) {
+                if ( ref ) ksprintf(&str, "%s", ref);            
+                if ( inf->loc != 0 ) ksprintf(&str,"%d", inf->loc);
+                else kputc('?', &str);
+                
+                if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
+                else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
+                ksprintf(&str, "%s", alt);
+            }
+            else {
+                if ( inf->loc != 0 ) ksprintf(&str,"%d", inf->loc);
+                else kputc('?', &str);
+                
+                if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
+                else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
 
-            if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
-            else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
-            if ( h->type == var_type_snp) ksprintf(&str, "%s", alt);
-            else if (h->type == var_type_del) kputs("del", &str);
-            else error("Variant type inconsistant.");
+                if ( h->start != h->end ) {
+                    kputc('_', &str);
+                    if ( type->func1 == func_region_utr5 ) kputc('-', &str);
+                    else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
+                    ksprintf(&str, "%d", inf->end_loc);
+                    if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
+                    else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
+                }
+                if ( h->type == var_type_del ) kputs("del", &str);
+                else if ( h->type == var_type_ins) ksprintf(&str, "ins%s", alt);
+                else if ( h->type == var_type_delins) ksprintf(&str, "delins%s", alt);
+                else error("Variant type inconsistant. %d", h->type);           
+            }
         }
 
         if ( ref ) free(ref);
@@ -169,7 +170,7 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
         else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
         else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);
-        else if ( h->type == var_type_delins ) ksprintf(&str, "%s>%s", ref, alt);
+        else if ( h->type == var_type_delins ) ksprintf(&str, "delins%s", alt);
         else error("Failed to parse HGVS nom.");
 
         if ( ref ) free(ref);
