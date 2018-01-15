@@ -184,6 +184,10 @@ static int hgvs_handler_fill_buffer(struct hgvs *n, struct hgvs_handler *h)
         h->gls[h->n_gene++] = head;
         head = head->next;
     }
+
+    // release overhang memory
+    if ( h->n_gene == 0 && l > 0 ) free(h->gls);
+    
     return h->n_gene;
 }
 static int find_the_block(struct genepred_line *l, int *s, int *e, int pos)
@@ -591,8 +595,18 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
                 if ( alt_length > 0 ) kputsn(alt_seq, alt_length, &str);
 		if ( ref_length < transcript_retrieve_length ) {
 		    kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
-		    for ( i = 0; i < str.l/3; ++i )
+#ifdef DEBUG_MODE
+                    fprintf(stderr, "%s : ", gl->name1);
+#endif
+		    for ( i = 0; i < str.l/3; ++i ) {
+#ifdef DEBUG_MODE
+                        fprintf(stderr, "%s", codon_short_names[codon2aminoid(str.s+i*3)]);
+#endif
 			if ( check_is_stop(str.s+i*3) ) break;
+                    }
+#ifdef DEBUG_MODE
+                    fprintf(stderr, "\n");
+#endif
                     // frameshift -1 for no change,else for termination site
 		    type->fs = ori_stop == i +1 ? -1 : i+1;
 
@@ -625,6 +639,10 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
             } // end of frameshift
         } // end of delins
 
+        // ajust amnio acid change; for some frameshift variants first aa maybe retained, we should adjust aa forward
+        // until the most first aa change position. For example,
+        // NM_014638.3:c.3705_3721dup(p.Leu1240Leufs*29) should be interpret as :p.(Ser1241Phefs*42)
+        
         // check
         // stop retain
         // stop loss

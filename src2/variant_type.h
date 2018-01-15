@@ -164,6 +164,7 @@ static inline const char *var_func_type_string(enum var_func_type type)
     assert(type >= 0);
     return vartypes[type];
 }
+
 static inline const char *var_type_splice_string(enum var_type_splice type)
 {
     static const char *splicetypes[5] = {

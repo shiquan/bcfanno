@@ -19,6 +19,99 @@ static int anno_hgvs_update_buffer(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf
         f->files[i] = hgvs_init(bcf_seqname(hdr, line), line->pos+1, line->pos+line->rlen, line->d.allele[0], line->d.allele[i+1]);
     return 0;
 }
+// generate variant string in annovar format
+// OR4F5:NM_001005484:exon1:c.T809A:p.V270E
+static char *generate_annovar_name(struct hgvs *h)
+{
+    kstring_t str = {0,0,0};
+    int i;
+    for ( i = 0; i < h->n_tran; ++i ) {
+        if ( i ) kputc('|', &str);
+        struct hgvs_type *type = &h->trans[i].type;
+        struct hgvs_inf  *inf  = &h->trans[i].inf;
+        char *ref, *alt;
+        if ( inf->strand == '+' ) {
+            ref = h->ref ? strdup(h->ref) : NULL;
+            alt = h->alt ? strdup(h->alt) : NULL;
+        }
+        else {
+            ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
+            alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
+        }
+
+        ksprintf(&str,"%s:%s:", inf->gene, inf->transcript);
+        if ( inf->offset != 0 ) ksprintf(&str, "intron%d:", type->count);
+        else ksprintf(&str, "exon%d:", type->count);
+        if ( type->func1 == func_region_noncoding ) kputs("n.", &str);
+        else if ( type->func1 == func_region_cds  ) kputs("c.", &str);
+        else if ( type->func1 == func_region_utr5 ) kputs("c.-", &str);
+        else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
+
+        if ( inf->dup_offset != 0 ) {
+            assert(inf->loc != 0 );
+            int len = strlen(h->alt);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
+            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
+        }
+        else if ( h->start != h->end ) {
+            if ( inf->loc != 0 ) ksprintf(&str,"%d", inf->loc);
+            else kputc('?', &str);
+
+            if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
+            else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
+
+            kputc('_', &str);
+
+            if ( type->func1 == func_region_utr5 ) kputc('-', &str);
+            else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
+            ksprintf(&str, "%d", inf->end_loc);
+            if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
+            else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
+            if ( h->type == var_type_del ) kputs("del", &str);
+            else if ( h->type == var_type_ins) ksprintf(&str, "ins%s", alt);
+            else if ( h->type == var_type_delins) ksprintf(&str, "%s>%s", ref,alt);
+            else error("Variant type inconsistant.");
+        }
+        else {
+            if ( ref ) ksprintf(&str, "%s", ref);            
+            if ( inf->loc != 0 ) ksprintf(&str,"%d", inf->loc);
+            else kputc('?', &str);
+
+            if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
+            else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
+            if ( h->type == var_type_snp) ksprintf(&str, "%s", alt);
+            else if (h->type == var_type_del) kputs("del", &str);
+            else error("Variant type inconsistant.");
+        }
+
+        if ( ref ) free(ref);
+        if ( alt ) free(alt);
+
+        if ( type->loc_amino > 0 && h->type == var_type_snp) ksprintf(&str, ":p%s%d%s", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+        else {
+            int i;
+            if ( type->vartype == var_is_inframe_insertion ) {
+                ksprintf(&str, ":p.%s%d_%s%dins",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
+                for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
+            }
+            else if ( type->vartype == var_is_inframe_deletion ) {
+                if ( type->loc_end_amino == 0 ) ksprintf(&str, ":p.%s%ddel",codon_short_names[type->ori_amino], type->loc_amino);
+                else  ksprintf(&str, ":p.%s%d_%s%ddel",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
+                for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
+            }
+            else if ( type->vartype == var_is_inframe_delins ) {
+                if ( type->loc_end_amino == 0 ) ksprintf(&str, ":p.%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino);
+                else ksprintf(&str, ":p.%s%d_%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino); 
+                for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
+            }
+            else if ( type->vartype == var_is_frameshift ) {
+                ksprintf(&str, ":p.%s%d%s",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+                if ( type->fs > 0 ) kputs("fs", &str);
+            }
+        }
+    }
+    return str.s;
+}
 static char *generate_hgvsnom_string(struct hgvs *h)
 {
     kstring_t str = {0,0,0};
@@ -357,6 +450,12 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
                 kputs(name, &str[j]);
                 if (name) free(name);
             }
+            else if ( strcmp(col->hdr_key, "ANNOVARname") == 0 ) {
+                char *name = generate_annovar_name(f);
+                kputs(name, &str[j]);
+                if ( name ) free(name);
+            }
+                
         }
         empty = 0;
     }
@@ -444,7 +543,7 @@ struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, c
             if ( ss[0] == '\0') continue;
             if ( strncmp(ss, "INFO/", 5) == 0 ) ss += 5;
             if ( strcmp(ss, "HGVSnom")  && strcmp(ss, "Gene") && strcmp(ss, "Transcript") && strcmp(ss, "VarType") && strcmp(ss, "ExonIntron") && strcmp(ss, "IVSnom")
-                 && strcmp(ss, "Oldnom") && strcmp(ss, "AAlength") ) {
+                 && strcmp(ss, "Oldnom") && strcmp(ss, "AAlength") && strcmp(ss, "ANNOVARname") ){
                 warnings("Do NOT support tag %s.", ss);
                 continue;
             }
@@ -470,6 +569,8 @@ struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, c
         struct anno_col *col = &f->cols[i];
         if ( strcmp(col->hdr_key, "HGVSnom") == 0 ) 
             BRANCH("HGVSnom", "##INFO=<ID=HGVSnom,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+        else if ( strcmp(col->hdr_key, "ANNOVARname") == 0 )
+            BRANCH("ANNOVARname", "##INFO=<ID=ANNOVARname,Number=A,Type=String,Description=\"Variant description in ANNOVAR format.\">");
         else if ( strcmp(col->hdr_key, "Gene") == 0 ) 
             BRANCH("Gene","##INFO=<ID=Gene,Number=A,Type=String,Description=\"Gene names\">");
         else if ( strcmp(col->hdr_key, "Transcript") == 0 ) 

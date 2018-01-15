@@ -46,6 +46,9 @@ tsv2vcf: $(HTSLIB) version.h
 vcf_rename_tags: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf_rename_tags.c $(HTSLIB)
 
+hgvs: $(HTSLIB) version.h
+	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o bcfanno_hgvs -DANNO_HGVS_MAIN  src2/anno_col.c src2/anno_hgvs.c src2/hgvs.c src2/name_list.c src2/anno_thread_pool.c src2/anno_pool.c src2/number.c src2/vcmp.c src2/genepred.c src2/sort_list.c src2/variant_type.c $(HTSLIB)
+
 bcfanno: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -lz -pthread -o $@ src2/anno_bed.c src2/anno_col.c src2/anno_hgvs.c src2/anno_pool.c src2/anno_thread_pool.c src2/anno_vcf.c src2/bcfanno_main.c src2/config.c src2/flank_seq.c src2/genepred.c src2/hgvs.c src2/json_config.c src2/kson.c src2/name_list.c src2/number.c src2/sort_list.c src2/variant_type.c src2/vcf_annos.c src2/vcmp.c $(HTSLIB)
 
@@ -58,7 +61,7 @@ test: $(HTSLIB) version.h
 clean: testclean
 	-rm -f gmon.out *.o *~ $(PROG) version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
-	-rm -f anno_vcf bedadd vcfadd bcfanno anno_bed hgvs_generate hgvs_vcf GenePredExtGen
+	-rm -f anno_vcf bedadd vcfadd bcfanno anno_bed hgvs_generate hgvs_vcf GenePredExtGen bcfanno_hgvs
 	-rm -f config bcfanno_debug vcf2tsv tsv2vcf vcf_rename_tags
 
 testclean:
