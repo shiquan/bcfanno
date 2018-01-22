@@ -120,7 +120,7 @@
 	fprintf(stderr, "[%s] " ANSI_COLOR_GREEN line ANSI_COLOR_RESET"\n", _time_buff, ##__VA_ARGS__); \
     } while(0)
 
-#define DONOT_POST_ERR_STRING "Please DO NOT post this error message on forums or emails. And please read the online manual"
+//#define DONOT_POST_ERR_STRING "Do NOT post this error message on forums or emails. Please read our online manual. Thank you!"
 
 static inline void *bcfanno_realloc(void *x, size_t size)
 {

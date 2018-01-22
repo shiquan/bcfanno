@@ -252,7 +252,7 @@ int parse_args(int argc, char **argv)
     
     if ( args.fname_json == 0 ) {
 	fprintf(stderr, "[error] No configure file is specified. Use -h for help message.\n");
-	fprintf(stderr, "[notice] %s.\n", DONOT_POST_ERR_STRING);
+	//fprintf(stderr, "[notice] %s.\n", DONOT_POST_ERR_STRING);
 	return 1;
     }
 
