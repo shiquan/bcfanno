@@ -601,7 +601,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
                     type->loc_amino += offset_init_codon;
                     type->ori_amino = codon2aminoid(ori_seq+i*3);
                     new_seq_p = ori_seq + offset_init_codon*3;
-                    assert ( type->loc_end_amino <= type->loc_amino );
+                    assert ( type->loc_end_amino >= type->loc_amino );
                 }
                 // check end aa
                 for ( ; offset_tail_codon < type->n-offset_init_codon-1; ) {
