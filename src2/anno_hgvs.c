@@ -218,15 +218,14 @@ static char *generate_hgvsnom_string(struct hgvs *h)
 static char *generate_gene_string(struct hgvs *h)
 {
     kstring_t str = {0,0,0};
-    struct anno_stack *s = anno_stack_init();
+    //struct anno_stack *s = anno_stack_init();
     int i;
-    for ( i = 0; i < h->n_tran; ++i )
-        anno_stack_push(s, h->trans[i].inf.gene);
-    for ( i = 0; i < s->l; ++i ) {
-        if ( i ) kputc('|', &str);
-        kputs(s->a[i], &str);
-    }
-    anno_stack_destroy(s);
+    for ( i = 0; i < h->n_tran; ++i ) {
+     if ( i ) kputc('|', &str);
+        struct hgvs_inf *inf = &h->trans[i].inf;
+        if ( inf->gene ) kputs(inf->gene, &str);
+        else kputc('.', &str);
+    }   
     return str.s;
 }
 static char *generate_transcript_string(struct hgvs *h)
