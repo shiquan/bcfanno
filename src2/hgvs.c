@@ -554,8 +554,9 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         BRANCH(var_is_inframe_deletion);
             
         if ( ref_length == 3 ) {
-            type->loc_end_amino = 0; type->ori_end_amino = 0;
-            type->mut_amino = codon2aminoid(ori_seq);
+            type->loc_end_amino = type->loc_amino;
+            type->ori_end_amino = codon2aminoid(ori_seq);
+            //type->mut_amino = codon2aminoid(ori_seq);
         }
         else {
             memcpy(codon, ori_seq + ref_length-3, 3);            
@@ -654,8 +655,9 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
                 type->loc_end_amino = type->loc_amino+1;
                 type->ori_end_amino = codon2aminoid(ori_seq+3);
             }
-            type->aminos = malloc(sizeof(int)*(type->n-i));
-            for ( j=i;i < type->n; ++i,++j) type->aminos[j] = codon2aminoid(str.s+3*i);
+            type->n -= i;
+            type->aminos = malloc(sizeof(int)*(type->n));            
+            for ( j = 0;j < type->n; ++i,++j) type->aminos[j] = codon2aminoid(str.s+3*i);
             if ( str.m ) free(str.s);
         }
         // inframe deletion
