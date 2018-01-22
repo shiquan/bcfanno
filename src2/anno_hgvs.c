@@ -72,8 +72,8 @@ static char *generate_annovar_name(struct hgvs *h)
 
                 if ( h->start != h->end ) {
                     kputc('_', &str);
-                    if ( type->func1 == func_region_utr5 ) kputc('-', &str);
-                    else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
+                    if ( type->func2 == func_region_utr5 ) kputc('-', &str);
+                    else if ( type->func2 == func_region_utr3 ) kputc('*', &str);
                     ksprintf(&str, "%d", inf->end_loc);
                     if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
                     else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
@@ -88,20 +88,23 @@ static char *generate_annovar_name(struct hgvs *h)
         if ( ref ) free(ref);
         if ( alt ) free(alt);
 
-        if ( type->loc_amino > 0 && h->type == var_type_snp) ksprintf(&str, ":p%s%d%s", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+        if ( type->loc_amino > 0 && h->type == var_type_snp) ksprintf(&str, ":p.%s%d%s", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
         else {
             int i;
             if ( type->vartype == var_is_inframe_insertion ) {
+                assert(type->loc_end_amino -1 == type->loc_amino);
                 ksprintf(&str, ":p.%s%d_%s%dins",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
                 for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
             else if ( type->vartype == var_is_inframe_deletion ) {
-                if ( type->loc_end_amino == 0 ) ksprintf(&str, ":p.%s%ddel",codon_short_names[type->ori_amino], type->loc_amino);
-                else  ksprintf(&str, ":p.%s%d_%s%ddel",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
+                assert(type->loc_end_amino > 0);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%s%ddel",codon_short_names[type->ori_amino], type->loc_amino);
+                else ksprintf(&str, ":p.%s%d_%s%ddel",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
                 for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
             else if ( type->vartype == var_is_inframe_delins ) {
-                if ( type->loc_end_amino == 0 ) ksprintf(&str, ":p.%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino);
+                assert(type->loc_end_amino > 0);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino);
                 else ksprintf(&str, ":p.%s%d_%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino); 
                 for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
@@ -151,8 +154,8 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         while ( h->start != h->end) {
             //if ( inf->dup_offset && h->end - h->start == 1 ) break;
             kputc('_', &str);
-            if ( type->func1 == func_region_utr5 ) kputc('-', &str);
-            else if ( type->func1 == func_region_utr3 ) kputc('*', &str);
+            if ( type->func2 == func_region_utr5 ) kputc('-', &str);
+            else if ( type->func2 == func_region_utr3 ) kputc('*', &str);
             ksprintf(&str, "%d", inf->end_loc);
             if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
             else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
@@ -184,18 +187,20 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         else {
             int i;
             if ( type->vartype == var_is_inframe_insertion ) {
+                assert(type->loc_amino +1 == type->loc_end_amino);
                 ksprintf(&str, "(p.%s%d_%s%dins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
                 for (i = 0; i < type->n; ++i) kputs(codon_names[type->aminos[i]], &str);
-                kputc(')', &str);                         
+                kputc(')', &str);
             }
             else if ( type->vartype == var_is_inframe_deletion ) {
-                if ( type->loc_end_amino == 0 ) ksprintf(&str, "(p.%s%ddel",codon_names[type->ori_amino], type->loc_amino);
+                assert(type->loc_end_amino != 0);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, "(p.%s%ddel",codon_names[type->ori_amino], type->loc_amino);
                 else  ksprintf(&str, "(p.%s%d_%s%ddel",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
                 for (i = 0; i < type->n; ++i) kputs(codon_names[type->aminos[i]], &str);
                 kputc(')', &str);                                         
             }
             else if ( type->vartype == var_is_inframe_delins ) {
-                if ( type->loc_end_amino == 0 ) ksprintf(&str, "(p.%s%ddelins",codon_names[type->ori_amino], type->loc_amino);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, "(p.%s%ddelins",codon_names[type->ori_amino], type->loc_amino);
                 else ksprintf(&str, "(p.%s%d_%s%ddelins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino); 
                 for (i = 0; i < type->n; ++i) kputs(codon_names[type->aminos[i]], &str);
                 kputc(')', &str);                                         
@@ -203,7 +208,6 @@ static char *generate_hgvsnom_string(struct hgvs *h)
             else if ( type->vartype == var_is_frameshift ) {
                 ksprintf(&str, "(p.%s%d%s",codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino]);
                 if ( type->fs > 0 ) ksprintf(&str, "fs*%d", type->fs);
-                //else kputw(type->fs, &str);
                 kputc(')', &str);                                         
             }
         }

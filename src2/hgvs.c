@@ -277,12 +277,13 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     struct hgvs_inf *inf = &hgvs->trans[n].inf;
     struct hgvs_type *type = &hgvs->trans[n].type;
     memset(type, 0, sizeof(struct hgvs_type));
+
     int pos = inf->pos;
     int ref_length = hgvs->ref == NULL ? 0 : strlen(hgvs->ref);
     int alt_length = hgvs->alt == NULL ? 0 : strlen(hgvs->alt);
     char *ref_seq = hgvs->ref == NULL ? NULL : strdup(hgvs->ref);
     char *alt_seq = hgvs->alt == NULL ? NULL : strdup(hgvs->alt);
-    char *ori_seq = NULL;
+
     // for reverse strand, complent sequence
     if ( inf->strand == '-' ) {        
         if ( ref_seq ) compl_seq(ref_seq, ref_length);
@@ -309,7 +310,7 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     if ( type->func1 == func_region_utr5 ) inf->loc = gl->utr5_length - inf->pos +1;
     else if ( type->func1 == func_region_utr3 ) inf->loc = inf->pos - gl->cds_length;
     else if ( type->func1 == func_region_cds ) inf->loc = inf->pos - gl->utr5_length;
-    else inf->loc = inf->pos;    
+    else inf->loc = inf->pos;
     //end
     if ( type->func2 == func_region_utr5 ) inf->end_loc = gl->utr5_length - inf->end_pos +1;
     else if ( type->func2 == func_region_utr3 ) inf->end_loc = inf->end_pos - gl->cds_length;
@@ -394,12 +395,29 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         goto no_amino_code;
     }
 
-    //  Check if UTR regions.  
-    if ( pos <= gl->utr5_length -SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr5); goto no_amino_code; }
-    if ( pos <= gl->utr5_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }  // init
-    if ( pos >= gl->cds_length + SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr3); goto no_amino_code;}
-    if ( pos >= gl->cds_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }
+    //  deletion variant from UTR5 that changes at least one base of the canonical start codon, trim the UTR part
+    // int deletion_variant_cover_utr5_length = 0;
+    if ( type->func1 == func_region_utr5 && type->func2 != func_region_utr5 ) {
 
+        // Do not try to predict the amnino acid changes if partly or whole start codon deleted
+
+        BRANCH(var_is_transcript_ablation);
+        if ( type->func2 == func_region_cds ) {
+            //deletion_variant_cover_utr5_length = ref_length - inf->end_loc;            
+            //assert(deletion_variant_cover_utr5_length > 0);
+            type->vartype2 = var_is_splice_site; // for variants covered start codon, should always be splice site
+            type->vartype  = var_is_start_lost;
+        }
+        goto no_amino_code;
+    }
+    else {
+        //  Check if UTR regions.  
+        if ( pos <= gl->utr5_length -SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr5); goto no_amino_code; }
+        if ( pos <= gl->utr5_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }  // init
+        if ( pos >= gl->cds_length + SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr3); goto no_amino_code;}
+        if ( pos >= gl->cds_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }
+    }
+    
     // next we will check amino acid changes
     if ( inf->offset != 0 ) goto no_amino_code;
     
@@ -409,11 +427,16 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     int cod = (cds_pos-1) % 3;
     // codon inition position in the transcript, 0 based.
     // NOTICE: One to 3 base(s) will be CAPPED for the start of insertion; remove caps to check amino acid changes.
+    //int start = cod == 0 ? gl->utr5_length + 1 : (cds_pos-1)/3*3 + gl->utr5_length;
     int start = (cds_pos-1)/3*3 + gl->utr5_length;
     // retrieve affected sequences and downstream    
     int transcript_retrieve_length = 0;
     char *name = gl->name1;
-    ori_seq = faidx_fetch_seq(h->rna_fai, name, start, start + 1000, &transcript_retrieve_length);
+    // original sequnence from RNA sequence, start round from first aa changed position;
+    // start aa location may be changed becase realignment, but ori_seq will be "stable" (reset if duplicate) in this function;
+    // ori_seq is a temp sequence, will be free before level this function.
+    char *ori_seq = NULL;
+    ori_seq = faidx_fetch_seq(h->rna_fai, name, start, start + 10000, &transcript_retrieve_length);
     if ( ori_seq == NULL || transcript_retrieve_length == 0 ) goto failed_check;
 
     // Sometime trancated transcript records will disturb downstream analysis.
@@ -422,18 +445,6 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         goto failed_check;
     }
         
-    // Check the ref sequence consistant with database or not. If variants are same with transcript sequence, set type to no_call.
-    // Only check the first base.
-    //char *ref = hgvs->ref;
-    //char *alt = hgvs->alt;
-    if ( ref_length > 0 && ref_seq != NULL ) {
-        if ( seq2code4(ori_seq[cod]) != seq2code4(ref_seq[0]) ) {
-            if ( alt_length == ref_length ) {
-                if (seq2code4(ori_seq[cod]) == seq2code4(alt_seq[0]) ) type->vartype = var_is_no_call;
-                else warnings("Inconsistance nucletide: %s,%d,%c vs %s,%d,%c.", hgvs->chr, hgvs->start, ref_seq[0], gl->name1, pos, ori_seq[cod]);
-            }
-        }
-    }
     
     // Check if insert bases in tandam short repeats region, amino acids will be changed in the downstream;
     // Realign the alternative allele ..
@@ -471,8 +482,18 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     codon[3] = '\0';
     type->ori_amino = codon2aminoid(codon);
     type->loc_amino = (cds_pos-1)/3 + 1;
+
+    // reset type    
     if ( type->n ) { free(type->aminos); type->n = 0; }
-    if ( ref_length == 1 && ref_length == alt_length ) {
+
+    //if ( ref_length == 1 && ref_length == alt_length ) {
+    if ( hgvs->type == var_type_snp ) {
+        // Check the ref sequence consistant with database or not. If variants are same with transcript sequence, set type to no_call.
+        if ( seq2code4(ori_seq[cod]) != seq2code4(ref_seq[0]) ) {
+            if (seq2code4(ori_seq[cod]) == seq2code4(alt_seq[0]) ) type->vartype = var_is_no_call;
+            else warnings("Inconsistance nucletide: %s,%d,%c vs %s,%d,%c.", hgvs->chr, hgvs->start, ref_seq[0], gl->name1, pos, ori_seq[cod]);
+        }
+
         codon[cod] = *alt_seq;
         type->mut_amino = codon2aminoid(codon);
         if ( type->ori_amino == type->mut_amino ) {
@@ -486,171 +507,267 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         }
     }
     // if insert or delete
-    else {
+    //else {
+    else if ( hgvs->type == var_type_ins ) {
         // Insertions
-        if ( ref_length == 0 ) {
             
-            // if insert frameshift sequence goto check delins
-            if ( alt_length%3 ) goto delins;
+        // if insertion break the frame goto check delins
+        if ( alt_length%3 ) goto delins;
+        // if insertion break the original codon goto check delins
+        if ( cod != 2 ) goto delins;
+        
+        // Check if insertion does NOT change the amino acid, treat as inframe insertion, else go to delins
+        // memcpy(codon, ori_seq, 3);
+
+        // ?
+        //if ( type->ori_amino != codon2aminoid(codon) ) goto delins;
+        
+        BRANCH(var_is_inframe_insertion);
+        
+        // end amino acid
+        memcpy(codon, ori_seq+3, 3);
+        type->ori_end_amino = codon2aminoid(codon);
+        type->loc_end_amino = type->loc_amino + 1;
+        
+        // free aminos buffer before reallocated it, previous memory leaks
+        type->n = alt_length/3;
+        type->aminos = malloc(type->n *sizeof(int));
+
+        int i;
+        for ( i = 0; i < alt_length/3; ++i ) {
+            memcpy(codon, alt_seq+i*3, 3);
+            type->aminos[i] = codon2aminoid(codon);
+        }
+    } 
+    // Deletion
+    else if ( hgvs->type == var_type_del ) {
+        // for an exon-span deletion, the transcript has been trimmed, report stop-lost?
+        if ( ref_length >= transcript_retrieve_length ) {
+            type->vartype = var_is_stop_lost;
+            goto no_amino_code;
+        }
+        
+        if ( ref_length%3 ) goto delins;
+
+        if ( cod != 2 ) goto delins;
+        
+        BRANCH(var_is_inframe_deletion);
             
-            // Check if insertion does NOT change the amino acid, treat as inframe insertion, else go to delins
-            memcpy(codon, ori_seq, 3);
-            
-            if ( type->ori_amino != codon2aminoid(codon) ) goto delins;
-            BRANCH(var_is_inframe_insertion);
-            // end amino acid
-            memcpy(codon, ori_seq+3, 3);
+        if ( ref_length == 3 ) {
+            type->loc_end_amino = 0; type->ori_end_amino = 0;
+            type->mut_amino = codon2aminoid(ori_seq);
+        }
+        else {
+            memcpy(codon, ori_seq + ref_length-3, 3);            
             type->ori_end_amino = codon2aminoid(codon);
-            type->loc_end_amino = type->loc_amino + 1;
-
-            // free aminos buffer before reallocated it, previous memory leaks
-            type->n = alt_length/3;
-            type->aminos = malloc(type->n *sizeof(int));
-
-            kstring_t str = { 0, 0, 0};
-            kputs(alt_seq+2-cod, &str);
-            kputsn(ori_seq + cod +1, 2 - cod, &str);
-
-            int i;
-            for ( i = 0; i < alt_length/3; ++i ) {
-                memcpy(codon, str.s+i*3, 3);
-                type->aminos[i] = codon2aminoid(codon);
-            }
-            if (str.m) free(str.s);
-        } 
-        // Deletion
-        else if ( alt_length == 0 ) {
-	    // for an exon-span deletion, the transcript has been trimmed, complex type will be report
-	    if ( ref_length >= transcript_retrieve_length ) type->vartype = var_is_complex;
-            if ( ref_length%3 || cod != 2) goto delins;
-            BRANCH(var_is_inframe_deletion);
-            
-            if ( ref_length == 3 ) { type->loc_end_amino = 0; type->ori_end_amino = 0; }
-            else {
-                memcpy(codon, ori_seq + ref_length, 3);            
-                type->ori_end_amino = codon2aminoid(codon);
-                type->loc_end_amino = type->loc_amino + ref_length/3;
-            }
+            type->loc_end_amino = type->loc_amino + ref_length/3;        
             type->n = ref_length/3;
             type->aminos = malloc(type->n *sizeof(int));
             int i;
             for ( i = 0; i < ref_length/3; ++i ) type->aminos[i] = codon2aminoid(ori_seq+i*3);
         }
-        // Delins        
-        else {
-          delins:
-            if ( alt_length == ref_length ) {
-                BRANCH(var_is_inframe_delins);
-                memcpy(codon, ori_seq + ref_length, 3);
-                type->ori_end_amino = codon2aminoid(codon);
-                type->loc_end_amino = (cds_pos+ref_length-1)/3+1;
+    }
+    // Delins
+    else {
+      delins:
+
+        // assume it is a inframe delins first
+        BRANCH(var_is_inframe_delins);
+        
+        type->loc_end_amino = (cds_pos+ref_length-1)/3+1;
+        type->ori_end_amino = codon2aminoid(ori_seq+(type->loc_end_amino - type->loc_amino)*3);
+        
+        if ( alt_length == ref_length) {
+            char *new_seq_p = ori_seq;
+            
+            // if inframe delins break one amino acid frame, try to trim both ends of amino acid sequences and predict alternate aa
+            if ( type->loc_end_amino > type->loc_amino ) {
                 int i, j;
-                for ( i = 0, j = cod; i < ref_length; ++i ) ori_seq[++j] = alt_seq[i];
-                type->n = type->loc_end_amino - type->loc_amino + 1;
-                type->aminos = (int*)malloc(sizeof(int)*type->n);
-                for ( i = 0; i < type->n; ++i ) type->aminos[i] = codon2aminoid(ori_seq+i*3);
-            }
-            // inframe insertion
-            else if ( ref_length == 0 && alt_length %3 == 0 ) {
-                BRANCH(var_is_inframe_delins);
-                type->loc_end_amino = 0;
-                type->ori_end_amino = 0;
-                kstring_t str = { 0, 0, 0 };
-                kputsn(ori_seq, cod+1, &str);
-                kputs(alt_seq, &str);
-                kputsn(ori_seq+cod+1, 3-cod-1, &str);
-                assert(str.l%3 == 0);
-                type->n = str.l/3;
-                type->aminos = malloc(sizeof(int)*type->n);
-                int i;
-                for ( i = 0; i < type->n; ++i) type->aminos[i] = codon2aminoid(str.s+3*i);
-                if ( str.m ) free(str.s);
-            }
-            // inframe deletion
-            else if ( alt_length == 0 && ref_length %3 == 0 ) {
-                BRANCH(var_is_inframe_delins);
-                type->loc_end_amino = (cds_pos+ref_length-1)/3+1;
-                memcpy(codon, ori_seq + ref_length, 3);              
-                type->ori_end_amino = codon2aminoid(codon);
-                if (cod > 0 ) memcpy(codon, ori_seq, cod);
-		// check complex type
-		if ( ref_length < transcript_retrieve_length - cod ) {
-		    memcpy(codon+cod, ori_seq+ref_length+cod, 3-cod);                
-		    type->n = 1;
-		    type->aminos = (int*)malloc(sizeof(int));
-		    type->aminos[0] = codon2aminoid(codon);
-		} 
-            }
-            // frameshift
-            else {                
-                BRANCH(var_is_frameshift);
-                int i;
-                kstring_t str = {0, 0, 0};
-                int ori_stop = gl->cds_length - type->loc_amino;
-                char codon[4];
-                memcpy(codon, ori_seq, 3);
-                type->ori_amino = codon2aminoid(codon);
+                char *alt_allele = strndup(ori_seq, ref_length+4);
+                for ( i = 0, j = cod; i < ref_length && j < ref_length; ++i ) alt_allele[++j] = alt_seq[i];
                 
-                if ( cod > 0 ) kputsn(ori_seq, cod, &str);
-                if ( alt_length > 0 ) kputsn(alt_seq, alt_length, &str);
-		if ( ref_length < transcript_retrieve_length ) {
-		    kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
-#ifdef DEBUG_MODE
-                    fprintf(stderr, "%s : ", gl->name1);
-#endif
-		    for ( i = 0; i < str.l/3; ++i ) {
-#ifdef DEBUG_MODE
-                        fprintf(stderr, "%s", codon_short_names[codon2aminoid(str.s+i*3)]);
-#endif
-			if ( check_is_stop(str.s+i*3) ) break;
-                    }
-#ifdef DEBUG_MODE
-                    fprintf(stderr, "\n");
-#endif
-                    // frameshift -1 for no change,else for termination site
-		    type->fs = ori_stop == i +1 ? -1 : i+1;
+                type->n = type->loc_end_amino - type->loc_amino + 1;
 
-                    // delins in stop codon
-		    if (str.l < 3) {
-                        faidx_t *fai = fai_load(h->reference_fname);
-                        if ( fai ) {
-                            char *refseq = NULL;
-                            int length = 0;
-                            if ( gl->strand == '+' ) 
-                                refseq = faidx_fetch_seq(fai, gl->chrom, gl->txend, gl->txend+10, &length);
-                            else {
-                                refseq = faidx_fetch_seq(fai, gl->chrom, gl->txstart - 10, gl->txstart, &length);
-                                compl_seq(refseq, length);
-                            }
-                            if ( length && refseq ) {
-                                kputs(refseq, &str);
-                                memcpy(codon, str.s, 3);
-                                type->mut_amino = codon2aminoid(codon);
-                            }
-                            fai_destroy(fai);
+                // trim ends of amino acid sequences
+                int offset_init_codon = 0;
+                int offset_tail_codon = 0;
+                // check start aa
+                for ( ; offset_init_codon < type->n; ) {
+                    if ( codon2aminoid(alt_allele+offset_init_codon*3) == codon2aminoid(ori_seq+offset_init_codon*3) ) offset_init_codon++;
+                    break;
+                }
+                if ( offset_init_codon > 0 ) {
+                    type->loc_amino += offset_init_codon;
+                    type->ori_amino = codon2aminoid(ori_seq+i*3);
+                    new_seq_p = ori_seq + offset_init_codon*3;
+                    assert ( type->loc_end_amino <= type->loc_amino );
+                }
+                // check end aa
+                for ( ; offset_tail_codon < type->n-offset_init_codon-1; ) {
+                    if ( codon2aminoid(alt_allele+(type->n-1-offset_tail_codon)*3) == codon2aminoid(ori_seq+(type->n-1-offset_tail_codon)*3) ) offset_tail_codon++;
+                    break;
+                }
+                if ( offset_tail_codon > 0 ) {
+                    type->loc_end_amino -= offset_tail_codon;
+                    type->ori_end_amino = codon2aminoid(ori_seq+(type->n-1-offset_tail_codon)*3);
+                }
+
+                if ( alt_allele ) free(alt_allele);
+            }
+            type->n = type->loc_end_amino - type->loc_amino + 1;
+            type->aminos = (int*)malloc(sizeof(int)*type->n);
+            for ( i = 0; i < type->n; ++i ) type->aminos[i] = codon2aminoid(new_seq_p+i*3);
+            // repredict the change type if only one aa changed
+            if ( type->n == 1 ) {
+                type->mut_amino = type->aminos[0];
+                if ( type->ori_amino == type->mut_amino ) {
+                    if ( type->ori_amino == X_CODO ) type->vartype = var_is_stop_retained;
+                    else type->vartype = var_is_synonymous;
+                }
+                else {
+                    if ( type->ori_amino == X_CODO ) type->vartype = var_is_stop_lost;
+                    else if ( type->mut_amino == X_CODO) type->vartype = var_is_nonsense;
+                    else type->vartype = var_is_missense;
+                }
+                free(type->aminos);
+                type->aminos = NULL;
+                type->n = 0;
+            }
+        }
+        // inframe insertion
+        else if ( ref_length == 0 && alt_length %3 == 0 ) {
+            // if insert codons without check orignal codon will interpret as inframe_insertion
+            // else if orignal codon changed, interpret as inframe_delins
+            kstring_t str = {0,0,0};
+            kputsn(ori_seq, cod+1, &str);
+            kputs(alt_seq, &str);
+            kputsn(ori_seq+cod+1, 3-cod-1, &str);
+            assert(str.l%3 == 0);
+            type->n = str.l/3;
+            
+            // if inserted base disrupt original aa, 2 nearby aa will be checked
+            int i = 0, j;
+            if ( cod != 2 && codon2aminoid(ori_seq) == codon2aminoid(str.s) ) {
+                // convert p.XXdelinsXX ==> p.XX_XXinsXX
+                type->vartype = var_is_inframe_insertion;
+                i = 1;
+                type->loc_end_amino = type->loc_amino+1;
+                type->ori_end_amino = codon2aminoid(ori_seq+3);
+            }
+            type->aminos = malloc(sizeof(int)*(type->n-i));
+            for ( j=i;i < type->n; ++i,++j) type->aminos[j] = codon2aminoid(str.s+3*i);
+            if ( str.m ) free(str.s);
+        }
+        // inframe deletion
+        else if ( alt_length == 0 && ref_length %3 == 0 ) {
+            
+            if ( ref_length < transcript_retrieve_length - cod ) {
+                // cod == 0 for first base of codon, cod > 0 indicate deletion breakup original codon, treat it as delins
+                if ( cod == 0 ) {
+                    type->n = ref_length/3;
+                    type->aminos = malloc(type->n*sizeof(int));
+                    int i;
+                    for (i=0; i<type->n; ++i) type->aminos[i] = codon2aminoid(ori_seq+i*3);
+                }
+                else {
+                    memcpy(codon, ori_seq, cod);
+                    memcpy(codon+cod, ori_seq+ref_length+cod, 3-cod);
+                    // original nearby codons break, connect trancated codons on both ends into a new codon 
+                    type->n = 1;
+                    type->aminos = (int*)malloc(sizeof(int));
+                    type->aminos[0] = codon2aminoid(codon);
+                    // there is no need to update ori_seq in this function
+                    // if first codon or last codon same with alternative codon, trim it
+                    if ( type->ori_amino == type->aminos[0] ) {
+                        type->vartype = var_is_inframe_deletion;
+                        type->loc_amino++;
+                        type->ori_amino = codon2aminoid(ori_seq+3);
+                        type->n = 0;
+                        free(type->aminos);
+                        type->aminos = NULL;
+                    }
+                    else if ( type->ori_end_amino == type->aminos[0] ) {
+                        type->vartype = var_is_inframe_deletion;
+                        type->loc_end_amino--;
+                        // !!! type->loc_amino should inited and NOT changed again before enter this function
+                        int l = (type->loc_end_amino - type->loc_amino)*3;
+                        type->ori_end_amino = codon2aminoid(ori_seq+l);
+                        type->n = 0;
+                        free(type->aminos);
+                        type->aminos = NULL;
+                    }
+                }
+            }
+            // if deletion break the end of transcription..
+            else {
+                goto variant_frameshift;
+            }
+        }
+        // frameshift
+        else {
+          variant_frameshift:
+            type->vartype = var_is_frameshift;
+            kstring_t str = {0,0,0};
+            int ori_stop = gl->cds_length - type->loc_amino;
+            char codon[4];
+            memcpy(codon, ori_seq, 3);
+            type->ori_amino = codon2aminoid(codon);
+                
+            if ( cod > 0 ) kputsn(ori_seq, cod, &str);
+            if ( alt_length > 0 ) kputsn(alt_seq, alt_length, &str);
+            if ( ref_length < transcript_retrieve_length ) {
+                kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
+                // delins in stop codon, and no UTR 3 in this transcript                
+                if (str.l < 3) {
+                    faidx_t *fai = fai_load(h->reference_fname);
+                    if ( fai ) {
+                        char *refseq = NULL;
+                        int length = 0;
+                        if ( gl->strand == '+' ) 
+                            refseq = faidx_fetch_seq(fai, gl->chrom, gl->txend, gl->txend+10, &length);
+                        else {
+                            refseq = faidx_fetch_seq(fai, gl->chrom, gl->txstart - 10, gl->txstart, &length);
+                            compl_seq(refseq, length);
                         }
+                        if ( length && refseq ) {
+                            kputs(refseq, &str);
+                            memcpy(codon, str.s, 3);
+                            type->mut_amino = codon2aminoid(codon);
+                        }
+                        fai_destroy(fai);
                     }
-                    else {
-                        memcpy(codon, str.s, 3);
-                        type->mut_amino = codon2aminoid(codon);
-                    }
-		    if ( str.m ) free(str.s);
-		}
+                }
+                else {
+                    memcpy(codon, str.s, 3);
+                    type->mut_amino = codon2aminoid(codon);
+                }
+                
+                int i = 0, j;
+                // ajust amnio acid change; for some frameshift variants first aa maybe retained, we should adjust aa forward
+                // until the most first aa change position. For example,
+                // NM_014638.3:c.3705_3721dup(p.Leu1240Leufs*29) should be interpret as :p.(Ser1241Phefs*42)
+
+                for ( ;; ) {
+                    if (type->ori_amino != type->mut_amino || i*3>str.l) break;
+                    i++;
+                    memcpy(codon, ori_seq+i*3, 3);
+                    type->ori_amino = codon2aminoid(codon);
+                    memcpy(codon, str.s+i*3, 3);
+                    type->mut_amino = codon2aminoid(codon);
+                }
+                for ( j = i; j < str.l/3; ++j ) {
+                    if ( check_is_stop(str.s+j*3) ) break;
+                }
+                // frameshift -1 for no change,else for termination site
+                type->fs = ori_stop == j+1-i ? -1 : j+1-i;
+                // adjust location to the nearest variant position
+                type->loc_amino += i;
+                type->loc_end_amino += i;
+                    
+                if ( str.m ) free(str.s);
             } // end of frameshift
-        } // end of delins
-
-        // ajust amnio acid change; for some frameshift variants first aa maybe retained, we should adjust aa forward
-        // until the most first aa change position. For example,
-        // NM_014638.3:c.3705_3721dup(p.Leu1240Leufs*29) should be interpret as :p.(Ser1241Phefs*42)
-        
-        // check
-        // stop retain
-        // stop loss
-        // start loss
-       
-        
+        } // end of Delins        
     } // end var type
-
     
 #undef BRANCH
     
@@ -660,12 +777,12 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     return 0;
     
   failed_check:
+    if ( ori_seq != NULL ) free(ori_seq);
     type->vartype = var_is_unknown;
     
   no_amino_code:
     if ( ref_seq != NULL ) free(ref_seq);
     if ( alt_seq != NULL ) free(alt_seq);
-    if ( ori_seq != NULL ) free(ori_seq);
 
     type->loc_amino = 0;
     type->ori_amino = 0;

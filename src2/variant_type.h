@@ -56,6 +56,8 @@ extern int same_DNA_seqs(const char *a, const char *b, int l );
 extern int codon2aminoid(char *codon);
 extern char *rev_seqs(const char *dna_seqs, unsigned long n);
 
+#define X_CODO   0
+
 #define C4_Stop  0
 #define C4_Phe   1
 #define C4_Leu   2
@@ -91,6 +93,7 @@ const static int codon_matrix[4][4][4] = {
     { { C4_Stop, C4_Tyr, C4_Stop, C4_Tyr, }, { C4_Ser, C4_Ser, C4_Ser, C4_Ser, }, { C4_Stop, C4_Cys, C4_Trp, C4_Cys, }, { C4_Leu, C4_Phe, C4_Leu, C4_Phe, }, },
 };
 
+// DNA level
 enum variant_type {
     var_type_nonref = -1, // for gatk <NONREF> allele
     var_type_unknow = 0,
@@ -103,6 +106,7 @@ enum variant_type {
     var_type_complex, 
 };
 
+// RNA level
 // check the variants type
 enum var_func_type {
     _var_type_promoter_to_int = -1,
@@ -114,7 +118,7 @@ enum var_func_type {
     var_is_utr3,
     var_is_synonymous,
     var_is_missense,
-    var_is_nonsense, // stop gain
+    var_is_nonsense, // stop gained
     var_is_inframe_insertion,
     var_is_inframe_deletion,
     var_is_inframe_delins,
@@ -123,8 +127,8 @@ enum var_func_type {
     var_is_stop_retained,
     var_is_complex,
     var_is_no_call,
-    var_is_transcript_ablation,
-    var_is_stop_gained,    
+    var_is_transcript_ablation, // whole exome deletion
+    var_is_start_lost,
 };
 
 enum var_type_splice {
@@ -152,14 +156,12 @@ static inline const char *var_func_type_string(enum var_func_type type)
         "Frameshift",
         "StopLost",
         "StopRetained",
-        //"SpliceSite",
-        //"SpliceDonor",
-        //"SpliceAcceptor",
         "Complex",
         "NoCall",
         "TranscriptAblation",
-        "StopGained",
-        NULL, NULL,
+        "StartLost",
+        NULL,
+        NULL,
     };
     assert(type >= 0);
     return vartypes[type];
