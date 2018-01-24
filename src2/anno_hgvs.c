@@ -47,10 +47,16 @@ static char *generate_annovar_name(struct hgvs *h)
         else if ( type->func1 == func_region_utr5 ) kputs("c.-", &str);
         else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
 
-        if ( inf->dup_offset != 0 ) {
+        if ( inf->dup_offset > 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
             if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
+            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
+        }
+        else if ( inf->dup_offset < 0 ) {
+            assert(inf->loc != 0 );
+            int len = strlen(h->alt);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc);
             else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
         }
         else {
@@ -137,49 +143,55 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
 
         // for dup 
-        if ( inf->dup_offset != 0 ) {           
+        if ( inf->dup_offset > 0 ) {           
             assert(inf->loc != 0);
             int len = strlen(h->alt);
             if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
             else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
-            goto amino_acid_change;
         }
-        // for nondup, inf->dup_offset will always be 0
-        if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc);
-        else kputc('?', &str);
-
-        if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
-        else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
-
-        while ( h->start != h->end) {
-            //if ( inf->dup_offset && h->end - h->start == 1 ) break;
-            kputc('_', &str);
-            if ( type->func2 == func_region_utr5 ) kputc('-', &str);
-            else if ( type->func2 == func_region_utr3 ) kputc('*', &str);
-            ksprintf(&str, "%d", inf->end_loc);
-            if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
-            else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
-            break;
-        }
-        char *ref, *alt;
-        if ( inf->strand == '+' ) {
-            ref = h->ref ? strdup(h->ref) : NULL;
-            alt = h->alt ? strdup(h->alt) : NULL;
+        else if ( inf->dup_offset < 0 ) {
+            assert(inf->loc != 0 );
+            int len = strlen(h->alt);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc);
+            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
         }
         else {
-            ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
-            alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
+            // for nondup, inf->dup_offset will always be 0
+            if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc);
+            else kputc('?', &str);
+            
+            if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
+            else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
+
+            while ( h->start != h->end) {
+                //if ( inf->dup_offset && h->end - h->start == 1 ) break;
+                kputc('_', &str);
+                if ( type->func2 == func_region_utr5 ) kputc('-', &str);
+                else if ( type->func2 == func_region_utr3 ) kputc('*', &str);
+                ksprintf(&str, "%d", inf->end_loc);
+                if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
+                else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
+                break;
+            }
+            char *ref, *alt;
+            if ( inf->strand == '+' ) {
+                ref = h->ref ? strdup(h->ref) : NULL;
+                alt = h->alt ? strdup(h->alt) : NULL;
+            }
+            else {
+                ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
+                alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
+            }
+            if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
+            else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
+            else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);
+            else if ( h->type == var_type_delins ) ksprintf(&str, "delins%s", alt);
+            else error("Failed to parse HGVS nom.");
+
+            if ( ref ) free(ref);
+            if ( alt ) free(alt);
         }
-        if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
-        else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
-        else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);
-        else if ( h->type == var_type_delins ) ksprintf(&str, "delins%s", alt);
-        else error("Failed to parse HGVS nom.");
 
-        if ( ref ) free(ref);
-        if ( alt ) free(alt);
-
-      amino_acid_change:
         // protein code
         if ( type->loc_amino > 0 && h->type == var_type_snp ) 
             ksprintf(&str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
