@@ -57,7 +57,10 @@ static char *generate_annovar_name(struct hgvs *h)
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
             if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc);
-            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
+            else {
+                assert(inf->dup_offset == -1);
+                ksprintf(&str, "%ddup", inf->loc);
+            }
         }
         else {
             if ( h->type == var_type_snp ) {
@@ -99,19 +102,19 @@ static char *generate_annovar_name(struct hgvs *h)
             int i;
             if ( type->vartype == var_is_inframe_insertion ) {
                 assert(type->loc_end_amino -1 == type->loc_amino);
-                ksprintf(&str, ":p.%s%d_%s%dins",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
+                ksprintf(&str, ":p.%d_%dins", type->loc_amino, type->loc_end_amino);
                 for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
             else if ( type->vartype == var_is_inframe_deletion ) {
                 assert(type->loc_end_amino > 0);
-                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%s%ddel",codon_short_names[type->ori_amino], type->loc_amino);
-                else ksprintf(&str, ":p.%s%d_%s%ddel",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
-                for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%ddel", type->loc_amino);
+                else ksprintf(&str, ":p.%d_%ddel", type->loc_amino, type->loc_end_amino);
+                //for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
             else if ( type->vartype == var_is_inframe_delins ) {
                 assert(type->loc_end_amino > 0);
-                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino);
-                else ksprintf(&str, ":p.%s%d_%s%ddelins",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino); 
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%ddelins", type->loc_amino);
+                else ksprintf(&str, ":p.%d_%ddelins", type->loc_amino, type->loc_end_amino); 
                 for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
             else if ( type->vartype == var_is_frameshift ) {
@@ -153,7 +156,10 @@ static char *generate_hgvsnom_string(struct hgvs *h)
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
             if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc);
-            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
+            else {
+                assert(inf->dup_offset == -1);
+                ksprintf(&str, "%ddup", inf->loc);
+            }
         }
         else {
             // for nondup, inf->dup_offset will always be 0
