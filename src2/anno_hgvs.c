@@ -118,7 +118,7 @@ static char *generate_annovar_name(struct hgvs *h)
                 for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
             else if ( type->vartype == var_is_frameshift ) {
-                ksprintf(&str, ":p.%s%d%s",codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+                ksprintf(&str, ":p.%s%d",codon_short_names[type->ori_amino], type->loc_amino);
                 if ( type->fs > 0 ) kputs("fs", &str);
             }
         }

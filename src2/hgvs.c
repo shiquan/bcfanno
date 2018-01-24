@@ -302,6 +302,12 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         return -1;
     }
         
+#define BRANCH(_type) do {                              \
+        if ( type->vartype == var_is_unknown ) {        \
+            type->vartype = _type;                      \
+        }                                               \
+} while(0)
+
     
     // Check if insert bases in tandam short repeats region, amino acids will be changed in the downstream;
     // Realign the alternative allele ..
@@ -335,7 +341,8 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
             ori_seq = offset_seq;
             start = new_start;
         }
-        else {
+        // if no dup found forward, check backward
+        else if ( offset == 0 ) {
             // variant caller may fail to align the inserted base left side,  check backward base check if duplicate
             if ( alt_length < start ) {
                 int left_start = cds_pos + gl->utr5_length - alt_length;
@@ -366,13 +373,13 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         codon[cod] = *alt_seq;
         type->mut_amino = codon2aminoid(codon);
         if ( type->ori_amino == type->mut_amino ) {
-            if ( type->ori_amino == 0 ) type->vartype = var_is_stop_retained;
-            else type->vartype = var_is_synonymous;
+            if ( type->ori_amino == 0 ) BRANCH(var_is_stop_retained);
+            else  BRANCH(var_is_synonymous);
         }
         else {
-            if ( type->ori_amino == 0 ) type->vartype = var_is_stop_lost;
-            else if ( type->mut_amino == 0 ) type->vartype = var_is_nonsense;
-            else type->vartype = var_is_missense;
+            if ( type->ori_amino == 0 ) BRANCH(var_is_stop_lost);
+            else if ( type->mut_amino == 0 ) BRANCH(var_is_nonsense);
+            else BRANCH(var_is_missense);
         }
     }
     // if insert or delete
@@ -649,6 +656,8 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         } // end of Delins        
     } // end var type
 
+#undef BRANCH
+    
     if ( ori_seq ) free(ori_seq);
     return 0;
 }
