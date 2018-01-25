@@ -29,6 +29,12 @@ static char *generate_annovar_name(struct hgvs *h)
         if ( i ) kputc('|', &str);
         struct hgvs_type *type = &h->trans[i].type;
         struct hgvs_inf  *inf  = &h->trans[i].inf;
+        // for noncoding donot export annovar name
+        if ( type->func1 != func_region_cds || inf->offset != 0 ) {
+            kputc('.', &str);
+            continue;
+        }
+                
         char *ref, *alt;
         if ( inf->strand == '+' ) {
             ref = h->ref ? strdup(h->ref) : NULL;
@@ -39,6 +45,8 @@ static char *generate_annovar_name(struct hgvs *h)
             alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
         }
 
+
+        
         ksprintf(&str,"%s:%s:", inf->gene, inf->transcript);
         if ( inf->offset != 0 ) ksprintf(&str, "intron%d:", type->count);
         else ksprintf(&str, "exon%d:", type->count);
@@ -107,7 +115,7 @@ static char *generate_annovar_name(struct hgvs *h)
             }
             else if ( type->vartype == var_is_inframe_deletion ) {
                 assert(type->loc_end_amino > 0);
-                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%ddel", type->loc_amino);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%ddel%s", type->loc_amino, ref);
                 else ksprintf(&str, ":p.%d_%ddel", type->loc_amino, type->loc_end_amino);
                 //for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
