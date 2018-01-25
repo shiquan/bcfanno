@@ -102,9 +102,6 @@ static char *generate_annovar_name(struct hgvs *h)
             }
         }
 
-        if ( ref ) free(ref);
-        if ( alt ) free(alt);
-
         if ( type->loc_amino > 0 && h->type == var_type_snp) ksprintf(&str, ":p.%s%d%s", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
         else {
             int i;
@@ -115,7 +112,7 @@ static char *generate_annovar_name(struct hgvs *h)
             }
             else if ( type->vartype == var_is_inframe_deletion ) {
                 assert(type->loc_end_amino > 0);
-                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%ddel%s", type->loc_amino, ref);
+                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, ":p.%ddel%s", type->loc_amino, codon_short_names[type->ori_amino]);
                 else ksprintf(&str, ":p.%d_%ddel", type->loc_amino, type->loc_end_amino);
                 //for (i = 0; i < type->n; ++i) kputs(codon_short_names[type->aminos[i]], &str);
             }
@@ -130,6 +127,10 @@ static char *generate_annovar_name(struct hgvs *h)
                 if ( type->fs > 0 ) kputs("fs", &str);
             }
         }
+        
+        if ( ref ) free(ref);
+        if ( alt ) free(alt);
+
     }
     return str.s;
 }
