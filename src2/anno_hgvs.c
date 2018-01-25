@@ -50,16 +50,16 @@ static char *generate_annovar_name(struct hgvs *h)
         if ( inf->dup_offset > 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
-            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1,h->alt);
+            else ksprintf(&str, "%ddup%s", inf->loc+inf->dup_offset, h->alt);
         }
         else if ( inf->dup_offset < 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset+1, inf->loc, h->alt);
             else {
                 assert(inf->dup_offset == -1);
-                ksprintf(&str, "%ddup", inf->loc);
+                ksprintf(&str, "%ddup%s", inf->loc, h->alt);
             }
         }
         else {
