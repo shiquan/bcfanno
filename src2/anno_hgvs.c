@@ -208,8 +208,10 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         }
 
         // protein code
-        if ( type->loc_amino > 0 && h->type == var_type_snp ) 
-            ksprintf(&str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+        if ( type->loc_amino > 0 && h->type == var_type_snp )
+            if ( type->ori_amino == X_CODO && type->ext > 0 ) ksprintf(&str, "(p.*%d%sext*%d/p.*%d%sext*%d)", type->loc_amino, codon_names[type->mut_amino], type->ext, type->loc_amino, codon_short_names[type->mut_amino], type->ext);
+            else ksprintf(&str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]); 
+                
         // indels
         else {
             int i;

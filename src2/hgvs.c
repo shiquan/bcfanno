@@ -283,7 +283,7 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
     // codon inition position in the transcript, 0 based.
     // NOTICE: One to 3 base(s) will be CAPPED for the start of insertion; remove caps to check amino acid changes.
     //int start = cod == 0 ? gl->utr5_length + 1 : (cds_pos-1)/3*3 + gl->utr5_length;
-   int start = (cds_pos-1)/3*3 + gl->utr5_length;
+    int start = (cds_pos-1)/3*3 + gl->utr5_length;
     // retrieve affected sequences and downstream    
     int transcript_retrieve_length = 0;
     char *name = gl->name1;
@@ -373,14 +373,24 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         codon[cod] = *alt_seq;
         type->mut_amino = codon2aminoid(codon);
         if ( type->ori_amino == type->mut_amino ) {
-            if ( type->ori_amino == 0 ) BRANCH(var_is_stop_retained);
+            if ( type->ori_amino == X_CODO ) BRANCH(var_is_stop_retained);
             else  BRANCH(var_is_synonymous);
         }
         else {
-            if ( type->ori_amino == 0 ) BRANCH(var_is_stop_lost);
-            else if ( type->mut_amino == 0 ) BRANCH(var_is_nonsense);
+            if ( type->ori_amino == X_CODO ) {
+                // stop-loss, check extension
+                assert(type->vartype == var_is_unknown);
+                type->vartype = var_is_stop_lost;
+                int i;
+                for ( i = 1; i < transcript_retrieve_length/3; ++i ) {
+                    if ( check_is_stop(ori_seq+i*3) ) break;
+                }
+                if ( i > 1 && i < transcript_retrieve_length/3 ) type->ext = i;
+            }
+            else if ( type->mut_amino == X_CODO ) BRANCH(var_is_nonsense);
             else BRANCH(var_is_missense);
         }
+
     }
     // if insert or delete
     //else {
@@ -806,14 +816,14 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         if ( pos <= gl->utr5_length -SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr5); goto no_amino_code; }
         if ( pos <= gl->utr5_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }  // init
         if ( pos >= gl->cds_length + SPLICE_SITE_EXON_RANGE ) { BRANCH(var_is_utr3); goto no_amino_code;}
-        if ( pos >= gl->cds_length ) { type->vartype2 = var_is_splice_site; goto no_amino_code; }
+        if ( pos >= gl->cds_length ) { type->vartype2 = var_is_splice_site; } // check codon changes
     }
     
     // next we will check amino acid changes
     if ( inf->offset != 0 ) goto no_amino_code;
 
 #undef BRANCH
-    
+    // check protein changes
     int ret = check_protein_changes(h, hgvs, inf, type, gl, ref_length, alt_length, ref_seq, alt_seq);
 
     if ( ret == -1 ) goto failed_check;

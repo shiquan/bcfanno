@@ -1,6 +1,8 @@
 PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags
 DEBUG_PROG= bcfanno_debug
 
+.PHONY: clean    
+
 all: $(PROG)
 
 debug: $(DEBUG_PROG)

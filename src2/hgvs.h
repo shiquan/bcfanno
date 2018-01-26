@@ -51,8 +51,11 @@ struct hgvs_type {
     // buffer for insertion and deletion
     int n;
     int *aminos;
+
     // Terminal sequence after loc_amino.
     int fs;
+    // Extern codon, for stop-loss
+    int ext;
 };
 
 struct hgvs_inf {
