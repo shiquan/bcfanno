@@ -6,6 +6,7 @@
 #include "htslib/kstring.h"
 #include "htslib/vcf.h"
 #include "htslib/tbx.h"
+#include "anno_pool.h"
 
 struct anno_vcf_buffer {
     int no_such_chrom;
@@ -42,6 +43,7 @@ extern void anno_vcf_file_destroy(struct anno_vcf_file *f);
 extern struct anno_vcf_file *anno_vcf_file_duplicate(struct anno_vcf_file *f);
 extern void anno_vcf_file_destroy(struct anno_vcf_file *f);
 extern int anno_vcf_core(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line);
+extern int anno_vcf_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct anno_pool *pool);
 
 // APIs from vcf_annos.c
 extern int vcf_setter_filter(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col, void *data);

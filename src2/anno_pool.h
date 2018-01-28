@@ -8,8 +8,10 @@
 struct anno_pool {
     // maximum number of records
     int m;
-    int n_reader;
+    int n_reader;   
     bcf1_t **readers;
+    // init records per chunk
+    int n_chunk;
     void *arg;
 };
 

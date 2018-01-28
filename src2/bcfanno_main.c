@@ -40,6 +40,8 @@ static const char *hts_bcf_wmode(int file_type)
     return "w";                                 // uncompressed VCF
 }
 
+#define RECORDS_PER_CHUNK 1000
+
 int usage()
 {
     fprintf(stderr, "\n");
@@ -50,8 +52,9 @@ int usage()
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
-    fprintf(stderr, "   -r  [1000]                     records per thread\n");
+    fprintf(stderr, "   -r  [%d]                     records per thread\n", RECORDS_PER_CHUNK);    
     fprintf(stderr, "   -t, --thread                   thread\n");
+    fprintf(stderr, "   --unsort                       set if input is not sorted by cooridinate, **bad performance**\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/bcfanno\n");
     fprintf(stderr, "\n");
@@ -93,6 +96,8 @@ struct args {
 
     struct bcfanno_config *config;
 
+    int input_unsorted;
+    
     // records to cache per thread
     int n_record;
     
@@ -111,7 +116,8 @@ struct args {
     .commands     = {0, 0, 0},
     .quiet        = 0,
     .n_thread     = 1,
-    .n_record     = 1000,
+    .input_unsorted = 0,
+    .n_record     = RECORDS_PER_CHUNK,
     .indexs       = NULL,
 };
 
@@ -216,7 +222,10 @@ int parse_args(int argc, char **argv)
 	    args.test_databases_only = 1;
 	    continue;
 	}
-
+        if ( strcmp(a, "--unsorted") == 0 ) {
+            args.input_unsorted = 1;
+            continue;
+        }
         const char **var = 0;
 	if ( strcmp(a, "-c") == 0 || strcmp(a, "--config") == 0 ) 
 	    var = &args.fname_json;
@@ -363,24 +372,35 @@ void *anno_core(void *arg, int idx)
     struct anno_index *index = args.indexs[idx];
     struct anno_pool  *pool  = (struct anno_pool*) arg;
     
-    int i, j;
-    
-    for ( i = 0; i < pool->n_reader; ++i ) {
+    int i, j ;
+    // IMPROVE HERE: read line by line may not require sorted input but highly CPU consume, read a chunk of records
+    // based on the start and end of pool will highly improve the performance
+    if ( args.input_unsorted == 1 ) {
+        for ( i = 0; i < pool->n_reader; ++i ) {
 
-        bcf1_t *line = pool->readers[i];
-        if ( bcf_get_variant_types(line) == VCF_REF )
-            continue;
-        if ( index->hgvs ) 
-            anno_hgvs_core(index->hgvs, index->hdr_out, line);
+            bcf1_t *line = pool->readers[i];
+            if ( bcf_get_variant_types(line) == VCF_REF )
+                continue;
+            if ( index->hgvs ) 
+                anno_hgvs_core(index->hgvs, index->hdr_out, line);
 
-        for ( j = 0; j < index->n_vcf; ++j )
-            anno_vcf_core(index->vcf_files[j], index->hdr_out, line);
+            for ( j = 0; j < index->n_vcf; ++j )
+                anno_vcf_core(index->vcf_files[j], index->hdr_out, line);
         
-        for ( j = 0; j < index->n_bed; ++j )
-            anno_bed_core(index->bed_files[j], index->hdr_out, line);
+            for ( j = 0; j < index->n_bed; ++j )
+                anno_bed_core(index->bed_files[j], index->hdr_out, line);
 
-        if ( index->seqidx ) bcf_add_flankseq(index->seqidx, index->hdr_out, line);
-        
+            //if ( index->seqidx ) bcf_add_flankseq(index->seqidx, index->hdr_out, line);
+        }
+    }
+    // retrieve attributes in chunk
+    else {
+        //if ( index->hgvs )
+        //anno_hgvs_chunk(index->hgvs, index->hdr_out, pool);
+        for ( i = 0; i < index->n_vcf; ++i )
+            anno_vcf_chunk(index->vcf_files[i], index->hdr_out, pool);
+        //for ( i = 0; i < index->n_bed; ++i )
+        //anno_bed_chunk(index->bed_files[j], index->hdr_out, pool);             
     }
     
     return pool;
