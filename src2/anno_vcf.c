@@ -437,6 +437,8 @@ int anno_vcf_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct anno_pool *po
     int i = 0, j = 0;
     // for each chunk, clean the iter first
     pool->n_chunk = 0;
+    struct anno_vcf_buffer *b = f->buffer;
+    b->cached = 0;
     for ( ;; ) {
 
         if ( pool->n_chunk == pool->n_reader ) break;
@@ -449,7 +451,7 @@ int anno_vcf_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct anno_pool *po
             j = 0; // reset buffer's iter
         }
         
-        struct anno_vcf_buffer *b = f->buffer;
+
         
         for ( ; i < pool->n_chunk; ) {
             bcf1_t *line = pool->readers[i];
