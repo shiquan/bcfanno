@@ -12,6 +12,7 @@ struct anno_vcf_buffer {
     int no_such_chrom;
     int last_rid;
     int cached, max;
+    int i_chunk;
     bcf1_t **buffer;
     vcmp_t *vcmp;
     int mtmpi, mtmpf, mtmps;

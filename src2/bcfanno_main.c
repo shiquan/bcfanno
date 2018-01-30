@@ -52,9 +52,10 @@ int usage()
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
-    fprintf(stderr, "   -r  [%d]                     records per thread\n", RECORDS_PER_CHUNK);    
+    fprintf(stderr, "   -r  [%d]                       records per thread\n", RECORDS_PER_CHUNK);    
     fprintf(stderr, "   -t, --thread                   thread\n");
     fprintf(stderr, "   --unsort                       set if input is not sorted by cooridinate, **bad performance**\n");
+    fprintf(stderr, "   --flank                        if set this flag and reference genome specified in configure, FLKSEQ tag will be generated\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/bcfanno\n");
     fprintf(stderr, "\n");
@@ -97,6 +98,8 @@ struct args {
     struct bcfanno_config *config;
 
     int input_unsorted;
+    // if this flag and reference genome is set, FLKSEQ will be annotated
+    int flank_seq_is_need;
     
     // records to cache per thread
     int n_record;
@@ -117,6 +120,7 @@ struct args {
     .quiet        = 0,
     .n_thread     = 1,
     .input_unsorted = 0,
+    .flank_seq_is_need = 0,
     .n_record     = RECORDS_PER_CHUNK,
     .indexs       = NULL,
 };
@@ -224,6 +228,10 @@ int parse_args(int argc, char **argv)
 	}
         if ( strcmp(a, "--unsorted") == 0 ) {
             args.input_unsorted = 1;
+            continue;
+        }
+        if ( strcmp(a, "--flank") == 0 ) {
+            args.flank_seq_is_need = 1;
             continue;
         }
         const char **var = 0;
@@ -364,6 +372,32 @@ void memory_release()
     free(args.indexs);
 }
 
+static void update_chunk_region(struct anno_pool *pool)
+{
+    int i_chunk;
+    int start = -1, end = -1, last_rid = -1, last_pos = -1;
+    pool->curr_line = pool->readers[pool->n_chunk];
+    start = pool->curr_line->pos;
+    last_rid = pool->curr_line->rid;
+    
+    for ( i_chunk = pool->n_chunk; i_chunk < pool->n_reader; ++i_chunk ) {
+        int pos = pool->readers[i_chunk]->pos;
+        int rid = pool->readers[i_chunk]->rid;
+        if ( last_rid == -1 ) last_rid = rid;
+        if ( last_rid != rid ) break;
+        if ( start == -1 ) start = pos;        
+        if ( last_pos != -1 && pos - last_pos > CHUNK_MAX_GAP ) break;
+        last_pos = pos;
+        end = pos;
+    }
+    // 
+    pool->curr_start = start;
+    pool->curr_end   = end;
+
+    pool->i_chunk = pool->n_chunk;
+    pool->n_chunk = i_chunk;
+}
+
 void *anno_core(void *arg, int idx)
 {
 
@@ -382,25 +416,34 @@ void *anno_core(void *arg, int idx)
             if ( bcf_get_variant_types(line) == VCF_REF )
                 continue;
             if ( index->hgvs ) 
-                anno_hgvs_core(index->hgvs, index->hdr_out, line);
+            anno_hgvs_core(index->hgvs, index->hdr_out, line);
 
             for ( j = 0; j < index->n_vcf; ++j )
                 anno_vcf_core(index->vcf_files[j], index->hdr_out, line);
         
             for ( j = 0; j < index->n_bed; ++j )
                 anno_bed_core(index->bed_files[j], index->hdr_out, line);
-
-            //if ( index->seqidx ) bcf_add_flankseq(index->seqidx, index->hdr_out, line);
+            if ( args.flank_seq_is_need == 1 && index->seqidx )
+                bcf_add_flankseq(index->seqidx, index->hdr_out, line);
         }
     }
     // retrieve attributes in chunk
     else {
-        //if ( index->hgvs )
-        //anno_hgvs_chunk(index->hgvs, index->hdr_out, pool);
-        for ( i = 0; i < index->n_vcf; ++i )
-            anno_vcf_chunk(index->vcf_files[i], index->hdr_out, pool);
-        //for ( i = 0; i < index->n_bed; ++i )
-        //anno_bed_chunk(index->bed_files[j], index->hdr_out, pool);             
+        for ( ;; ) {
+            if ( pool->n_chunk == pool->n_reader ) break;
+            update_chunk_region(pool);
+            
+            if ( index->hgvs )
+                anno_hgvs_chunk(index->hgvs, index->hdr_out, pool);
+            for ( i = 0; i < index->n_vcf; ++i )
+                anno_vcf_chunk(index->vcf_files[i], index->hdr_out, pool);
+            for ( i = 0; i < index->n_bed; ++i )                
+                anno_bed_chunk(index->bed_files[i], index->hdr_out, pool);
+        }
+        if ( args.flank_seq_is_need == 1 && index->seqidx ) {
+            for ( i = 0; i < pool->n_reader; ++i) 
+                bcf_add_flankseq(index->seqidx, index->hdr_out, pool->readers[i]);
+        }
     }
     
     return pool;
@@ -409,23 +452,52 @@ void *anno_core(void *arg, int idx)
 int annotate_light()
 {
     struct anno_index *idx = args.indexs[0];
-    bcf1_t *line = bcf_init();
-    int j;
-    while ( bcf_read(args.fp_input, args.hdr, line) == 0 ) {
-        if ( line->rid == -1 ) goto output_line;
-        if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
-        if ( idx->hgvs )
-            anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
 
-        for ( j = 0; j < idx->n_vcf; ++j )
-            anno_vcf_core(idx->vcf_files[j], idx->hdr_out, line);
-        
-        for ( j = 0; j < idx->n_bed; ++j )
-            anno_bed_core(idx->bed_files[j], idx->hdr_out, line);
+    if ( args.input_unsorted == 1 ) {
+        bcf1_t *line = bcf_init();
+        int j;
+        while ( bcf_read(args.fp_input, args.hdr, line) == 0 ) {
+            if ( line->rid == -1 ) goto output_line;
+            if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
+            if ( idx->hgvs )
+                anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
+            
+            for ( j = 0; j < idx->n_vcf; ++j )
+                anno_vcf_core(idx->vcf_files[j], idx->hdr_out, line);
+            
+            for ( j = 0; j < idx->n_bed; ++j )
+                anno_bed_core(idx->bed_files[j], idx->hdr_out, line);
 
-        if ( idx->seqidx ) bcf_add_flankseq(idx->seqidx, idx->hdr_out, line);
-      output_line:
-        bcf_write1(args.fp_out, args.hdr, line);
+            if ( args.flank_seq_is_need == 1 && idx->seqidx ) bcf_add_flankseq(idx->seqidx, idx->hdr_out, line);
+          output_line:
+            bcf_write1(args.fp_out, args.hdr, line);
+        }
+    }
+    else {
+        for ( ;; ) {
+            struct anno_pool *pool = anno_reader(args.fp_input, args.hdr, args.n_record);
+            if ( pool == 0 || pool->n_reader == 0) break;
+            int i;
+            for ( ;; ) {
+                if ( pool->n_chunk == pool->n_reader ) break;
+                update_chunk_region(pool);
+                if ( idx->hgvs )
+                    anno_hgvs_chunk(idx->hgvs, idx->hdr_out, pool);
+                for ( i = 0; i < idx->n_vcf; ++i )
+                    anno_vcf_chunk(idx->vcf_files[i], idx->hdr_out, pool);
+                for ( i = 0; i < idx->n_bed; ++i )                
+                    anno_bed_chunk(idx->bed_files[i], idx->hdr_out, pool);
+            }
+            if ( args.flank_seq_is_need == 1 && index->seqidx ) {
+                for ( i = 0; i < pool->n_reader; ++i) 
+                    bcf_add_flankseq(index->seqidx, index->hdr_out, pool->readers[i]);                
+            }
+            for ( i = 0; i < pool->n_reader; ++i) {
+                bcf_write1(args.fp_out, args.hdr, pool->readers[i]);
+                bcf_destroy(pool->readers[i]);
+            }
+            free(pool->readers);                
+        }
     }
     
     return 0;

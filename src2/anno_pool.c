@@ -5,7 +5,7 @@
 static struct anno_pool *anno_pool_init(int m)
 {    
     struct anno_pool *p = malloc(sizeof(*p));
-    p->n_reader = 0;
+    memset(p, 0, sizeof(*p));
     p->m = m;
     p->readers = malloc(m * sizeof(bcf1_t*));
     return p;
@@ -14,6 +14,7 @@ static struct anno_pool *anno_pool_init(int m)
 struct anno_pool *anno_reader(htsFile *fp, bcf_hdr_t *hdr, int n_record) {
     
     struct anno_pool *p = anno_pool_init(n_record);
+    
     for ( ;; ) {
         p->readers[p->n_reader] = bcf_init();
         if ( bcf_read(fp, hdr, p->readers[p->n_reader]) )

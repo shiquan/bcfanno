@@ -6,6 +6,7 @@
 #include "htslib/vcf.h"
 #include "stack_lite.h"
 #include "name_list.h"
+#include "anno_pool.h"
 
 static int anno_hgvs_update_buffer(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf1_t *line)
 {
@@ -19,6 +20,7 @@ static int anno_hgvs_update_buffer(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf
         f->files[i] = hgvs_init(bcf_seqname(hdr, line), line->pos+1, line->pos+line->rlen, line->d.allele[0], line->d.allele[i+1]);
     return 0;
 }
+
 // generate variant string in annovar format
 // OR4F5:NM_001005484:exon1:c.T809A:p.V270E
 static char *generate_annovar_name(struct hgvs *h)
@@ -250,7 +252,7 @@ static char *generate_gene_string(struct hgvs *h)
     //struct anno_stack *s = anno_stack_init();
     int i;
     for ( i = 0; i < h->n_tran; ++i ) {
-     if ( i ) kputc('|', &str);
+        if ( i ) kputc('|', &str);
         struct hgvs_inf *inf = &h->trans[i].inf;
         if ( inf->gene ) kputs(inf->gene, &str);
         else kputc('.', &str);
@@ -421,21 +423,26 @@ static char *generate_aalength_string(struct hgvs *h)
     return str.s;
 }
 //static int anno_hgvs_setter_info(struct anno_hgvs_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
-static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr, bcf1_t *line)
+static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr, bcf1_t *line, int chunk)
 {
     int i, j;
     struct hgvs_handler *h = file->h;    
     int empty = 1;
     kstring_t *str = malloc(file->n_col*sizeof(kstring_t));
     for ( i = 0; i < file->n_col; ++i ) memset(&str[i], 0, sizeof(kstring_t));
-    
+
     for ( i = 0; i < file->n_allele; ++i ) {
         struct hgvs *f = file->files[i];
-
         if ( i > 0 ) 
             for ( j = 0; j < file->n_col; ++j ) kputc(',', &str[j]);
-        
-        if ( hgvs_anno_trans(f, h) == 0 ) {
+
+        int ret;
+        if ( chunk == 1 ) 
+            ret = hgvs_anno_trans_chunk(f, h);
+        else
+            ret = hgvs_anno_trans(f,h);
+
+        if ( ret == 0 ) {
             for ( j = 0; j < file->n_col; ++j ) kputc('.', &str[j]);                
             continue;
         }
@@ -488,7 +495,6 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
                 kputs(name, &str[j]);
                 if ( name ) free(name);
             }
-                
         }
         empty = 0;
     }
@@ -511,6 +517,7 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
     free(str);
     return 0;
 }
+
 struct anno_hgvs_file *anno_hgvs_file_duplicate(struct anno_hgvs_file *f)
 {
     struct anno_hgvs_file *d = malloc(sizeof(*d));
@@ -626,10 +633,27 @@ struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, c
 }
 void anno_hgvs_core(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf1_t *line)
 {
-    anno_hgvs_update_buffer(f, hdr, line);
-    anno_hgvs_setter_hgvsnom(f, hdr, line);    
+    anno_hgvs_update_buffer(f, hdr, line);    
+    anno_hgvs_setter_hgvsnom(f, hdr, line, 0);
 }
 
+int anno_hgvs_chunk(struct anno_hgvs_file *f, bcf_hdr_t *hdr, struct anno_pool *pool)
+{
+    // chunk buffer will be filled here
+    if ( hgvs_handler_fill_buffer_chunk(f->h, (char*)bcf_seqname(hdr, pool->curr_line), pool->curr_start, pool->curr_end+1) == 0 )
+        return 0;
+    
+    int i;
+    for ( i = pool->i_chunk; i < pool->n_chunk; ++i ) {
+        bcf1_t *line = pool->readers[i];
+        if ( bcf_get_variant_types(line) == VCF_REF ) continue;
+        bcf_unpack(pool->readers[i], BCF_UN_INFO);
+        anno_hgvs_update_buffer(f, hdr, line);
+        anno_hgvs_setter_hgvsnom(f, hdr, line, 1);
+    }
+    
+    return 0;
+}
 
 #ifdef ANNO_HGVS_MAIN
 #include "anno_thread_pool.h"

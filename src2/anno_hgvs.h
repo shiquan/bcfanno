@@ -30,4 +30,5 @@ extern struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *co
 extern struct anno_hgvs_file *anno_hgvs_file_duplicate(struct anno_hgvs_file *f);
 extern void anno_hgvs_file_destroy(struct anno_hgvs_file *f);
 extern void anno_hgvs_core(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf1_t *line);
+extern int anno_hgvs_chunk(struct anno_hgvs_file *f, bcf_hdr_t *hdr, struct anno_pool *pool);
 #endif

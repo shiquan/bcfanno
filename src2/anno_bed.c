@@ -16,7 +16,7 @@ static char *tsv_get_column(struct anno_bed_tsv *t, int icol)
     }
     return t->string.s + t->fields[icol];
 }
-static char *func_region_string_generate(struct anno_bed_file *file, struct anno_col *col)
+static char *func_region_string_generate(struct anno_bed_file *file, bcf1_t *line, struct anno_col *col)
 {
     struct anno_bed_buffer *buffer = file->buffer;
     if ( buffer->cached == 0 )
@@ -24,14 +24,24 @@ static char *func_region_string_generate(struct anno_bed_file *file, struct anno
 
     struct anno_stack *s = anno_stack_init();
     int i;
-    for ( i = 0; i < buffer->cached; ++i ) {
+    int end = line->pos +line->rlen;
+    for ( i = buffer->i; i < buffer->cached; ++i ) {
         struct anno_bed_tsv *t = buffer->buffer[i];
+        if ( buffer->end_pos_for_skip == 0 || buffer->end_pos_for_skip < t->end ) buffer->end_pos_for_skip = t->end;
+        if ( line->pos > buffer->end_pos_for_skip ) {
+            buffer->i = i;
+            continue;
+        }
+
+        if ( end < t->start ) break;
+
+        if ( line->pos < t->start || line->pos >= t->end ) continue;
+        
         char *name = tsv_get_column(t, col->icol);
         if ( name == NULL )
-            warnings("Failed to retrieve record, %s, %s, %s, %d.", file->fname,
-                     col->hdr_key, col->curr_name, col->curr_line);
+            warnings("Failed to retrieve record, %s, %s, %s, %d.", file->fname, col->hdr_key, col->curr_name, col->curr_line);
         else
-            anno_stack_push(s, name);        
+            anno_stack_push(s, name);    
     }
     kstring_t string = {0,0,0};
     for ( i = 0; i < s->l; ++i ) {
@@ -101,29 +111,30 @@ static int anno_bed_update_buffer(struct anno_bed_file *file, bcf_hdr_t *hdr, bc
     tid = tbx_name2id(file->idx, bcf_seqname(hdr, line));
     // if overlap flag is set and cached this region already, skip re-fill buffer
     if ( file->overlapped == 0 &&
-         buffer->last_id  == tid &&
+         buffer->last_rid  == tid &&
          buffer->last_start <= line->pos +1 &&
          buffer->last_end > line->pos )
         return -1;
 
     if ( tid == -1 ) {
         if ( buffer->no_such_chrom == 0 ) {
-            warnings("No chromosome %s found in database %s.",
-                     bcf_seqname(hdr, line), file->fname);
+            warnings("No chromosome %s found in database %s.", bcf_seqname(hdr, line), file->fname);
             buffer->no_such_chrom = 1;
         }
         return 1;
     }
     else buffer->no_such_chrom = 0; 
 
-    // re-fill buffer
+    // reset buffer
     buffer->cached = 0;
-
+    buffer->i = 0;
+    buffer->end_pos_for_skip = 0;
+        
     hts_itr_t *itr = tbx_itr_queryi(file->idx, tid, line->pos, line->pos + line->rlen);
     if ( itr == NULL )
         return 1;
 
-    buffer->last_id = tid;
+    buffer->last_rid = tid;
     buffer->last_start = -1;
     buffer->last_end = -1;    
 
@@ -170,6 +181,76 @@ static int anno_bed_update_buffer(struct anno_bed_file *file, bcf_hdr_t *hdr, bc
     return buffer->cached;
 }
 
+int anno_bed_update_buffer_chunk(struct anno_bed_file *f, bcf_hdr_t *hdr, struct anno_pool *pool)
+{
+    assert(pool->n_reader > 0);
+    // first line
+    bcf1_t *line = pool->curr_line;
+    struct anno_bed_buffer *b = f->buffer;
+    // reset all cached records
+    b->cached = 0;
+    b->i = 0;
+    b->end_pos_for_skip = 0;
+    
+    int tid;
+    tid = tbx_name2id(f->idx, bcf_seqname(hdr, line));    
+
+    if ( tid == -1 ) {
+        if ( b->no_such_chrom == 0 ) {
+            warnings("No chromosome %s found in database %s.", bcf_seqname(hdr, line), f->fname);
+            b->no_such_chrom = 1;
+        }
+        return 0;
+    }
+    else b->no_such_chrom = 0; 
+    
+    // re-fill buffer
+    b->cached = 0;
+    b->i = 0;
+    
+    hts_itr_t *itr = tbx_itr_queryi(f->idx, tid, pool->curr_start, pool->curr_end+1);
+    if ( itr == NULL )
+        return 0;
+
+    b->last_rid = tid;
+    b->last_start = -1;
+    b->last_end = -1;    
+
+    for ( ;; ) {
+
+        if ( b->cached == b->max ) {
+            b->max += 8;
+            b->buffer = realloc(b->buffer, sizeof(void*)*b->max);
+            int i;
+            for ( i = 8; i > 0; --i)
+                b->buffer[b->max-i] = anno_bed_tsv_init();
+        }
+
+        struct anno_bed_tsv *t = b->buffer[b->cached];
+        anno_bed_tsv_clean(t);
+        
+        if ( tbx_itr_next(f->fp, f->idx, itr, &t->string) < 0 )
+            break;
+        
+        if ( string2tsv(t) )
+            continue;
+
+        b->cached++;
+
+        if ( b->last_end == -1 ) {
+            b->last_end   = t->end;
+            b->last_start = t->start;
+            continue;
+        }
+        if ( b->last_end < t->end) b->last_end = t->end;
+        if ( b->last_start > t->start) b->last_start = t->start;
+    }
+
+    hts_itr_destroy(itr);
+    
+    return b->cached;
+
+}
 int anno_bed_core(struct anno_bed_file *file, bcf_hdr_t *hdr, bcf1_t *line)
 {
     int i;
@@ -188,6 +269,31 @@ int anno_bed_core(struct anno_bed_file *file, bcf_hdr_t *hdr, bcf1_t *line)
     return 0;
 }
 
+int anno_bed_chunk(struct anno_bed_file *f, bcf_hdr_t *hdr, struct anno_pool *pool )
+{
+    int i = 0, j = 0;
+    struct anno_bed_buffer *b = f->buffer;
+    b->cached = 0;
+
+    if ( anno_bed_update_buffer_chunk(f, hdr, pool) == 0 )
+        return 0;
+        
+    for ( i = pool->i_chunk; i < pool->n_chunk; ++i) {
+        bcf1_t *line = pool->readers[i];
+
+        if ( bcf_get_variant_types(line) == VCF_REF ) continue;
+        bcf_unpack(line, BCF_UN_INFO);
+            
+        for ( j = 0; j < f->n_col; ++j ) {
+            struct anno_col *col = &f->cols[j];
+            col->curr_name = bcf_seqname(hdr, line);
+            col->curr_line = line->pos+1;
+            if ( col->func.bed(f, hdr, line, col) ) 
+                warnings("Failed to update %s for record %s:%d.", col->hdr_key, col->curr_name, col->curr_line);
+        }
+    }
+    return 0;
+}
 // setter functions
 static int anno_bed_setter_info_string(struct anno_bed_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col) {
     struct anno_bed_buffer *b = file->buffer;
@@ -196,7 +302,7 @@ static int anno_bed_setter_info_string(struct anno_bed_file *file, bcf_hdr_t *hd
         ret = bcf_get_info_string(hdr, line, col->hdr_key, &b->tmps, &b->mtmps);
         if ( ret > 0 && (b->tmps[0]!='.'||b->tmps[1]!= 0)) return 0;
     }
-    char *string = func_region_string_generate(file, col);
+    char *string = func_region_string_generate(file, line, col);
     if ( string == NULL ) return 0;
     ret = bcf_update_info_string_fixed(hdr, line, col->hdr_key, string);
     free(string);
@@ -214,12 +320,14 @@ struct anno_bed_file *anno_bed_file_init(bcf_hdr_t *hdr, const char *fname, char
     f->idx = tbx_index_load(fname);
     if ( f->idx == NULL )
         error("Failed to load index of %s.", fname);
-    f->overlapped = 0;
+
+    // do not check the last regions
+    f->overlapped = 1;
 
     // init buffer
     struct anno_bed_buffer *b = malloc(sizeof(*b));
     b->no_such_chrom = 0;
-    b->last_id = -1;
+    b->last_rid = -1;
     b->last_start = -1;
     b->last_end = -1;
     b->cached = 0;
@@ -365,7 +473,7 @@ struct anno_bed_file *anno_bed_file_duplicate(struct anno_bed_file *f)
     // init buffer
     struct anno_bed_buffer *b = malloc(sizeof(*b));
     b->no_such_chrom = 0;
-    b->last_id = -1;
+    b->last_rid = -1;
     b->last_start = -1;
     b->last_end = -1;
     b->cached = 0;

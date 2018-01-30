@@ -97,6 +97,7 @@ static int setter_ARinfo_int32(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *
     
     // fill in any missing values in the target VCF (or all, if not present)
     int ntmpi2 = bcf_get_info_float(hdr, line, col->hdr_key, &b->tmpi2, &b->mtmpi2);
+
     if ( ntmpi2 < ndst )
         hts_expand(int32_t,ndst,b->mtmpi2,b->tmpi2);
 
@@ -127,14 +128,15 @@ int vcf_setter_info_int(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line, s
 
     if ( ntmpi < 0 ) return 0;    // nothing to add
 
-    if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
-        return setter_ARinfo_int32(f,hdr,line,col,rec->n_allele,rec->d.allele,ntmpi);
-
+    // check missing tag come first, changed by shiquan, 2018/01/30
     if ( col->replace==REPLACE_MISSING ) {    
         int ret = bcf_get_info_int32(hdr, line, col->hdr_key, &b->tmpi2, &b->mtmpi2);
         if ( ret>0 && b->tmpi2[0]!=bcf_int32_missing ) return 0;
     }
-
+    
+    if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
+        return setter_ARinfo_int32(f,hdr,line,col,rec->n_allele,rec->d.allele,ntmpi);
+   
     return bcf_update_info_int32_fixed(hdr,line,col->hdr_key,b->tmpi,ntmpi);
 }
 static int setter_ARinfo_real(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col, int nals, char **als, int ntmpf)
@@ -185,13 +187,14 @@ int vcf_setter_info_real(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line, 
     int ntmpf = bcf_get_info_float(f->hdr,rec,col->hdr_key,&b->tmpf,&b->mtmpf);    
     if ( ntmpf < 0 ) return 0;    // nothing to add
 
-    if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
-        return setter_ARinfo_real(f,hdr,line,col,rec->n_allele,rec->d.allele,ntmpf);
-
+    // check missing tag come first, changed by shiquan, 2018/01/30
     if ( col->replace==REPLACE_MISSING ) {
         int ret = bcf_get_info_float(hdr, line, col->hdr_key, &b->tmpf2, &b->mtmpf2);
         if ( ret>0 && !bcf_float_is_missing(b->tmpf2[0]) ) return 0;
     }
+
+    if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
+        return setter_ARinfo_real(f,hdr,line,col,rec->n_allele,rec->d.allele,ntmpf);
 
     return bcf_update_info_float_fixed(hdr,line,col->hdr_key,b->tmpf,ntmpf);
 }
@@ -301,13 +304,14 @@ int vcf_setter_info_str(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line, s
     int ntmps = bcf_get_info_string(f->hdr,rec,col->hdr_key,&b->tmps,&b->mtmps);
     if ( ntmps < 0 ) return 0;    // nothing to add
 
-    if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
-        return setter_ARinfo_string(f,hdr,line,col,rec->n_allele,rec->d.allele);
-
+    // check missing tag come first, changed by shiquan, 2018/01/30 
     if ( col->replace==REPLACE_MISSING ) {
         int ret = bcf_get_info_string(hdr, line, col->hdr_key, &b->tmps2, &b->mtmps2);
         if ( ret>0 && (b->tmps2[0]!='.' || b->tmps2[1]!=0) ) return 0;
     }
-
+   
+    if ( col->number==BCF_VL_A || col->number==BCF_VL_R ) 
+        return setter_ARinfo_string(f,hdr,line,col,rec->n_allele,rec->d.allele);
+    
     return bcf_update_info_string(hdr,line,col->hdr_key,b->tmps);
 }

@@ -10,8 +10,14 @@ struct anno_pool {
     int m;
     int n_reader;   
     bcf1_t **readers;
+
     // init records per chunk
+    int i_chunk;
     int n_chunk;
+    int curr_start;
+    int curr_end;
+    bcf1_t *curr_line; // point to top of each chunk in the readers
+    
     void *arg;
 };
 

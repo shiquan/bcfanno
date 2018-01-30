@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "genepred.h"
 #include "variant_type.h"
+#include "anno_pool.h"
 
 #define SPLICE_SITE_EXON_RANGE      3
 #define SPLICE_SITE_INTRON5_RANGE   3
@@ -115,8 +116,17 @@ struct hgvs_handler {
     void *gene_hash;
     // point to transcript hash
     void *trans_hash;
+
+    // random access mode
     int n_gene;
     struct genepred_line **gls;
+    
+    // sweep record per chunk
+    int end_pos_for_skip;
+    int i_record;   
+    int n_record;
+    int m_record;
+    struct genepred_line **records;
 };
 
 extern struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname);
@@ -126,5 +136,7 @@ extern void hgvs_handler_destroy(struct hgvs_handler *h);
 extern struct hgvs *hgvs_init(const char *chrom, int start, int end, char *ref, char *alt);
 extern void hgvs_destroy(struct hgvs *h);
 extern int hgvs_anno_trans(struct hgvs *n, struct hgvs_handler *h);
+extern int hgvs_handler_fill_buffer_chunk(struct hgvs_handler *h, char* name, int start, int end);
+extern int hgvs_anno_trans_chunk(struct hgvs *n, struct hgvs_handler *h);
 
 #endif

@@ -121,38 +121,21 @@ static int anno_vcf_update_buffer(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_
 }
 int anno_vcf_update_buffer_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct anno_pool *pool)
 {
-    int start = -1, end = -1, last_rid = -1, last_pos = -1;
     assert(pool->n_reader > 0);
     // first line
-    bcf1_t *line = pool->readers[pool->n_chunk];
-    start = line->pos;
-    last_rid = line->rid;
-    int i;
-    for ( i = pool->n_chunk; i < pool->n_reader; ++i ) {
-        int pos = pool->readers[i]->pos;
-        int rid = pool->readers[i]->rid;
-        if ( last_rid == -1 ) last_rid = rid;
-        if ( last_rid != rid ) break;
-        if ( start == -1 ) start = pos;        
-        if ( last_pos != -1 && pos - last_pos > CHUNK_MAX_GAP ) break;
-        last_pos = pos;
-        end = pos;
-    }
-    // 
-    pool->n_chunk = i;
+    bcf1_t *line = pool->curr_line;
 
     struct anno_vcf_buffer *b = f->buffer;
-    if ( b->last_rid != last_rid ) {
+    b->cached = 0;
+    b->i_chunk = 0;
+    if ( b->last_rid != line->rid ) {
         b->no_such_chrom = 0;
-        b->last_rid = last_rid;
+        b->last_rid = line->rid;
     }
     else if ( b->no_such_chrom == 1 )
         return 0;
     
-    if ( f->itr ) {
-        hts_itr_destroy(f->itr);
-        f->itr = NULL;
-    }
+    assert( f->itr == NULL );
 
     if ( f->tbx_idx ) {
         int tid = tbx_name2id(f->tbx_idx, bcf_seqname(hdr, line));
@@ -163,7 +146,7 @@ int anno_vcf_update_buffer_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct
             }
             return 0;
         }
-        f->itr = tbx_itr_queryi(f->tbx_idx, tid, start, end+1);
+        f->itr = tbx_itr_queryi(f->tbx_idx, tid, pool->curr_start, pool->curr_end+1);
     }
     else if ( f->bcf_idx ) {
         // check id in header of database
@@ -175,11 +158,11 @@ int anno_vcf_update_buffer_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct
             }
             return 0;
         }
-        f->itr = bcf_itr_queryi(f->bcf_idx, tid, start, end+1);    
+        f->itr = bcf_itr_queryi(f->bcf_idx, tid, pool->curr_start, pool->curr_end+1);    
     }
     else error("Failed to reload index of %s.", f->fname);
 
-        // no record
+    // no record
     if ( f->itr == NULL )
         return 0;
 
@@ -434,53 +417,41 @@ int anno_vcf_core(struct anno_vcf_file *f, bcf_hdr_t *hdr, bcf1_t *line)
 
 int anno_vcf_chunk(struct anno_vcf_file *f, bcf_hdr_t *hdr, struct anno_pool *pool)
 {
-    int i = 0, j = 0;
-    // for each chunk, clean the iter first
-    pool->n_chunk = 0;
+    int i, j;
+    //b->cached = 0;
+    if ( anno_vcf_update_buffer_chunk(f, hdr, pool)  == 0)
+        return 0;
+
     struct anno_vcf_buffer *b = f->buffer;
-    b->cached = 0;
-    for ( ;; ) {
+    
+    for ( i = pool->i_chunk; i < pool->n_chunk; ++i ) {
 
-        if ( pool->n_chunk == pool->n_reader ) break;
-        if ( pool->n_chunk < pool->n_reader) {
-            if ( anno_vcf_update_buffer_chunk(f, hdr, pool) == 0 ) {
-                // if no any annotation found, skip these records then
-                i = pool->n_chunk;
-                continue;
-            }
-            j = 0; // reset buffer's iter
-        }
-        
+        bcf1_t *line = pool->readers[i];
 
-        
-        for ( ; i < pool->n_chunk; ) {
-            bcf1_t *line = pool->readers[i];
-
-            if ( bcf_get_variant_types(line) == VCF_REF ) continue;
-            bcf_unpack(line, BCF_UN_INFO);
+        if ( bcf_get_variant_types(line) == VCF_REF ) continue;
+        bcf_unpack(line, BCF_UN_INFO);
             
-            for ( ; j < b->cached; ) {
-                bcf1_t *d = b->buffer[j];
-                if ( d->pos < line->pos ) { ++j; continue; }
+        for ( j = b->i_chunk; j < b->cached; ++j) {
+            bcf1_t *d = b->buffer[j];
+            if ( d->pos < line->pos ) { b->i_chunk = j+1; continue; }
+            
+            // if no annotator in buffer, check next record
+            if ( d->pos > line->pos ) break;
 
-                // if no annotator in buffer, check next record
-                if ( d->pos > line->pos ) break;
+            // if not same variant, check next annotation. FIXME: if more than one variant in same position
+            if ( d->rlen != line->rlen ) continue;
 
-                // if not same variant, check next annotation. FIXME: if more than one variant in same position
-                if ( d->rlen != line->rlen ) { ++j; continue; }
-                int k;
-                for ( k = 0; k < f->n_col; ++k ) {
-                    struct anno_col *col = &f->cols[k];
-                    col->curr_name = bcf_seqname(hdr, line);
-                    col->curr_line = line->pos + 1;
-                    if ( col->func.vcf(f, hdr, line, col, d) )
-                        warnings("Failed to annotate %s:%d with %s.", col->curr_name, col->curr_line, f->fname);
-                }
-                // next annotation, for multi-allele record, more than one annotation will be used
-                ++j;
+            // check allele
+            if ( match_allele(line, d) ) continue;
+
+            int k;
+            for ( k = 0; k < f->n_col; ++k ) {
+                struct anno_col *col = &f->cols[k];
+                col->curr_name = bcf_seqname(hdr, line);
+                col->curr_line = line->pos + 1;
+                if ( col->func.vcf(f, hdr, line, col, d) )
+                    warnings("Failed to annotate %s:%d with %s.", col->curr_name, col->curr_line, f->fname);
             }
-            // next record
-            ++i;
         }
     }
     return 0;
@@ -544,7 +515,31 @@ void *anno_vcf(void *arg, int idx) {
     /*     bcf_unpack(line, BCF_UN_INFO); */
     /*     anno_vcf_core(f, args->hdr_out, line); */
     /* } */
-    anno_vcf_chunk(f, args->hdr_out, pool);
+    for ( ;; ) {
+        if ( pool->n_chunk == pool->n_reader ) break;
+                
+        int i, i_chunk;
+        int start = -1, end = -1, last_rid = -1, last_pos = -1;                        
+        start = line->pos;
+        last_rid = line->rid;
+
+        for ( i_chunk = pool->n_chunk; i_chunk < pool->n_reader; ++i_chunk ) {
+            int pos = pool->readers[i_chunk]->pos;
+            int rid = pool->readers[i_chunk]->rid;
+            if ( last_rid == -1 ) last_rid = rid;
+            if ( last_rid != rid ) break;
+            if ( start == -1 ) start = pos;        
+            if ( last_pos != -1 && pos - last_pos > CHUNK_MAX_GAP ) break;
+            last_pos = pos;
+            end = pos;
+        }
+        // 
+        pool->curr_start = start;
+        pool->curr_end   = end;
+        pool->curr_line = pool->readers[pool->n_chunk];
+        pool->n_chunk = i_chunk;
+        anno_vcf_chunk(f, args->hdr_out, pool);
+    }
     return pool;
 }
 

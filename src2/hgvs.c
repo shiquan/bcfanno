@@ -128,6 +128,50 @@ void hgvs_destroy(struct hgvs *h)
     free(h->trans);
     free(h);
 }
+int hgvs_handler_fill_buffer_chunk(struct hgvs_handler *h, char* name, int start, int end)
+{
+    extern int name_hash_key_exists(void *hash, char *key); 
+    int i;
+    // clean buffer
+    if ( h->n_record > 0 ) {
+        for ( i = 0; i < h->n_record; ++i ) genepred_line_destroy(h->records[i]);
+        //free(h->records);
+        //h->records = NULL;
+    }
+    h->n_record = 0;
+    h->i_record = 0;
+    h->end_pos_for_skip = 0;
+    int id;
+    id = tbx_name2id(h->idx, name);
+    if ( id == -1 ) return 0;
+
+    // retrieve genepred records from database
+    hts_itr_t *itr = tbx_itr_queryi(h->idx, id, start, end+1);
+    kstring_t string = {0,0,0};
+    
+    //struct genepred_line *head = NULL;
+    //struct genepred_line *temp = NULL;
+    while ( tbx_itr_next(h->fp_idx, h->idx, itr, &string) >= 0 ) {
+        if ( h->n_record == h->m_record ) {
+            h->m_record += 10;
+            h->records = realloc(h->records, h->m_record*sizeof(struct genepred_line));
+        }
+        struct genepred_line *line = genepred_line_create();
+        if ( parse_line(&string, line) ) continue;
+        if ( h->gene_hash || h->trans_hash ) {
+            if ( name_hash_key_exists(h->gene_hash, line->name2) ) 
+                h->records[h->n_record++] = line;
+            else if ( name_hash_key_exists(h->trans_hash, line->name1) )
+                h->records[h->n_record++] = line;
+            else genepred_line_destroy(line);
+        }
+        else h->records[h->n_record++] = line;        
+    }
+    free(string.s);
+    tbx_itr_destroy(itr);
+    
+    return h->n_record;
+}
 static int hgvs_handler_fill_buffer(struct hgvs *n, struct hgvs_handler *h)
 {
     extern int name_hash_key_exists(void *hash, char *key);
@@ -193,7 +237,8 @@ static int hgvs_handler_fill_buffer(struct hgvs *n, struct hgvs_handler *h)
 static int find_the_block(struct genepred_line *l, int *s, int *e, int pos)
 {
     *s = 0; *e = 0;
-    int i;
+    if ( pos < l->txstart || pos > l->txend ) return 1;
+    int i;    
     for ( i = 0; i < l->exon_count; ++i ) {
         int start = l->exons[BLOCK_START][i];
         int end = l->exons[BLOCK_END][i];
@@ -452,31 +497,6 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
             }
             if ( str.m ) free(str.s);
         }
-        // if insertion break the original codon goto check delins
-        //if ( cod != 2 ) goto delins;
-        
-        // Check if insertion does NOT change the amino acid, treat as inframe insertion, else go to delins
-        // memcpy(codon, ori_seq, 3);
-
-        // ?
-        //if ( type->ori_amino != codon2aminoid(codon) ) goto delins;
-        
-        /* BRANCH(var_is_inframe_insertion); */
-        
-        /* // end amino acid */
-        /* memcpy(codon, ori_seq+3, 3); */
-        /* type->ori_end_amino = codon2aminoid(codon); */
-        /* type->loc_end_amino = type->loc_amino + 1; */
-        
-        /* // free aminos buffer before reallocated it, previous memory leaks */
-        /* type->n = alt_length/3; */
-        /* type->aminos = malloc(type->n *sizeof(int)); */
-
-        /* int i; */
-        /* for ( i = 0; i < alt_length/3; ++i ) { */
-        /*     memcpy(codon, alt_seq+i*3, 3); */
-        /*     type->aminos[i] = codon2aminoid(codon); */
-        /* } */
     } 
     // Deletion
     else if ( hgvs->type == var_type_del ) {
@@ -850,6 +870,41 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     type->fs = 0;
     return 0;
 }
+static int hgvs_anno_trans_core(struct hgvs_handler *h, struct hgvs *n, struct hgvs_core *trans, struct genepred_line *gl)
+{
+    // update hgvs locations
+    struct hgvs_inf *inf = &trans->inf;
+    struct hgvs_type *type = &trans->type;
+    inf->aa_length = gl->cdsstart == gl->cdsend ? 0 : (gl->cds_length - gl->utr5_length)/3;
+    inf->strand = gl->strand;
+    inf->version = gl->name_version;
+        
+    int ex1 = 0, ex2 = 0;
+    if ( find_locate(gl, &inf->pos, &inf->offset, n->start, &ex1) ) return 1;
+    if ( n->start != n->end ) {
+        // unannotated location will export as '?'
+        if ( find_locate(gl, &inf->end_pos, &inf->end_offset, n->end, &ex2) ) type->func2 = func_region_outrange;
+            
+        if ( gl->strand == '-' ) {
+            int t = inf->pos;
+            inf->pos = inf->end_pos;
+            inf->end_pos = t;
+            t = inf->offset;
+            inf->offset = inf->end_offset;
+            inf->end_offset = t;
+        } 
+    }
+    else {
+        inf->end_pos = inf->pos;
+        inf->end_offset = inf->offset;
+    }
+    inf->transcript = strdup(gl->name1);
+    inf->gene = strdup(gl->name2);
+    
+    // update variant functional types
+    check_func_vartype(h, n, n->n_tran, gl);
+    return 0;
+}
 int hgvs_anno_trans(struct hgvs *n, struct hgvs_handler *h)
 {
     if ( hgvs_handler_fill_buffer(n, h) == 0 ) return 0;
@@ -865,38 +920,43 @@ int hgvs_anno_trans(struct hgvs *n, struct hgvs_handler *h)
         }
         struct hgvs_core *trans = &n->trans[n->n_tran];
         memset(trans, 0, sizeof(*trans));
-        // update hgvs locations
-        struct hgvs_inf *inf = &trans->inf;
-        struct hgvs_type *type = &trans->type;
-        inf->aa_length = gl->cdsstart == gl->cdsend ? 0 : (gl->cds_length - gl->utr5_length)/3;
-        inf->strand = gl->strand;
-        inf->version = gl->name_version;
-        
-        int ex1 = 0, ex2 = 0;
-        if ( find_locate(gl, &inf->pos, &inf->offset, n->start, &ex1) ) continue;            
-        if ( n->start != n->end ) {
-            // unannotated location will export as '?'
-            if ( find_locate(gl, &inf->end_pos, &inf->end_offset, n->end, &ex2) ) type->func2 = func_region_outrange;
-            
-            if ( gl->strand == '-' ) {
-                int t = inf->pos;
-                inf->pos = inf->end_pos;
-                inf->end_pos = t;
-                t = inf->offset;
-                inf->offset = inf->end_offset;
-                inf->end_offset = t;
-            } 
-        }
-        else {
-            inf->end_pos = inf->pos;
-            inf->end_offset = inf->offset;
-        }
-        inf->transcript = strdup(gl->name1);
-        inf->gene = strdup(gl->name2);
+        if ( hgvs_anno_trans_core(h, n, trans, gl) ) continue;
+        n->n_tran++;
+    }
+    return n->n_tran; 
+}
 
-        // update variant functional types
+int hgvs_anno_trans_chunk(struct hgvs *n, struct hgvs_handler *h)
+{
+    int i, n_gene = 0;
+    for ( i = h->i_record; i < h->n_record; ++i ) {
+        struct genepred_line *gl = h->records[i];
+        if ( h->end_pos_for_skip == 0 || h->end_pos_for_skip < gl->txend ) h->end_pos_for_skip = gl->txend;
+        if ( n->start > h->end_pos_for_skip) {
+            h->i_record = i+1;
+            continue;
+        }
+        if ( n->end < gl->txstart ) break;
+        n_gene++;
+    }
+    if ( n_gene == 0 ) return 0;
+    
+    n->trans = malloc(n_gene*sizeof(struct hgvs_core));
 
-        check_func_vartype(h, n, n->n_tran, gl);
+    n->n_tran = 0;
+    int j;
+    for ( i = h->i_record, j = 0; i < h->n_record && j < n_gene; ++i,++j ) {
+        assert(n->n_tran < n_gene);
+        struct genepred_line *gl = h->records[i];
+         if ( gl->loc_parsed == 0 ) {
+            if ( parse_line_locs(gl) ) {
+                warnings("Failed to parse locs of %s", gl->name2);
+                continue;
+            }
+        }
+        struct hgvs_core *trans = &n->trans[n->n_tran];
+        memset(trans, 0, sizeof(*trans));
+        if ( hgvs_anno_trans_core(h, n, trans, gl) ) continue;
         n->n_tran++;
     }
     return n->n_tran;    
