@@ -328,8 +328,8 @@ int parse_args(int argc, char **argv)
     // init output file handler
     args.fp_out = args.fname_output == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.fname_output, hts_bcf_wmode(out_type));
 
-    // set genepredPlus format
-    set_format_genepredPlus();
+    // set genepredExt format
+    set_format_genepredext();
     
     // read bcf header from input bcf/vcf
     args.hdr = bcf_hdr_read(args.fp_input);

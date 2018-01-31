@@ -664,7 +664,7 @@ int anno_hgvs_chunk(struct anno_hgvs_file *f, bcf_hdr_t *hdr, struct anno_pool *
 int usage()
 {
     fprintf(stderr, "anno_hgvs [options] in.vcf\n");
-    fprintf(stderr, " -data <genepred_plus.gz>   GenePredPlus database.\n");
+    fprintf(stderr, " -data <genepred_plus.gz>   GenePredext database.\n");
     fprintf(stderr, " -rna  <rna.fa>             RNA sequence in fasta format.\n");
     fprintf(stderr, " -ref  <reference.fa>       Genome reference sequence in fasta format.\n");
     fprintf(stderr, " -tag <tag,tag>             Specify tags.\n");    

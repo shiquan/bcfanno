@@ -29,7 +29,7 @@ int usage()
             " -data     Gene prediction format database.\n"
             " -rna      Transcripts sequence database included in FASTA format, indexed by samtools faidx.\n"
             " -ref      Genome reference database in FASTA format, indexed by samtools faidx.\n"
-            " -format   Format of gene prediction database, genepred is default. [genepred,refflat,refgene]\n"
+            " -format   Format of gene prediction database, genepred is default. [genepred,refflat,refgene,genepredext]\n"
             " -skip-ver Skip version number of the transcript name.\n"
             " -p        Set threads [1].\n"
             " -chrs     Rename chromosome (contig) names in database. Renamed chroms consistent with reference genome.\n"
@@ -201,6 +201,8 @@ int parse_args(int ac, char **av)
             set_format_refgene();
         else if ( strcmp(args.format, "refflat") == 0 )
             set_format_refflat();
+        else if ( strcmp(args.format, "genepredext") == 0 )
+            set_format_genepredext();
         else
             error("Unknown format %s.", args.format);
     }

@@ -377,7 +377,7 @@ int bcfanno_config_debug(struct bcfanno_config *config)
 
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
-	LOG_print("[refgene] GenePredPlus database: %s", refgene->genepred_fname);	
+	LOG_print("[refgene] GenePredext database: %s", refgene->genepred_fname);	
         LOG_print("[refgene] columns : %s", refgene->columns);
 	if ( refgene->refseq_fname )
 	    LOG_print("[refgene] transcript fasta : %s", refgene->refseq_fname);

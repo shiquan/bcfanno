@@ -21,7 +21,7 @@ struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_f
     h->idx = tbx_index_load(data_fname);
     if ( h->idx == NULL ) error("Failed to load index of %s : %s.", data_fname, strerror(errno));
 
-    set_format_genepredPlus();
+    set_format_genepredext();
     
     return h;
 }

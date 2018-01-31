@@ -307,7 +307,7 @@ static struct genepred_format genepred_formats = {
     //.realn = 13,
 };
 
-static struct genepred_format genepredPlus_formats = {    
+static struct genepred_format genepredext_formats = {    
     .name1 = 0,
     .chrom = 1,
     .strand = 2,
@@ -339,7 +339,7 @@ static struct genepred_format refflat_formats = {
     .realn = -1,
 };
 
-// The type defined the format of database. Default is genepredPlus format.
+// The type defined the format of database. Default is genepredext format.
 static struct genepred_format *type = &notset_formats;
 
 void set_format_refgene()
@@ -350,9 +350,9 @@ void set_format_genepred()
 {
     type = &genepred_formats;
 }
-void set_format_genepredPlus()
+void set_format_genepredext()
 {
-    type = &genepredPlus_formats;
+    type = &genepredext_formats;
 }
 void set_format_refflat()
 {
@@ -482,7 +482,7 @@ int parse_line(kstring_t *string, struct genepred_line *line)
         error_print("Type is not set. Please try ...\n"
                     "void set_format_refgene()\n"
                     "void set_format_genepred()\n"
-                    "void set_format_genepredPlus()\n"
+                    "void set_format_genepredext()\n"
                     "void set_format_refflat()\n"
             );
 
