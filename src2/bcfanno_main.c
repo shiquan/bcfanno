@@ -488,9 +488,9 @@ int annotate_light()
                 for ( i = 0; i < idx->n_bed; ++i )                
                     anno_bed_chunk(idx->bed_files[i], idx->hdr_out, pool);
             }
-            if ( args.flank_seq_is_need == 1 && index->seqidx ) {
+            if ( args.flank_seq_is_need == 1 && idx->seqidx ) {
                 for ( i = 0; i < pool->n_reader; ++i) 
-                    bcf_add_flankseq(index->seqidx, index->hdr_out, pool->readers[i]);                
+                    bcf_add_flankseq(idx->seqidx, idx->hdr_out, pool->readers[i]);                
             }
             for ( i = 0; i < pool->n_reader; ++i) {
                 bcf_write1(args.fp_out, args.hdr, pool->readers[i]);
