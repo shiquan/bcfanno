@@ -371,9 +371,9 @@ int bcfanno_load_config(struct bcfanno_config *config, const char *config_fname)
 int bcfanno_config_debug(struct bcfanno_config *config)
 {
     int i;
-    LOG_print("configure file writer : %s", config->author == NULL ? "Unknown" : config->author);
-    LOG_print("configure file ID : %s", config->config_id == NULL ? "Unknown" : config->config_id);
-    LOG_print("reference sequence : %s", config->reference_path == NULL ? "Unknown" : config->reference_path);    
+    if ( config->author ) LOG_print("configure file writer : %s", config->author);
+    if ( config->config_id ) LOG_print("configure file ID : %s", config->config_id);
+    if ( config->reference_path ) LOG_print("reference sequence : %s", config->reference_path);    
 
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
