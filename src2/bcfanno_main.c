@@ -94,7 +94,7 @@ struct args {
 
     // give warnings instead of abortion 
     int quiet;
-
+    
     struct bcfanno_config *config;
 
     int input_unsorted;
@@ -106,6 +106,8 @@ struct args {
     
     int n_thread;
     struct anno_index **indexs;
+
+    uint64_t total_record;
 } args = {
     .test_databases_only = 0,
     .fname_input  = NULL,
@@ -123,6 +125,7 @@ struct args {
     .flank_seq_is_need = 0,
     .n_record     = RECORDS_PER_CHUNK,
     .indexs       = NULL,
+    .total_record = 0,
 };
 
 struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config)
@@ -457,6 +460,7 @@ int annotate_light()
         bcf1_t *line = bcf_init();
         int j;
         while ( bcf_read(args.fp_input, args.hdr, line) == 0 ) {
+            args.total_record ++;
             if ( line->rid == -1 ) goto output_line;
             if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
             if ( idx->hgvs )
@@ -476,6 +480,7 @@ int annotate_light()
     else {
         for ( ;; ) {
             struct anno_pool *pool = anno_reader(args.fp_input, args.hdr, args.n_record);
+            args.total_record += (uint64_t)pool->n_reader;
             if ( pool == 0 || pool->n_reader == 0) break;
             int i;
             for ( ;; ) {
@@ -520,6 +525,7 @@ int annotate()
 
     for ( ;; ) {
         struct anno_pool *arg = anno_reader(args.fp_input, args.hdr, args.n_record);
+        args.total_record += (uint64_t)arg->n_reader;
         if ( arg->n_reader == 0 )
             break;
         
@@ -555,9 +561,12 @@ int annotate()
 
     return 0;
 }
+#include <time.h>
 
 int main(int argc, char **argv)
 {
+    clock_t t = clock();
+    
     if ( parse_args(argc, argv) )
         return 1;
 
@@ -565,5 +574,11 @@ int main(int argc, char **argv)
         return 1;
 
     memory_release();
+
+    if ( quiet_mode == 0 ) {
+        t = clock() -t;
+        double time_taken = ((double)t)/CLOCKS_PER_SEC;
+        LOG_print("Annotate %lld records in %.2f seconds.", args.total_record, time_taken);
+    }
     return 0;
 }

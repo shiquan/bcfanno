@@ -1,0 +1,28 @@
+{
+    // database in this block used to predict variant types and HGVS names
+    "hgvs": {        
+	"gene_data":"example/toy.GenePredExt.gz", // GenePredExt format is defined by bcfanno, check manual for details
+        "refseq":"example/toy_transcripts.fa", // whole sequences of transcripts
+        "columns":"VarType,ExonIntron,Gene,Transcript,HGVSnom,AAlength",
+    },
+    // allele specific databases
+    "vcfs": [
+        // dbSNP database
+        {
+            "file":"example/toy_dbsnp.bcf",
+            "columns":"DBSNP_ASP,DBSNP_ASS,DBSNP_CAF,DBSNP_CFL,CLNDBN,CLNDSDB,CLNORIGIN,CLNSIG,DBSNP_COMMON,DBSNP_DSS,RS,DBSNP_SAO,DBSNP_VLD,DBSNP_VP",
+        },
+        //  HGMD database
+        {
+            "file":"example/toy_hgmd.bcf",
+            "columns":"HGMD_disease,HGMD_tag,HGMD_pmid,HGMD_acc_num,HGMD_descr",
+        },
+    ],
+    // region sepecific databases
+    "beds": [
+        { 
+            "file": "example/toy_cytoband.bed.gz", // for bed-like database, self-defined header should be set at the beginning of this file.
+            "columns": "CytoBand",
+        },
+    ],
+}
