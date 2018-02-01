@@ -281,7 +281,7 @@ int parse_args(int argc, char **argv)
 	error("Failed to load configure file. %s : %s", args.fname_json, strerror(errno));    
     
     if ( quiet_mode == 0 ) {
-	LOG_print("Load configure file success.");
+	//LOG_print("Load configure file success.");
 	bcfanno_config_debug(args.config);
     }
 
