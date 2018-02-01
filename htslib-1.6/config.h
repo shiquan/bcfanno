@@ -18,10 +18,10 @@
 /* #undef ENABLE_PLUGINS */
 
 /* Define if HTSlib should enable S3 support. */
-#define ENABLE_S3 1
+#define ENABLE_S3 1 
 
 /* Define if you have the Common Crypto library. */
-#define HAVE_COMMONCRYPTO 1
+/* #define HAVE_COMMONCRYPTO 1 */
 
 /* Define to 1 if you have the `drand48' function. */
 #define HAVE_DRAND48 1
