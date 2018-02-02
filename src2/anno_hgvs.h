@@ -26,7 +26,7 @@ struct anno_hgvs_file {
     int mtmps;
 };
 
-extern struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna, const char *reference);
+extern struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna, const char *reference, const char *gene_list, const char *trans_list);
 extern struct anno_hgvs_file *anno_hgvs_file_duplicate(struct anno_hgvs_file *f);
 extern void anno_hgvs_file_destroy(struct anno_hgvs_file *f);
 extern void anno_hgvs_core(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf1_t *line);

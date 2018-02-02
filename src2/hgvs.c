@@ -3,8 +3,9 @@
 #include "htslib/hts.h"
 #include "htslib/faidx.h"
 #include "htslib/vcf.h"
+#include "name_list.h"
 
-struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname)
+struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname, const char *gene_list, const char *trans_list)
 {
     struct hgvs_handler *h = malloc(sizeof(*h));
     memset(h, 0, sizeof(*h));
@@ -22,6 +23,9 @@ struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_f
     if ( h->idx == NULL ) error("Failed to load index of %s : %s.", data_fname, strerror(errno));
 
     set_format_genepredext();
+
+    if ( gene_list ) h->gene_hash = name_hash_init(gene_list);
+    if ( trans_list ) h->trans_hash = name_hash_init(trans_list);
     
     return h;
 }
@@ -159,9 +163,9 @@ int hgvs_handler_fill_buffer_chunk(struct hgvs_handler *h, char* name, int start
         struct genepred_line *line = genepred_line_create();
         if ( parse_line(&string, line) ) continue;
         if ( h->gene_hash || h->trans_hash ) {
-            if ( name_hash_key_exists(h->gene_hash, line->name2) ) 
+            if (h->gene_hash && name_hash_key_exists(h->gene_hash, line->name2) ) 
                 h->records[h->n_record++] = line;
-            else if ( name_hash_key_exists(h->trans_hash, line->name1) )
+            else if ( h->trans_hash && name_hash_key_exists(h->trans_hash, line->name1) )
                 h->records[h->n_record++] = line;
             else genepred_line_destroy(line);
         }

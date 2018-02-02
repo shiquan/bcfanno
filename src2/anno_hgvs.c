@@ -541,7 +541,7 @@ void anno_hgvs_file_destroy(struct anno_hgvs_file *f)
     for ( i = 0; i < f->n_col; ++i ) free(f->cols[i].hdr_key);
     free(f);
 }
-struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna, const char *reference)
+struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna, const char *reference, const char *gene_list, const char *trans_list)
 {
     if ( data == NULL || rna == NULL ) return NULL;
         
@@ -628,7 +628,7 @@ struct anno_hgvs_file *anno_hgvs_file_init(bcf_hdr_t *hdr, const char *column, c
     }
 #undef BRANCH
 
-    f->h = hgvs_handler_init(rna, data, reference);
+    f->h = hgvs_handler_init(rna, data, reference, gene_list, trans_list);
     return f;
 }
 void anno_hgvs_core(struct anno_hgvs_file *f, bcf_hdr_t *hdr, bcf1_t *line)

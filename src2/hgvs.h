@@ -129,7 +129,7 @@ struct hgvs_handler {
     struct genepred_line **records;
 };
 
-extern struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname);
+extern struct hgvs_handler *hgvs_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname, const char *gene_list, const char *trans_list);
 extern struct hgvs_handler *hgvs_handler_duplicate(struct hgvs_handler *h);
 extern void hgvs_handler_destroy(struct hgvs_handler *h);
 

@@ -157,7 +157,7 @@ struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config
     else idx->n_vcf = 0;
     
     if ( refgene_config->genepred_fname && refgene_config->refseq_fname )
-        idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path);
+        idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path, refgene_config->gene_list_fname, refgene_config->trans_list_fname);
     else idx->hgvs = NULL;
     
     if ( config->reference_path ) {
