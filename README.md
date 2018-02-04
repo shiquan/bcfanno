@@ -40,7 +40,7 @@ Run bcfanno with toy data :
 
 ```
 
-## (Optional) View your view with Microsoft excel
+## (Optional) View annotations with Microsoft excel
 This step is optional, need to install my another program [tsv2excel](https://github.com/shiquan/tsv2excel) first.
 ```
 ./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f BED,CytoBand,TGT,SAMPLE,RS,VarType,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid | tsv2excel -o toy.xlsx

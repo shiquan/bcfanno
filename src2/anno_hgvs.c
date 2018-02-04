@@ -199,7 +199,10 @@ static char *generate_hgvsnom_string(struct hgvs *h)
                 ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
                 alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
             }
-            if ( h->type == var_type_snp ) ksprintf(&str, "%s>%s", ref, alt);
+            if ( h->type == var_type_snp ){
+                if ( type->vartype == var_is_no_call )  ksprintf(&str, "%s>%s", alt, alt);
+                else ksprintf(&str, "%s>%s", ref, alt);
+            }                    
             else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
             else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);
             else if ( h->type == var_type_delins ) ksprintf(&str, "delins%s", alt);

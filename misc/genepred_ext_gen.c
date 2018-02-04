@@ -392,7 +392,7 @@ char *process(struct args *args, struct index *index, kstring_t *str)
     uint8_t *qseq = malloc(qlen *sizeof(*qseq));
     //transcript
     uint8_t *rseq = malloc(rlen *sizeof(*rseq));
-        
+
     for ( i = 0; i < tmp.l; ++i )
         qseq[i] = sntab[(int)tmp.s[i]];
     for ( i = 0; i < rlen; ++i )
