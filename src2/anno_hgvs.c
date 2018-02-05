@@ -46,8 +46,6 @@ static char *generate_annovar_name(struct hgvs *h)
             ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
             alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
         }
-
-
         
         ksprintf(&str,"%s:%s:", inf->gene, inf->transcript);
         if ( inf->offset != 0 ) ksprintf(&str, "intron%d:", type->count);
@@ -60,16 +58,16 @@ static char *generate_annovar_name(struct hgvs *h)
         if ( inf->dup_offset > 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1,h->alt);
-            else ksprintf(&str, "%ddup%s", inf->loc+inf->dup_offset, h->alt);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1,alt);
+            else ksprintf(&str, "%ddup%s", inf->loc+inf->dup_offset, alt);
         }
         else if ( inf->dup_offset < 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset+1, inf->loc, h->alt);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset+1, inf->loc, alt);
             else {
                 assert(inf->dup_offset == -1);
-                ksprintf(&str, "%ddup%s", inf->loc, h->alt);
+                ksprintf(&str, "%ddup%s", inf->loc, alt);
             }
         }
         else {

@@ -70,7 +70,7 @@ The full package of bcfanno is distributed by MIT/Expat License, copyright 2016-
 
 Belowed package or source code used in bcfanno copyrighted by other institution.
 - [htslib1.6](www.htslib.org)  The MIT/Expat License, Copyright (C) 2012-2014 Genome Research Ltd.
-- anno_thread_pool.[ch] The MIT/Expat License, Copyright (c) 2013-2017 Genome Research Ltd.
+- thread_pool.[ch] The MIT/Expat License, Copyright (c) 2013-2017 Genome Research Ltd.
 
 ## How to cite bcfanno
 

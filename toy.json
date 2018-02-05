@@ -4,6 +4,7 @@
 	"gene_data":"example/toy.GenePredExt.gz", // GenePredExt format is defined by bcfanno, check manual for details
         "refseq":"example/toy_transcripts.fa", // whole sequences of transcripts
         "columns":"VarType,ExonIntron,Gene,Transcript,HGVSnom,AAlength",
+        //"trans_list":"trans.list",
     },
     // allele specific databases
     "vcfs": [
