@@ -1,4 +1,4 @@
-PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags
+PROG=       bcfanno vcf2tsv tsv2vcf vcf_rename_tags GenePredExtGen
 DEBUG_PROG= bcfanno_debug
 
 all: $(PROG)
@@ -35,7 +35,7 @@ force:
 
 
 GenePredExtGen: $(HTSLIB)
-	$(CC)  $(DEBUG_CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/genepred_ext_gen.c misc/ksw.c src2/anno_thread_pool.c src2/genepred.c src2/number.c src2/faidx_def.c $(HTSLIB)
+	$(CC) $(INCLUDES) -pthread -lz -o $@ misc/genepred_ext_gen.c misc/ksw.c src2/anno_thread_pool.c src2/genepred.c src2/number.c src2/faidx_def.c $(HTSLIB)
 
 vcf2tsv: $(HTSLIB) version.h 
 	$(CC) $(CFLAGS) $(INCLUDES) -pthread -lz -o $@ misc/vcf2tsv.c $(HTSLIB)
