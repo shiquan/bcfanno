@@ -302,7 +302,7 @@ static int find_locate(struct genepred_line *l, int *pos, int *offset, int start
             // there is no need to check match and *pos, becase for plus strand match will be always smaller than *pos
             // check if this deletion in the target block
             if ( l->loc[l->strand == '+' ? BLOCK_START : BLOCK_END][i] <= match && *pos > match) {
-                adjust -= del;            
+                adjust -= del;
                 // if this variant located in the deletion, just put pos to the edge of this gap
                 if ( *pos < match +  del ) { *pos += 1; return 0; }
             }
@@ -315,6 +315,10 @@ static int find_locate(struct genepred_line *l, int *pos, int *offset, int start
         
         if ( l->strand == '+' && match >= *pos ) break;            
         else if ( l->strand == '-' && match < *pos ) break;
+
+        // Since genepred locations in each exome has been adjusted, so if matched region in the upstream of the target exon, reset adjust to 0
+        if ( l->strand == '+' && match + adjust < l->loc[BLOCK_START][b1] ) adjust = 0;
+        else if ( l->strand == '-' && match + adjust < l->loc[BLOCK_END][b1] ) adjust = 0;
     }
     *pos += adjust;
     return 0;
