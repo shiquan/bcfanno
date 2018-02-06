@@ -45,7 +45,7 @@ This step is optional, need to install my another program [tsv2excel](https://gi
 ```
 ./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f BED,CytoBand,TGT,SAMPLE,RS,VarType,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid | tsv2excel -o toy.xlsx
 ```
-
+<img src="https://raw.githubusercontent.com/shiquan/bcfanno/master/Documentation/toy_anno.png" width="805" height="483" />
 
 ## Additional programs included in bcfanno package
 
