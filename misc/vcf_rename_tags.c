@@ -713,7 +713,7 @@ int tags_convert()
 	string.l = 0;
 	kputs(names[i], &string);
 	// split string by tab
-	int *splits = ksplit(&string, '\t', &nfields);
+	int *splits = ksplit(&string, 0, &nfields);
 	if (nfields != 2) {
 	    warnings("Error format; only accept two columns per line. %s", names[i]);
 	    continue;
@@ -741,7 +741,6 @@ int tags_convert()
 	    ss += 5;
 	if ( strlen(se) > 5 && strncmp(se, "INFO/", 5) == 0 )
 	    se += 5;
-	int rid = bcf_hdr_name2id(args.hdr_out, ss);
 	bcf_hrec_t *rec = bcf_hdr_get_hrec(args.hdr_out, BCF_HL_INFO, "ID", ss, NULL);
 	if ( !rec )
 	    continue;
@@ -749,7 +748,6 @@ int tags_convert()
 	assert(j >= 0);
 	free(rec->vals[j]);
 	rec->vals[j] = strdup(se);
-	args.hdr_out->id[BCF_DT_ID][rid].key = rec->vals[j];	
 	free(splits);
     }
     for ( i = 0; i < n; ++i )
