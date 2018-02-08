@@ -707,6 +707,10 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     struct hgvs_type *type = &hgvs->trans[n].type;
     memset(type, 0, sizeof(struct hgvs_type));
 
+    // Variant type should be consider as function variant type (vartype1) and splice site (vartype2);    
+    type->vartype = var_is_unknown;
+    type->vartype2 = var_is_not_splice;
+
     int pos = inf->pos;
     int ref_length = hgvs->ref == NULL ? 0 : strlen(hgvs->ref);
     int alt_length = hgvs->alt == NULL ? 0 : strlen(hgvs->alt);
@@ -719,11 +723,11 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
         if ( alt_seq ) compl_seq(alt_seq, alt_length);
     }
 
-    if (gl->cdsstart == gl->cdsend ) type->func1 = type->func2 = func_region_noncoding;
+    if (gl->cdsstart == gl->cdsend ) { type->func1 = type->func2 = func_region_noncoding; type->vartype = var_is_noncoding; }
     // if coding transcript, check UTR or coding regions
     else {
-        if ( inf->pos <= gl->utr5_length ) type->func1 = func_region_utr5;
-        else if ( inf->pos > gl->cds_length ) type->func1 = func_region_utr3;
+        if ( inf->pos <= gl->utr5_length ) { type->func1 = func_region_utr5; type->vartype = var_is_utr5; }
+        else if ( inf->pos > gl->cds_length ) { type->func1 = func_region_utr3; type->vartype = var_is_utr3; }
         else type->func1 = func_region_cds;
         
         if ( inf->pos == inf->end_pos && inf->offset == inf->end_offset) type->func2 = type->func1;
@@ -749,9 +753,6 @@ static int check_func_vartype(struct hgvs_handler *h, struct hgvs *hgvs, int n, 
     // check exon,intron,cds ID, check the splice sites
     int i; // exon / intron ID
     int c; // cds id
-    // Variant type should be consider as function variant type (vartype1) and splice site (vartype2);    
-    type->vartype = var_is_unknown;
-    type->vartype2 = var_is_not_splice;
     
     // Only check the start of variants
     // Count the Exome/Intron and CDS id, for minus strand id should count from backward

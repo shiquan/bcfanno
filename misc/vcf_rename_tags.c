@@ -736,19 +736,23 @@ int tags_convert()
 	    free(splits);
 	    continue;
 	}
-	    
+        
 	if ( strlen(ss) > 5 && strncmp(ss, "INFO/", 5) == 0 )
 	    ss += 5;
 	if ( strlen(se) > 5 && strncmp(se, "INFO/", 5) == 0 )
 	    se += 5;
-	bcf_hrec_t *rec = bcf_hdr_get_hrec(args.hdr_out, BCF_HL_INFO, "ID", ss, NULL);
-	if ( !rec )
-	    continue;
-	int j = bcf_hrec_find_key(rec, "ID");
-	assert(j >= 0);
-	free(rec->vals[j]);
-	rec->vals[j] = strdup(se);
-	free(splits);
+        int id = bcf_hdr_id2int(args.hdr_out, BCF_DT_ID, ss);
+        if ( bcf_hdr_idinfo_exists(args.hdr_out, BCF_HL_INFO, id) ) {
+            bcf_hrec_t *rec = bcf_hdr_get_hrec(args.hdr_out, BCF_HL_INFO, "ID", ss, NULL);
+            if ( !rec )
+                continue;
+            int j = bcf_hrec_find_key(rec, "ID");
+            assert(j >= 0);
+            free(rec->vals[j]);
+            rec->vals[j] = strdup(se);
+            args.hdr_out->id[BCF_DT_ID][id].key = rec->vals[j];
+            free(splits);
+        }
     }
     for ( i = 0; i < n; ++i )
 	free(names[i]);
@@ -764,12 +768,12 @@ int tags_convert()
         for ( i = 0; i < n; ++i ) {
             char *name, *repl;
             if ( convert_ncbi_name_flag == 1 ) {
-                name = chr_pairs[i].ucsc;
-                repl = chr_pairs[i].ncbi;
+                name = (char*)chr_pairs[i].ucsc;
+                repl = (char*)chr_pairs[i].ncbi;
             }
             else {
-                name = chr_pairs[i].ncbi;
-                repl = chr_pairs[i].ucsc;
+                name = (char*)chr_pairs[i].ncbi;
+                repl = (char*)chr_pairs[i].ucsc;
             }
             
             //int rid = bcf_hdr_id2int(args.hdr_out, BCF_DT_ID, name);
