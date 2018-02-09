@@ -58,7 +58,8 @@ static char *generate_annovar_name(struct hgvs *h)
         if ( inf->dup_offset > 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1,alt);
+            // inf->loc is the location of capped base
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup%s", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset,alt);
             else ksprintf(&str, "%ddup%s", inf->loc+inf->dup_offset, alt);
         }
         else if ( inf->dup_offset < 0 ) {
@@ -158,13 +159,14 @@ static char *generate_hgvsnom_string(struct hgvs *h)
         if ( inf->dup_offset > 0 ) {           
             assert(inf->loc != 0);
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset+1);
+            // inf->loc is the location of capped base
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset);
             else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
         }
         else if ( inf->dup_offset < 0 ) {
             assert(inf->loc != 0 );
             int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc);
+            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc + inf->dup_offset-len);
             else {
                 assert(inf->dup_offset == -1);
                 ksprintf(&str, "%ddup", inf->loc);
@@ -436,7 +438,10 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
         struct hgvs *f = file->files[i];
         if ( i > 0 ) 
             for ( j = 0; j < file->n_col; ++j ) kputc(',', &str[j]);
-
+        if ( f == NULL ) { // for N
+            for ( j = 0; j < file->n_col; ++j ) kputc('.', &str[j]);
+            continue;
+        }
         int ret;
         if ( chunk == 1 ) 
             ret = hgvs_anno_trans_chunk(f, h);

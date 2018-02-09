@@ -110,15 +110,22 @@ struct hgvs *hgvs_init(const char *chrom, int start, int end, char *ref, char *a
         h->type = var_type_del;
         h->ref = strdup(ref);
     }
+    if (*alt == 'N') {
+        if ( h->ref ) free(h->ref);
+        if ( h->alt ) free(h->alt);
+        free(h);
+        return NULL;
+    }
     // for insert, end smaller than start.
     if ( lr == 0 && h->end < h->start ) {
         h->end = h->start;
-        h->start--;
+        h->start--; // point start to capped base
     }
     return h;
 }
-void hgvs_destroy(struct hgvs *h)
+int hgvs_destroy(struct hgvs *h)
 {
+    if ( h == NULL ) return 0;
     if ( h->ref ) free(h->ref);
     if ( h->alt ) free(h->alt);
     int i;
@@ -131,6 +138,7 @@ void hgvs_destroy(struct hgvs *h)
     }
     free(h->trans);
     free(h);
+    return 0;
 }
 int hgvs_handler_fill_buffer_chunk(struct hgvs_handler *h, char* name, int start, int end)
 {
@@ -370,6 +378,11 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         char *ss = ori_seq;
         // remove caps
         ss += cod+1;
+        // insertion at the end of terminate codon
+        if (ss == NULL || *ss == '\0' ) {
+            type->vartype = var_is_stop_retained;
+            return 1;
+        }
         
         while ( same_DNA_seqs(alt_seq, ss, alt_length) == 0 ) { ss += alt_length; offset += alt_length; }
 
@@ -381,18 +394,18 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
             // update dup_offset for original inf struct, check this value when output hgvs position
             inf->dup_offset = offset;
 
-            cds_pos += offset;
-            cod = (cds_pos-1)%3;
-            int new_start = (cds_pos-1)/3*3 + gl->utr5_length;
-            assert(new_start >= start);
-            int start_offset = new_start -start;
-            char *offset_seq = strdup(ori_seq+start_offset);
-            transcript_retrieve_length -= start_offset;
-            offset_seq[transcript_retrieve_length] = '\0';
-            // point ori_seq to new memory address, this is not safe!
-            free(ori_seq);
-            ori_seq = offset_seq;
-            start = new_start;
+            /* cds_pos += offset; */
+            /* cod = (cds_pos-1)%3; */
+            /* int new_start = (cds_pos-1)/3*3 + gl->utr5_length; */
+            /* assert(new_start >= start); */
+            /* int start_offset = new_start -start; */
+            /* char *offset_seq = strdup(ori_seq+start_offset); */
+            /* transcript_retrieve_length -= start_offset; */
+            /* offset_seq[transcript_retrieve_length] = '\0'; */
+            /* // point ori_seq to new memory address, this is not safe! */
+            /* free(ori_seq); */
+            /* ori_seq = offset_seq; */
+            /* start = new_start; */
         }
         // if no dup found forward, check backward
         else if ( offset == 0 ) {
@@ -432,7 +445,7 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         else {
             if ( type->ori_amino == X_CODO ) {
                 // stop-loss, check extension
-                assert(type->vartype == var_is_unknown);
+                //assert(type->vartype == var_is_unknown);
                 type->vartype = var_is_stop_lost;
                 int i;
                 for ( i = 1; i < transcript_retrieve_length/3; ++i ) {
@@ -453,6 +466,7 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
         // if insertion break the frame goto check delins
         if ( alt_length%3 ) goto delins;        
         int i;
+        // should consider the start of insertion point to capped base, so frame will not change if cod == 2
         if ( cod == 2 ) {
             type->vartype = var_is_inframe_insertion;
             type->loc_end_amino = type->loc_amino+1;
@@ -634,70 +648,83 @@ static int check_protein_changes(struct hgvs_handler *h, struct hgvs *hgvs, stru
             char codon[4];
             memcpy(codon, ori_seq, 3);
             type->ori_amino = codon2aminoid(codon);
-                
-            if ( cod > 0 ) kputsn(ori_seq, cod, &str);
-            if ( alt_length > 0 ) kputsn(alt_seq, alt_length, &str);
-            if ( ref_length < transcript_retrieve_length ) {
-                kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
-                // delins in stop codon, and no UTR 3 in this transcript                
-                if (str.l < 3) {
-                    faidx_t *fai = fai_load(h->reference_fname);
-                    if ( fai ) {
-                        char *refseq = NULL;
-                        int length = 0;
-                        if ( gl->strand == '+' ) 
+
+            // capped base for insertion
+            if ( ref_length == 0 ) {
+                assert(alt_length > 0 );
+                if ( ref_length == 0 ) kputsn(ori_seq,cod+1, &str);
+                if ( alt_length > 0 ) kputsn(alt_seq, alt_length, &str);
+                kputsn(ori_seq+cod+1+ref_length, transcript_retrieve_length-cod-ref_length, &str);
+                memcpy(codon, str.s, 3);
+                type->mut_amino = codon2aminoid(codon);
+            }
+            else {
+                if ( cod > 0 ) kputsn(ori_seq, cod, &str);
+                if ( alt_length > 0 ) kputsn(alt_seq, alt_length, &str);
+
+                if ( ref_length < transcript_retrieve_length ) {
+                    kputsn(ori_seq+cod+ref_length, transcript_retrieve_length-cod-ref_length, &str);
+                    // delins in stop codon, and no UTR 3 in this transcript                
+                    if (str.l < 3) {
+                        faidx_t *fai = fai_load(h->reference_fname);
+                        if ( fai ) {
+                            char *refseq = NULL;
+                            int length = 0;
+                            if ( gl->strand == '+' ) 
                             refseq = faidx_fetch_seq(fai, gl->chrom, gl->txend, gl->txend+10, &length);
-                        else {
-                            refseq = faidx_fetch_seq(fai, gl->chrom, gl->txstart - 10, gl->txstart, &length);
-                            compl_seq(refseq, length);
+                            else {
+                                refseq = faidx_fetch_seq(fai, gl->chrom, gl->txstart - 10, gl->txstart, &length);
+                                compl_seq(refseq, length);
+                            }
+                            if ( length && refseq ) {
+                                kputs(refseq, &str);
+                                memcpy(codon, str.s, 3);
+                                type->mut_amino = codon2aminoid(codon);
+                            }
+                            fai_destroy(fai);
                         }
-                        if ( length && refseq ) {
-                            kputs(refseq, &str);
-                            memcpy(codon, str.s, 3);
-                            type->mut_amino = codon2aminoid(codon);
-                        }
-                        fai_destroy(fai);
+                    }
+                    else {
+                        memcpy(codon, str.s, 3);
+                        type->mut_amino = codon2aminoid(codon);
                     }
                 }
                 else {
-                    memcpy(codon, str.s, 3);
-                    type->mut_amino = codon2aminoid(codon);
+                    type->vartype = var_is_stop_lost;
+                    free(ori_seq);
+                    return 0;
                 }
-                
-                int i = 0, j;
-                // ajust amnio acid change; for some frameshift variants first aa maybe retained, we should adjust aa forward
-                // until the most first aa change position. For example,
-                // NM_014638.3:c.3705_3721dup(p.Leu1240Leufs*29) should be interpret as :p.(Ser1241Phefs*42)
+            }
+            int i = 0, j;
+            // ajust amnio acid change; for some frameshift variants first aa maybe retained, we should adjust aa forward
+            // until the most first aa change position. For example,
+            // NM_014638.3:c.3705_3721dup(p.Leu1240Leufs*29) should be interpret as :p.(Ser1241Phefs*42)
 
-                for ( ;; ) {
-                    if (type->ori_amino != type->mut_amino || i*3>str.l) break;
-                    i++;
-                    memcpy(codon, ori_seq+i*3, 3);
-                    type->ori_amino = codon2aminoid(codon);
-                    memcpy(codon, str.s+i*3, 3);
-                    type->mut_amino = codon2aminoid(codon);
-                }
-                for ( j = i; j < str.l/3; ++j ) {
-                    if ( check_is_stop(str.s+j*3) ) break;
-                }
-                // frameshift -1 for no change,else for termination site
-                type->fs = ori_stop == j+1-i ? -1 : j+1-i;
-                // adjust location to the nearest variant position
-                type->loc_amino += i;
-                type->loc_end_amino += i;
-                    
-                if ( str.m ) free(str.s);
+            for ( ;; ) {
+                if (type->ori_amino != type->mut_amino || i*3>str.l) break;
+                i++;
+                memcpy(codon, ori_seq+i*3, 3);
+                type->ori_amino = codon2aminoid(codon);
+                memcpy(codon, str.s+i*3, 3);
+                type->mut_amino = codon2aminoid(codon);
             }
-            else {
-                type->vartype = var_is_stop_lost;
+            for ( j = i; j < str.l/3; ++j ) {
+                if ( check_is_stop(str.s+j*3) ) break;
             }
+            // frameshift -1 for no change,else for termination site
+            type->fs = ori_stop == j+1-i ? -1 : j+1-i;
+            // adjust location to the nearest variant position
+            type->loc_amino += i;
+            type->loc_end_amino += i;
+            
+            if ( str.m ) free(str.s);
         } // end of Delins        
     } // end var type
 
 #undef BRANCH
     
     if ( ori_seq ) free(ori_seq);
-    return 0;
+    return 0;    
 }
 //static int check_func_vartype(struct hgvs_handler *hand, struct hgvs_inf *inf, struct hgvs_type *type, struct genepred_line *gl)
 // n : iterate of transcript

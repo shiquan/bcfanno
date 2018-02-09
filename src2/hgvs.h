@@ -134,7 +134,7 @@ extern struct hgvs_handler *hgvs_handler_duplicate(struct hgvs_handler *h);
 extern void hgvs_handler_destroy(struct hgvs_handler *h);
 
 extern struct hgvs *hgvs_init(const char *chrom, int start, int end, char *ref, char *alt);
-extern void hgvs_destroy(struct hgvs *h);
+extern int hgvs_destroy(struct hgvs *h);
 extern int hgvs_anno_trans(struct hgvs *n, struct hgvs_handler *h);
 extern int hgvs_handler_fill_buffer_chunk(struct hgvs_handler *h, char* name, int start, int end);
 extern int hgvs_anno_trans_chunk(struct hgvs *n, struct hgvs_handler *h);
