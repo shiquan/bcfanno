@@ -442,6 +442,10 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
             for ( j = 0; j < file->n_col; ++j ) kputc('.', &str[j]);
             continue;
         }
+        if ( f->type == var_type_nonref || f->type == var_type_unknow ) {
+            for ( j = 0; j < file->n_col; ++j ) kputc('.', &str[j]);
+            continue;
+        }
         int ret;
         if ( chunk == 1 ) 
             ret = hgvs_anno_trans_chunk(f, h);
