@@ -40,8 +40,6 @@ static const char *hts_bcf_wmode(int file_type)
     return "w";                                 // uncompressed VCF
 }
 
-#define RECORDS_PER_CHUNK 1000
-
 int usage()
 {
     fprintf(stderr, "\n");
@@ -373,32 +371,6 @@ void memory_release()
     int i;
     for ( i = 0; i < args.n_thread; ++i ) anno_index_destroy(args.indexs[i]);
     free(args.indexs);
-}
-
-static void update_chunk_region(struct anno_pool *pool)
-{
-    int i_chunk;
-    int start = -1, end = -1, last_rid = -1, last_pos = -1;
-    pool->curr_line = pool->readers[pool->n_chunk];
-    start = pool->curr_line->pos;
-    last_rid = pool->curr_line->rid;
-    
-    for ( i_chunk = pool->n_chunk; i_chunk < pool->n_reader; ++i_chunk ) {
-        int pos = pool->readers[i_chunk]->pos;
-        int rid = pool->readers[i_chunk]->rid;
-        if ( last_rid == -1 ) last_rid = rid;
-        if ( last_rid != rid ) break;
-        if ( start == -1 ) start = pos;        
-        if ( last_pos != -1 && pos - last_pos > CHUNK_MAX_GAP ) break;
-        last_pos = pos;
-        end = pos;
-    }
-    // 
-    pool->curr_start = start;
-    pool->curr_end   = end;
-
-    pool->i_chunk = pool->n_chunk;
-    pool->n_chunk = i_chunk;
 }
 
 void *anno_core(void *arg, int idx)

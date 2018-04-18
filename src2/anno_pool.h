@@ -5,6 +5,9 @@
 #include "htslib/vcf.h"
 #include "htslib/hts.h"
 
+#define RECORDS_PER_CHUNK 1000
+#define CHUNK_MAX_GAP 10000
+
 struct anno_pool {
     // maximum number of records
     int m;
@@ -23,4 +26,5 @@ struct anno_pool {
 
 extern struct anno_pool *anno_reader(htsFile *fp, bcf_hdr_t *hdr, int n_record);
 
+extern void update_chunk_region(struct anno_pool *pool);
 #endif

@@ -4,8 +4,6 @@
 #include "utils.h"
 #include "htslib/vcf.h"
 
-#define CHUNK_MAX_GAP 10000
-
 struct anno_col;
 struct anno_vcf_file;
 struct anno_bed_file;
