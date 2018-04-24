@@ -1092,7 +1092,7 @@ int gea_parse(kstring_t *s, const struct gea_hdr *h, struct gea_record *v)
             v->rid = kh_val(d, k).id;
         }
         // chromosome start
-        else if (i == 1)  v->chromStart = str2int(p);
+        else if (i == 1)  v->chromStart = str2int(p); // 0 based
         // chromosome end
         else if (i == 2 ) v->chromEnd = str2int(p);
         // name
@@ -1142,7 +1142,7 @@ int gea_parse(kstring_t *s, const struct gea_hdr *h, struct gea_record *v)
         // cdsStart
         else if ( i == 7 ) {
             if ( !strcmp(p, ".") ) v->cStart = -1;
-            else v->cStart = str2int(p);            
+            else v->cStart = str2int(p);  // 0 based
         }
         // cdsEnd
         else if ( i == 8 ) {
@@ -1375,6 +1375,11 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
     }
 
     if ( which & GEA_UN_CIGAR && !(b->unpacked & GEA_UN_CIGAR) ) {
+        // only consider alignment state of transcript
+        if ( strcmp(hdr->id[GEA_DT_BIOTYPE][b->biotype].key, "mRNA") != 0 &&
+             strcmp(hdr->id[GEA_DT_BIOTYPE][b->biotype].key, "ncRNA") != 0 )
+            return 0; 
+
         // alignmentState
         bcf_info_t *info = gea_get_info(hdr, b, "alignment_state");
         if ( info == NULL ) goto unset_alignment;
@@ -1492,7 +1497,7 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
             // Count forward length.
             if ( b->blockPair[1][i] <= b->cStart )  utr5_length += exon_length;
             // First cds, exon consist of UTR and cds.
-            else if ( b->cStart > b->blockPair[0][i] )  utr5_length += b->cStart - b->blockPair[0][i];
+            else if ( b->cStart > b->blockPair[0][i] )  utr5_length += b->cStart - b->blockPair[0][i]+1;
         
             if ( b->cEnd <= b->blockPair[0][i]) utr3_length += exon_length;
             else if ( b->cEnd < b->blockPair[1][i]) utr3_length += b->blockPair[1][i] - b->cEnd;
