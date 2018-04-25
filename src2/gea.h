@@ -296,6 +296,7 @@ int gea_check_format(const char *fn);
 
 struct gea_hdr *gea_hdr_read(htsFile *fp);
 int gea_hdr_write(htsFile *fp, const struct gea_hdr *hdr);
+void gea_hdr_destroy(struct gea_hdr *h);
 
 // Append new GEA header line, return 0 on success
 int gea_hdr_append(struct gea_hdr *hdr, const char *line);

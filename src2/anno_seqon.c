@@ -503,7 +503,7 @@ int mc_handler_fill_buffer_chunk(struct mc_handler *h, char* name, int start, in
     // clean buffer
     clean_buffer_chunk(h);
 
-    debug_print("%s:%d-%d", name, start, end);
+    //debug_print("%s:%d-%d", name, start, end);
     
     int id;
     id = tbx_name2id(h->idx, name);
@@ -761,7 +761,7 @@ static void update_variant_location(struct mc_inf *inf, struct mc_type *type, st
     }
 }
 
-static int predict_molcular_consequence_snp(struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int cod, char *ref, char *alt, char *ori, char *mut)
+static int predict_molecular_consequence_snp(struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int cod, char *ref, char *alt, char *ori, char *mut)
 {
     struct gea_coding_transcript *c = &v->c;
     
@@ -924,7 +924,7 @@ static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, str
     return 1;
 }
 // For deletion, lmut should always be 0, so no need to check it here
-static int predict_molcular_consequence_deletion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lori, int lmut, char *ori, char *mut, int cod)
+static int predict_molecular_consequence_deletion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lori, int lmut, char *ori, char *mut, int cod)
 {
     // re-alignment of reference and alternative alleles
     if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, &lori, &ori, &lmut, &mut) == 0 ) return 0;
@@ -992,7 +992,7 @@ static int predict_molcular_consequence_deletion(struct mc_handler *h, struct mc
     return 0;
 }
 
-static int predict_molcular_consequence_delins(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
+static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
 {
     // re-alignment of reference and alternative alleles
     if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, &lori, &ori, &lmut, &mut) == 0 ) return 0;
@@ -1048,7 +1048,7 @@ static int predict_molcular_consequence_delins(struct mc_handler *h, struct mc *
     return 0;
 }
 
-static int predict_molcular_consequence_insertion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
+static int predict_molecular_consequence_insertion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
 {
     // re-alignment of reference and alternative alleles
     if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, &lori, &ori, &lmut, &mut) == 0 ) return 0;
@@ -1133,7 +1133,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     int pos = inf->pos;
     struct gea_coding_transcript *c = &v->c;
 
-    debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
+    //debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
     
     // For variants in coding region, check the amino acid changes.
     int cds_pos = pos - c->utr5_length;
@@ -1175,20 +1175,20 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     switch (mc->type) {
         // For SNV, only one codon involved, check the alternative codon and predict the variant type directly.
         case var_type_snp : // fast check SNV, for most cases
-            predict_molcular_consequence_snp(mc, type, inf, v, cod, ref, alt, *ori, *mut);
+            predict_molecular_consequence_snp(mc, type, inf, v, cod, ref, alt, *ori, *mut);
             break;
 
             // for complex cases, we will build the alternative allele sequence and the amino acids
         case var_type_del:
-            predict_molcular_consequence_deletion(h, mc, type, inf, v, lref, ref, *lori, *lmut, *ori, *mut, cod);
+            predict_molecular_consequence_deletion(h, mc, type, inf, v, lref, ref, *lori, *lmut, *ori, *mut, cod);
             break;
             
         case var_type_ins:
-            predict_molcular_consequence_insertion(h, mc, type, inf, v, lalt, alt, *lori, *lmut, *ori, *mut, cod);
+            predict_molecular_consequence_insertion(h, mc, type, inf, v, lalt, alt, *lori, *lmut, *ori, *mut, cod);
             break;
             
         case var_type_delins:
-            predict_molcular_consequence_delins(h, mc, type, inf, v, lref, ref, lalt, alt, *lori, *lmut, *ori, *mut, cod);
+            predict_molecular_consequence_delins(h, mc, type, inf, v, lref, ref, lalt, alt, *lori, *lmut, *ori, *mut, cod);
             break;
 
         default:
@@ -1279,7 +1279,7 @@ static int transcript_function_update(struct mc_handler *h, int is_coding, struc
         return 1; // outside of transcripts ??
     }
     
-    // init molcular consequence
+    // init molecular consequence
     *con1 = mc_unknown;
     *con_splice = mc_unknown; 
 
@@ -1484,21 +1484,48 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
 }
 
 // return current iterate in the buffer
+//
+// check the chunk covered this variant
+// R1    |===================|
+// R2     |====|
+// R3           |=====|
+// R4                   |======|
+// R5                              |====|
+//               1
+//
+//                           2
+//                               3
+//                                         4
+//
+// this function will give the interval of chunck covered variant
 static int count_all_overlapped_records(struct mc_handler *h, struct mc *n, int *c, int *a, int *intragenic_flag)
 {
     int i; // used for iter records only, avoid to use it again
     *c = *a = *intragenic_flag = 0;
     
     // check how mang genes and/or motifs overlaped with this variant, it is the first round to check the records, we will check twice
-    for ( i = h->i_record; i < h->n_record; ++i ) {
-        
+    //for ( i = h->i_record; i < h->n_record; ++i ) {
+    for ( i = 0; i < h->n_record; ++i ) {
         struct gea_record *v = h->records[i];
 
         // update end_pos_for_skip marker
         if ( h->end_pos_for_skip == 0 ) h->end_pos_for_skip = v->chromEnd;
-        if ( n->start > h->end_pos_for_skip) {// if ( h->end_pos_for_skip < v->chromEnd ) {
-            h->i_record = i;
-            h->end_pos_for_skip = v->chromEnd;
+        //if ( n->start > h->end_pos_for_skip) {// if ( h->end_pos_for_skip < v->chromEnd ) {
+        //}
+        if ( h->end_pos_for_skip < v->chromEnd && n->start > h->end_pos_for_skip ) {
+            int j;
+            for ( j = h->i_record; j < i; ++j ) {
+                struct gea_record *g = h->records[j];
+                if ( g->chromEnd > n->start ) {
+                    h->i_record = j;
+                    h->end_pos_for_skip = g->chromEnd;
+                    break;
+                }
+            }
+            if ( j == i ) {
+                h->i_record = i;
+                h->end_pos_for_skip = v->chromEnd;
+            }
         }
 
         const char *bt = h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;
@@ -1514,10 +1541,10 @@ static int count_all_overlapped_records(struct mc_handler *h, struct mc *n, int 
         if ( strcmp(bt, "mRNA") == 0 || strcmp(bt, "ncRNA") == 0 ) (*a)++;
 
         // if no Gene record in database, skip to check intragenic variant
-        if ( strcmp(bt, "Gene") == 0 ) *intragenic_flag = 1; 
-
+        if ( strcmp(bt, "Gene") == 0 ) *intragenic_flag = 1;
         // count all records
         (*c)++;
+
     }
     return i;
 }
@@ -1591,9 +1618,9 @@ static int transcripts_variant_state_update(struct mc *n, struct mc_handler *h, 
     n->trans = malloc(a*sizeof(struct mc_core));    
     n->n_tran = 0;    
 
-    for ( i = h->i_record, j = 0; i < h->n_record && j < c; ++i, ++j ) {
+    for ( i = h->i_record, j = 0; i < h->n_record && j < c; ++i,++j ) {
         struct gea_record *v = (struct gea_record*)h->records[i];
-        const char *bt = h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;
+        const char *bt = h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;        
         if ( n->end < v->chromStart || n->start > v->chromEnd) continue;
         // for this part we only consider transcripts
         // intron region also could be overlapped with motifs
@@ -1639,17 +1666,22 @@ static int intergenic_update_molecular_consequence_state(struct mc *n, struct mc
         
         return 0;
     }
-    return 1;
+    // return records should be count
+    return i;
 }
 // There is no need to consider the difference of motif records overlapped with the variant, because we only need to interpet
 // it is in motif region.
-int mc_anno_trans_chunk(struct mc *n, struct mc_handler *h)
+int mc_anno_trans_chunk(struct mc *mc, struct mc_handler *h)
 {
     int c; // iterater for total of motif and genes
     int a; // iterater for transcript records only
-    if ( intergenic_update_molecular_consequence_state(n, h, &a, &c)  == 0 ) return -1;
+    int n;
+    n = intergenic_update_molecular_consequence_state(mc, h, &a, &c);
+
+    if ( n == 0 ) return -1;
+    
     // ** transcripts **
-    return transcripts_variant_state_update(n, h, a, c);
+    return transcripts_variant_state_update(mc, h, a, n);
 }
 
 /*
@@ -2032,9 +2064,6 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
     
     
 }
-//static void generate_hgvsnom_string_CodingInframe(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
-//{
-//}
 static void generate_hgvsnom_string_CodingSNV(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     ksprintf(str, "%s:c.%d%s>%s(p.%s%d%s/p.%s%d%s)", inf->transcript, inf->loc, mc->ref, mc->alt, codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
@@ -2289,7 +2318,7 @@ static char *generate_vartype_string(struct mc *h)
     }
     return str.s;    
 }
-static char *generate_molcular_consequence_string(struct mc *h)
+static char *generate_molecular_consequence_string(struct mc *h)
 {
     kstring_t str = {0,0,0};
     int i;
@@ -2480,7 +2509,7 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
         
         for ( j = 0; j < file->n_col; ++j ) {
             struct anno_col *col = &file->cols[j];
-            if ( strcmp(col->hdr_key, "HGVSnom") == 0 ) {
+            if ( strcmp(col->hdr_key, "HGVSnom1") == 0 ) {
                 char *name = generate_hgvsnom_string(f);
                 if (name) {
                     kputs(name, &str[j]);
@@ -2503,11 +2532,19 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
             }
             else if ( strcmp(col->hdr_key, "VarType") == 0 ) {
                 //char *name = generate_vartype_string(f);
-                char *name = generate_molcular_consequence_string(f);
+                char *name = generate_vartype_string(f);
                 if (name) {
                     kputs(name, &str[j]);
                     free(name);
                 }
+            }
+            else if ( strcmp(col->hdr_key, "MolecularConsequence") == 0 ) {
+                char *name = generate_molecular_consequence_string(f);
+                if (name) {
+                    kputs(name, &str[j]);
+                    free(name);
+                }
+
             }
             else if ( strcmp(col->hdr_key, "ExonIntron") == 0 ) {
                 char *name = generate_exonintron_string(f);
@@ -2585,12 +2622,12 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
         f->n_col = 6;
         f->cols = malloc(8*sizeof(struct anno_col));
         memset(f->cols, 0, 8*sizeof(struct anno_col));
-        f->cols[0].hdr_key = safe_duplicate_string("HGVSnom");
+        f->cols[0].hdr_key = safe_duplicate_string("HGVSnom1");
         f->cols[1].hdr_key = safe_duplicate_string("Gene");
         f->cols[2].hdr_key = safe_duplicate_string("Transcript");
         f->cols[3].hdr_key = safe_duplicate_string("VarType");
         f->cols[4].hdr_key = safe_duplicate_string("ExonIntron");
-        f->cols[5].hdr_key = safe_duplicate_string("AAlength"); 
+        f->cols[5].hdr_key = safe_duplicate_string("AAlength");        
         //f->cols[5].hdr_key = safe_duplicate_string("IVSnom");
         //f->cols[6].hdr_key = safe_duplicate_string("Oldnom");
 
@@ -2615,8 +2652,8 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
             else if (*ss == '-') { col->replace = REPLACE_EXISTING; ss++; }
             if ( ss[0] == '\0') continue;
             if ( strncmp(ss, "INFO/", 5) == 0 ) ss += 5;
-            if ( strcmp(ss, "HGVSnom")  && strcmp(ss, "Gene") && strcmp(ss, "Transcript") && strcmp(ss, "VarType") && strcmp(ss, "ExonIntron") && strcmp(ss, "IVSnom")
-                 && strcmp(ss, "Oldnom") && strcmp(ss, "AAlength") && strcmp(ss, "ANNOVARname") ){
+            if ( strcmp(ss, "HGVSnom1")  && strcmp(ss, "Gene") && strcmp(ss, "Transcript") && strcmp(ss, "VarType") && strcmp(ss, "ExonIntron") && strcmp(ss, "IVSnom")
+                 && strcmp(ss, "Oldnom") && strcmp(ss, "AAlength") && strcmp(ss, "ANNOVARname") && strcmp(ss, "MolecularConsequence")){
                 warnings("Do NOT support tag %s.", ss);
                 continue;
             }
@@ -2640,8 +2677,8 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
     int i;
     for ( i = 0; i < f->n_col; ++i ) {
         struct anno_col *col = &f->cols[i];
-        if ( strcmp(col->hdr_key, "HGVSnom") == 0 ) 
-            BRANCH("HGVSnom", "##INFO=<ID=HGVSnom,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+        if ( strcmp(col->hdr_key, "HGVSnom1") == 0 ) 
+            BRANCH("HGVSnom1", "##INFO=<ID=HGVSnom1,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
         else if ( strcmp(col->hdr_key, "ANNOVARname") == 0 )
             BRANCH("ANNOVARname", "##INFO=<ID=ANNOVARname,Number=A,Type=String,Description=\"Variant description in ANNOVAR format.\">");
         else if ( strcmp(col->hdr_key, "Gene") == 0 ) 
@@ -2650,12 +2687,14 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
             BRANCH("Transcript","##INFO=<ID=Transcript,Number=A,Type=String,Description=\"Transcript names\">");
         else if ( strcmp(col->hdr_key, "VarType") == 0 ) 
             BRANCH("VarType", "##INFO=<ID=VarType,Number=A,Type=String,Description=\"Variant type.\">");
+        else if ( strcmp(col->hdr_key, "MolecularConsequence") == 0 ) 
+            BRANCH("MolecularConsequence", "##INFO=<ID=MolecularConsequence,Number=A,Type=String,Description=\"Predicted molecular consequence of variant.\">");
         else if ( strcmp(col->hdr_key, "ExonIntron") == 0 ) 
             BRANCH("ExonIntron","##INFO=<ID=ExonIntron,Number=A,Type=String,Description=\"Exon/CDS or intron id on transcripts.\">");
         else if ( strcmp(col->hdr_key, "IVSnom") == 0 ) 
             BRANCH("IVSnom", "##INFO=<ID=IVSnom,Number=A,Type=String,Description=\"Old style nomenclature for the description of intron variants. Not recommand to use it.\">");
         else if ( strcmp(col->hdr_key, "Oldnom") == 0 ) 
-            BRANCH("Oldnom", "##INFO=<ID=Oldnom,Number=A,Type=String,Description=\"Old style nomenclature, compared with HGVSnom use gene position instead of UTR/coding position.\">");
+            BRANCH("Oldnom", "##INFO=<ID=Oldnom,Number=A,Type=String,Description=\"Old style nomenclature, compared with HGVSnom1 use gene position instead of UTR/coding position.\">");
         else if ( strcmp(col->hdr_key, "AAlength") == 0 ) 
             BRANCH("AAlength", "##INFO=<ID=AAlength,Number=A,Type=String,Description=\"Amino acid length for each transcript. 0 for noncoding transcript.\">");
     }
@@ -2679,7 +2718,6 @@ int anno_mc_chunk(struct anno_mc_file *f, bcf_hdr_t *hdr, struct anno_pool *pool
     int i;
     for ( i = pool->i_chunk; i < pool->n_chunk; ++i ) {
         bcf1_t *line = pool->readers[i];
-        
         // Do we need to annotate REF allele ?
         if ( bcf_get_variant_types(line) == VCF_REF ) continue;
         

@@ -1133,7 +1133,7 @@ int gea_parse(kstring_t *s, const struct gea_hdr *h, struct gea_record *v)
             if ( !strcmp(p, "-") ) v->strand = strand_is_minus;
             else if ( !strcmp(p, "+") ) v->strand = strand_is_plus;
             else if ( !strcmp(p, "+-") ) v->strand = strand_is_both;
-            else if ( !strcmp(p, ".") )  v->strand = strand_is_unknown;
+            else if ( !strcmp(p, ".") || !strcmp(p, "*"))  v->strand = strand_is_unknown;
             else {
                 warnings("Unknown strand symbol, %s", p);
                 v->strand = strand_is_unknown;
