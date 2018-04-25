@@ -335,9 +335,9 @@ void mc_handler_destroy(struct mc_handler *h)
     fai_destroy(h->rna_fai);
     tbx_destroy(h->idx);
     hts_close(h->fp_idx);
+    gea_hdr_destroy(h->hdr);
     int i;
     for ( i = 0; i < h->n_record; ++i ) gea_destroy((struct gea_record*)h->records[i]);
-    //if ( h->n_buffer) free(h->buffer);
     if ( h->n_record) free(h->records);
     free(h);
 }
@@ -425,7 +425,7 @@ int mc_destroy(struct mc *h)
     for ( i = 0; i < h->n_tran; ++i) {
         struct mc_inf *inf = &h->trans[i].inf;
         struct mc_type *type = &h->trans[i].type;
-        //if ( inf->transcript ) free(inf->transcript);
+        if ( inf->transcript ) free(inf->transcript);
         if ( inf->gene ) free(inf->gene);
         if ( inf->ref ) free(inf->ref);
         if ( inf->alt ) free(inf->alt);
@@ -433,7 +433,7 @@ int mc_destroy(struct mc *h)
     }
     free(h->trans);
     free(h);
-    memset(h, 0, sizeof(struct mc));
+
     return 0;
 }
 
