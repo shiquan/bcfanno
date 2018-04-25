@@ -10,6 +10,12 @@
 #include "sort_list.h"
 #include "anno_col.h"
 
+static char *safe_duplicate_string(char *str)
+{
+    if (str == NULL ) return NULL;
+    else return strdup(str);
+}
+
 #define MAX_GAP_GENE_DISTANCE 10000
 
 // molecular consequence
@@ -371,11 +377,11 @@ struct mc *mc_init(const char *chrom, int start, int end, char *ref, char *alt)
         }
 
         if ( lr > 0) {
-            h->ref = strdup(ref);
+            h->ref = safe_duplicate_string(ref);
             h->ref[lr] = '\0';
         }
         if ( la > 0 ) {
-            h->alt = strdup(alt);
+            h->alt = safe_duplicate_string(alt);
             h->alt[la] = '\0';
         }
         if ( la == 0 ) {
@@ -390,11 +396,11 @@ struct mc *mc_init(const char *chrom, int start, int end, char *ref, char *alt)
     }
     else if ( ref == NULL ) {
         h->type = var_type_ins;
-        h->alt = strdup(alt);
+        h->alt = safe_duplicate_string(alt);
     }
     else if ( alt == NULL ) {
         h->type = var_type_del;
-        h->ref = strdup(ref);
+        h->ref = safe_duplicate_string(ref);
     }
     if (*alt == 'N') {
         if ( h->ref ) free(h->ref);
@@ -789,8 +795,8 @@ static int predict_molcular_consequence_snp(struct mc *mc, struct mc_type *type,
         else if ( type->loc_amino == 1 ) type->con1 = mc_start_loss;
     }
 
-    if ( *mc->ref != *ref ) inf->ref = strdup(ref);
-    if ( *mc->alt != *alt ) inf->alt = strdup(alt);
+    if ( *mc->ref != *ref ) inf->ref = safe_duplicate_string(ref);
+    if ( *mc->alt != *alt ) inf->alt = safe_duplicate_string(alt);
     
     return 0;
 }
@@ -1345,10 +1351,10 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     struct mc_type *type = &trans->type;
     const char     *bt = h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;
     assert ( strcmp(bt, "mRNA") == 0 || strcmp(bt, "ncRNA") == 0);
-    assert(v->name);
+
     inf->strand = v->strand == strand_is_plus ? '+' : '-';
-    inf->transcript = strdup(v->name);
-    inf->gene = strdup(v->geneName);
+    inf->transcript = safe_duplicate_string(v->name);
+    inf->gene = safe_duplicate_string(v->geneName);
 
     //debug_print("%s\t%d\t%s\t%s\t%s", n->chr, n->start, n->ref, n->alt, inf->transcript);
     
@@ -1410,8 +1416,8 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     // init reference sequences and alternative sequences
     int ref_length = n->ref == NULL ? 0    : strlen(n->ref);
     int alt_length = n->alt == NULL ? 0    : strlen(n->alt);
-    char *ref_seq  = n->ref == NULL ? NULL : strdup(n->ref);
-    char *alt_seq  = n->alt == NULL ? NULL : strdup(n->alt);
+    char *ref_seq  = n->ref == NULL ? NULL : safe_duplicate_string(n->ref);
+    char *alt_seq  = n->alt == NULL ? NULL : safe_duplicate_string(n->alt);
     
     // for reverse strand, complent sequence
     if ( inf->strand == '-' ) {        
@@ -1449,7 +1455,7 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
     return 1;
 
   near_last_gene:
-    inter->gene = last->geneName == NULL ? NULL : strdup(last->geneName);
+    inter->gene = last->geneName == NULL ? NULL : safe_duplicate_string(last->geneName);
     if ( last->strand == strand_is_plus ) {
         // forward strand, variant located in the downstream of gene, gene length should be added for TSS 
         inter->gap_length = n->start - last->chromStart;
@@ -1463,7 +1469,7 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
     return 0;
 
   near_next_gene:
-    inter->gene = next->geneName == NULL ? NULL : strdup(next->geneName);
+    inter->gene = next->geneName == NULL ? NULL : safe_duplicate_string(next->geneName);
     if ( next->strand == strand_is_plus ) {
         // forward strand, variant located in the downstream of gene, gene length should be added for TSS 
         inter->gap_length = n->start - next->chromStart;
@@ -1495,7 +1501,6 @@ static int count_all_overlapped_records(struct mc_handler *h, struct mc *n, int 
             h->end_pos_for_skip = v->chromEnd;
         }
 
-        
         const char *bt = h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;
         // only consider coding transcript
         // Since upstream gene records had be filled, and all records in the chunk keep in coordinate,
@@ -1724,8 +1729,8 @@ static char *generate_annovar_name(struct mc *h)
                 
         char *ref, *alt;
         if ( inf->strand == '+' ) {
-            ref = h->ref ? strdup(h->ref) : NULL;
-            alt = h->alt ? strdup(h->alt) : NULL;
+            ref = h->ref ? safe_duplicate_string(h->ref) : NULL;
+            alt = h->alt ? safe_duplicate_string(h->alt) : NULL;
         }
         else {
             ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
@@ -2174,8 +2179,8 @@ static char *generate_hgvsnom_string(struct mc *h)
             }
             char *ref, *alt;
             if ( inf->strand == '+' ) {
-                ref = h->ref ? strdup(h->ref) : NULL;
-                alt = h->alt ? strdup(h->alt) : NULL;
+                ref = h->ref ? safe_duplicate_string(h->ref) : NULL;
+                alt = h->alt ? safe_duplicate_string(h->alt) : NULL;
             }
             else {
                 ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
@@ -2411,8 +2416,8 @@ static char *generate_oldnom_string(struct hgvs *h)
         }
         char *ref, *alt;
         if ( inf->strand == '+' ) {
-            ref = h->ref ? strdup(h->ref) : NULL;
-            alt = h->alt ? strdup(h->alt) : NULL;
+            ref = h->ref ? safe_duplicate_string(h->ref) : NULL;
+            alt = h->alt ? safe_duplicate_string(h->alt) : NULL;
         }
         else {
             ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
@@ -2580,14 +2585,14 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
         f->n_col = 6;
         f->cols = malloc(8*sizeof(struct anno_col));
         memset(f->cols, 0, 8*sizeof(struct anno_col));
-        f->cols[0].hdr_key = strdup("HGVSnom");
-        f->cols[1].hdr_key = strdup("Gene");
-        f->cols[2].hdr_key = strdup("Transcript");
-        f->cols[3].hdr_key = strdup("VarType");
-        f->cols[4].hdr_key = strdup("ExonIntron");
-        f->cols[5].hdr_key = strdup("AAlength"); 
-        //f->cols[5].hdr_key = strdup("IVSnom");
-        //f->cols[6].hdr_key = strdup("Oldnom");
+        f->cols[0].hdr_key = safe_duplicate_string("HGVSnom");
+        f->cols[1].hdr_key = safe_duplicate_string("Gene");
+        f->cols[2].hdr_key = safe_duplicate_string("Transcript");
+        f->cols[3].hdr_key = safe_duplicate_string("VarType");
+        f->cols[4].hdr_key = safe_duplicate_string("ExonIntron");
+        f->cols[5].hdr_key = safe_duplicate_string("AAlength"); 
+        //f->cols[5].hdr_key = safe_duplicate_string("IVSnom");
+        //f->cols[6].hdr_key = safe_duplicate_string("Oldnom");
 
     }
     else {
@@ -2615,7 +2620,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
                 warnings("Do NOT support tag %s.", ss);
                 continue;
             }
-            col->hdr_key = strdup(ss);            
+            col->hdr_key = safe_duplicate_string(ss);            
             f->n_col++;
         }
         free(s);

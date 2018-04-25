@@ -24,7 +24,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.  */
 
 // This file was edited to access worker id (thread layer) in work data (process layer).
-// Author : shiquan@genomics.cn
+// The struct names have been changed to avoid potential conflict with JB's thread_pool.
 
 #ifndef THREAD_POOL_H
 #define THREAD_POOL_H
