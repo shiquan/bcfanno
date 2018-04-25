@@ -1375,6 +1375,8 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
     }
 
     if ( which & GEA_UN_CIGAR && !(b->unpacked & GEA_UN_CIGAR) ) {
+        b->unpacked |= GEA_UN_CIGAR;
+        
         // only consider alignment state of transcript
         if ( strcmp(hdr->id[GEA_DT_BIOTYPE][b->biotype].key, "mRNA") != 0 &&
              strcmp(hdr->id[GEA_DT_BIOTYPE][b->biotype].key, "ncRNA") != 0 )
@@ -1451,6 +1453,8 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
              strcmp(hdr->id[GEA_DT_BIOTYPE][b->biotype].key, "ncRNA") != 0 )
             return 0; 
 
+        b->unpacked |= GEA_UN_TRANS;
+        
         if ( b->strand != strand_is_plus && b->strand != strand_is_minus )
             error("Strand is not specified. Cannot parse location of this gene '%s'.", b->name);
             
