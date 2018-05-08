@@ -212,9 +212,10 @@ struct gea_dec {
 #define CIGAR_UNKNOWN_TYPE 0
 #define CIGAR_MATCH_TYPE   1
 #define CIGAR_DELETE_TYPE  2
-#define CIGAR_INSERT_TYPE  3
+#define CIGAR_INSERT_TYPE  4
 #define CIGAR_MASK_TYPE    0xf
 
+#define CIGAR_EQUAL(val, type) (val&type)
 //
 // The gea_record structure corresponds to one GEA line. Reading from GEA fule is slower because the string
 // is first to be parsed, packed into GEA line (done in gea_parse), then unpacked into internal gea_record
@@ -297,6 +298,7 @@ int gea_check_format(const char *fn);
 struct gea_hdr *gea_hdr_read(htsFile *fp);
 int gea_hdr_write(htsFile *fp, const struct gea_hdr *hdr);
 void gea_hdr_destroy(struct gea_hdr *h);
+//struct gea_hdr *gea_hdr_duplicate(struct gea_hdr *h);
 
 // Append new GEA header line, return 0 on success
 int gea_hdr_append(struct gea_hdr *hdr, const char *line);

@@ -1313,6 +1313,9 @@ int gea_read(htsFile *fp, const struct gea_hdr *h,  struct gea_record *v)
     if (ret < 0) return ret;
     return gea_parse(&fp->line, h, v);
 }
+/* struct gea_hdr *gea_hdr_duplicate(struct gea_hdr *hdr) */
+/* { */
+/* } */
 
 static inline uint8_t *bcf_unpack_info_core1(uint8_t *ptr, bcf_info_t *info)
 {
@@ -1501,7 +1504,8 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
             // Count forward length.
             if ( b->blockPair[1][i] <= b->cStart )  utr5_length += exon_length;
             // First cds, exon consist of UTR and cds.
-            else if ( b->cStart > b->blockPair[0][i] )  utr5_length += b->cStart - b->blockPair[0][i]+1;
+            // Since cStart is 0 based whereas blockPair is 1 based, equal situation should be consider
+            else if ( b->cStart >= b->blockPair[0][i] )  utr5_length += b->cStart - b->blockPair[0][i]+1;
         
             if ( b->cEnd <= b->blockPair[0][i]) utr3_length += exon_length;
             else if ( b->cEnd < b->blockPair[1][i]) utr3_length += b->blockPair[1][i] - b->cEnd;
@@ -1522,13 +1526,15 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
         }
         
         // realign genome locations
-        if ( b->n_cigar > 0 ) {
+        if ( b->n_cigar > 0 ) { // for all matched stituation, we do NOT need realign the positions
             int match = 0, del = 0, ins = 0, offset = 0;
             int j = 0;
             int lock_utr5_realign = is_coding ? 0 : 1;
             int lock_cds_realign  = is_coding ? 0 : 1;
-                
-            for ( ;; ) {
+            int i = 0;
+            
+            for (;;) {
+
                 // Offset need to be added to utr5 length only if first match block smaller than it.
                 if ( lock_utr5_realign == 0 && c->utr5_length <= match) {
                     c->utr5_length += offset;
@@ -1542,18 +1548,20 @@ int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
                 }
 
                 if ( i == b->blockCount*2 || j == b->n_cigar ) break;
-                if ( b->cigars[j] & CIGAR_MATCH_TYPE ) match += b->cigars[j] >> CIGAR_PACKED_FIELD;
+                
+                if ( CIGAR_EQUAL(b->cigars[j],CIGAR_MATCH_TYPE) ) match += b->cigars[j] >> CIGAR_PACKED_FIELD;
                 // deletions should be consider as match when count locs
-                else if ( b->cigars[j] & CIGAR_DELETE_TYPE ) {
+                else if ( CIGAR_EQUAL(b->cigars[j], CIGAR_DELETE_TYPE) ) {
                     del = b->cigars[j] >> CIGAR_PACKED_FIELD;
                     match += del;
                     offset -= del;
                 }
                 // If insertion is tail-As, skip count offset.
-                else if ( b->cigars[j] & CIGAR_INSERT_TYPE ) {
+                else if ( CIGAR_EQUAL(b->cigars[j], CIGAR_INSERT_TYPE) ) {
                     ins = b->cigars[j] >> CIGAR_PACKED_FIELD;
                     if ( j != b->n_cigar -1) offset += ins;
                 }
+                
                 for (; i < b->blockCount*2;) {
                     int *loc = b->strand == strand_is_plus ? &c->loc[i%2][i/2] : &c->loc[i%2 ? 0 : 1][b->blockCount-i/2-1];
                     if (*loc > match) break;

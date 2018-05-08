@@ -149,10 +149,13 @@ enum func_region_type {
     _func_region_promote_to_int = -1,
     func_region_unknown = 0,
     func_region_cds,
-    func_region_noncoding,
+    func_region_noncoding_intron,
+    func_region_noncoding_exon,
     func_region_intron,
-    func_region_utr5,
-    func_region_utr3,
+    func_region_utr5_exon,
+    func_region_utr5_intron,
+    func_region_utr3_exon,
+    func_region_utr3_intron,
     func_region_intergenic,
     func_region_outrange,
 };
@@ -284,7 +287,7 @@ struct mc_handler {
 
 extern struct mc_handler *mc_handler_init(const char *rna_fname, const char *data_fname, const char *reference_fname, const char *name_list);
 extern struct mc_handler *mc_handler_duplicate(struct mc_handler *h);
-extern void mc_handler_destroy(struct mc_handler *h);
+extern void mc_handler_destroy(struct mc_handler *h, int l);
 
 extern struct mc *mc_init(const char *chrom, int start, int end, char *ref, char *alt);
 extern int mc_destroy(struct mc *h);
@@ -324,18 +327,22 @@ struct mc_handler *mc_handler_duplicate(struct mc_handler *h)
     memset(d, 0, sizeof(*d));
     d->rna_fname = h->rna_fname;
     d->data_fname = h->data_fname;
+    d->reference_fname = h->reference_fname;
+    
     d->rna_fai = fai_load(d->rna_fname);
     d->idx = tbx_index_load(d->data_fname);
     d->fp_idx = hts_open(d->data_fname, "r");
+
+    d->hdr = h->hdr;
     d->name_hash = h->name_hash;    
     return d;
 }
-void mc_handler_destroy(struct mc_handler *h)
+void mc_handler_destroy(struct mc_handler *h, int l)
 {
     fai_destroy(h->rna_fai);
     tbx_destroy(h->idx);
     hts_close(h->fp_idx);
-    gea_hdr_destroy(h->hdr);
+    if (l==0) gea_hdr_destroy(h->hdr);
     int i;
     for ( i = 0; i < h->n_record; ++i ) gea_destroy((struct gea_record*)h->records[i]);
     if ( h->n_record) free(h->records);
@@ -412,6 +419,10 @@ struct mc *mc_init(const char *chrom, int start, int end, char *ref, char *alt)
     if ( lr == 0 && h->end < h->start ) {
         h->end = h->start;
         h->start--; // point start to capped base
+
+        // there are several points should be notice here:
+        // 1, mc::pos point to capped base, but ref point to a NULL address;
+        // 2, capped base do NOT consider minus strand transcript, for minus insertion capped position will update to mc::end_pos
     }
     return h;
 }
@@ -657,7 +668,7 @@ static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int 
     // adjust position if located in exon and there are realignments in the transcript sequence
     if ( *offset != 0 ) return 0;
     if ( v->n_cigar == 0 ) return 0;
-    if ( v->n_cigar == 1 && (v->cigars[0] & CIGAR_MATCH_TYPE) ) return 0;
+    if ( v->n_cigar == 1 && CIGAR_EQUAL(v->cigars[0], CIGAR_MATCH_TYPE) ) return 0;
 
     int adjust = 0;
     int i;
@@ -666,8 +677,8 @@ static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int 
 
     for ( i = 0; i < v->n_cigar; ++i ) {            
 
-        if ( v->cigars[i] & CIGAR_MATCH_TYPE ) match += v->cigars[i] >> CIGAR_PACKED_FIELD;            
-        else if ( v->cigars[i] & CIGAR_DELETE_TYPE ) {
+        if ( CIGAR_EQUAL(v->cigars[i],CIGAR_MATCH_TYPE) ) match += v->cigars[i] >> CIGAR_PACKED_FIELD;            
+        else if ( CIGAR_EQUAL(v->cigars[i],CIGAR_DELETE_TYPE) ) {
             del = v->cigars[i] >> CIGAR_PACKED_FIELD;
             // there is no need to check match and *pos, becase for plus strand match will be always smaller than *pos
             // check if this deletion in the target block
@@ -678,7 +689,7 @@ static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int 
             }
             match += del;
         }
-        else if ( v->cigars[i] & CIGAR_INSERT_TYPE ) {
+        else if ( CIGAR_EQUAL(v->cigars[i], CIGAR_INSERT_TYPE) ) {
             ins = v->cigars[i] >> CIGAR_PACKED_FIELD;
             if ( c->loc[v->strand == strand_is_plus ? 0 :1][b1] <= match  && *pos > match ) adjust += ins;
         }
@@ -718,6 +729,8 @@ static int trim_capped_sequences(char **_ref, char **_alt, int *lr, int *la, int
     
     return i;
 }
+// this function construct the full alternative sequence, do NOT care is frameshift or not
+// for minus strand inserted based should be complemented first
 static int construct_alternative_sequence(char *ref, char *alt, int lref, int lalt, int pos, char *ori, int lori, char **mut, int *lmut)
 {
     *lmut = lori - lref + lalt;
@@ -731,9 +744,16 @@ static int construct_alternative_sequence(char *ref, char *alt, int lref, int la
     int i;
     char *p = *mut;
     for ( i = 0; i < pos; ++i, ++p ) *p = ori[i];
+    // for insertion, pos point to capped base
+    if ( lref == 0) {
+        *p = ori[pos];
+        p++;
+    }
     for ( i = 0; i < lalt; ++i, ++p ) *p = alt[i];
-
-    for ( i = pos+lref; i < lori; ++i, ++p) *p = ori[i];
+    if ( lref == 0 )         
+        for ( i = pos+1; i < lori; ++i, ++p) *p = ori[i];
+    else
+        for ( i = pos+lref; i < lori; ++i, ++p) *p = ori[i];
 
     *p = '\0';
     
@@ -745,7 +765,7 @@ static void update_variant_location(struct mc_inf *inf, struct mc_type *type, st
     struct gea_coding_transcript *c = &v->c;
     // Update the variant location of domain and functional region    
     if ( inf->pos <= c->utr5_length ) {
-        type->func1 = func_region_utr5;
+        type->func1 = func_region_utr5_exon;
         inf->loc = c->utr5_length - inf->pos +1;
         type->con1 = mc_utr5_exon;
     }
@@ -755,7 +775,7 @@ static void update_variant_location(struct mc_inf *inf, struct mc_type *type, st
         type->loc_amino = (inf->loc+3)/3;
     }
     else {
-        type->func1 = func_region_utr3;
+        type->func1 = func_region_utr3_exon;
         inf->loc = inf->pos - c->cds_length;
         type->con1 = mc_utr3_exon;
     }
@@ -775,9 +795,11 @@ static int predict_molecular_consequence_snp(struct mc *mc, struct mc_type *type
     if ( ori[cod] == *alt ) {
         type->mut_amino = type->ori_amino;
         type->con1 = mc_nocall;
+        if ( *mc->ref != ori[cod] ) inf->ref = strndup(ori+cod,1);
+        if ( *mc->alt != *alt ) inf->alt = safe_duplicate_string(alt);
         return 0;
     }
-    else if ( ori[cod] != *ref) warnings("Inconsistance nucletide between refenence and transcript: %s,%d,%c,%c ", v->name, inf->pos, ori[cod], *ref);
+    else if ( ori[cod] != *ref) warnings("Inconsistance nucletide between refenence and transcript: %s,%d,%s,%d,%c,%c ", mc->chr, mc->start, v->name, inf->pos, ori[cod], *ref);
     
     // normal case
     type->ori_amino = codon2aminoid(ori);
@@ -868,21 +890,42 @@ static int convert_bases_to_amino_acid(int l, char *s, int *l_aa, int **aa)
 //
 // So only need to update the positions and affected bases
 //
-static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int *lori, char **ori, int *lmut, char **mut)
+static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, int lalt, char *ref, char *alt, int *lori, char **ori, int *lmut, char **mut, int cod)
 {
-    // do we really need to trim the capped codon? Yes,realign the positions.
-    int offset = trim_capped_sequences(ori, mut, lori, lmut, 3);
     struct gea_coding_transcript *c = &v->c;
-    if ( offset ) {
-        inf->pos += offset;
+    
+    // trim Longest Common 3mer Prefixes
+    int offset = trim_capped_sequences(ori, mut, lori, lmut, 3);
+    if (lref > 0) inf->ref = strdup(ref);
+    if (lalt > 0) inf->alt = strdup(alt);
+
+    if (offset) {
+        // adjust offset by trim capped bases, cod is 0 based, convert offset to 0based by -1 
+        offset = offset - cod -1;
+
+        int i;
+        for ( i=0; i<*lmut && i<*lori; ++i) {
+            if ( (*mut)[i] != (*ori)[i] ) break;
+        }
+
+        offset += i;
+
+        inf->pos = inf->pos + offset;
+        
         if ( inf->pos > c->cds_length ) {
             type->con1 = mc_utr3_exon;
-            type->func1 = func_region_utr3;
+            type->func1 = func_region_utr3_exon;
             inf->loc = inf->pos - c->cds_length;
+            inf->end_loc = inf->end_pos + offset - c->cds_length;
             return 0; // out of coding region, no need to check the amino acid changes any more.
         }
-        inf->loc += offset;       
-        type->loc_amino = (inf->loc+offset)/3;
+        inf->loc += offset;
+        inf->end_loc += offset;
+        //type->loc_amino = (inf->loc+2)/3;
+
+        // update ref and alt sequence
+        if ( lref > 0 && strncmp(*ori+i, ref, lref) != 0 ) memcpy(inf->ref, *ori+i, lref);        
+        if ( lalt > 0 && strncmp(*mut+i, alt, lalt) != 0 ) memcpy(inf->alt, *mut+i, lalt);
     }
 
     // Sometime after round the codon frame, length of alternative sequence may smaller than 3, in this case transcript has no UTR3 and
@@ -920,23 +963,20 @@ static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, str
             return 0;
         }
     }
-
+    
     return 1;
 }
 // For deletion, lmut should always be 0, so no need to check it here
 static int predict_molecular_consequence_deletion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lori, int lmut, char *ori, char *mut, int cod)
 {
     // re-alignment of reference and alternative alleles
-    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, &lori, &ori, &lmut, &mut) == 0 ) return 0;
+    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, 0, ref, NULL, &lori, &ori, &lmut, &mut, cod) == 0 ) return 0;
 
     // inf->end_loc = inf->loc + lref -1;
     // location of amino acids
     type->loc_amino = (inf->loc+2)/3;
     type->loc_end_amino = (inf->end_loc+2)/3;
-    
-    // after realignment, deleted bases has be updated to new position. inf->ref/alt should point to NULL if it is not used.
-    if ( strncmp(ref, ori, lref) != 0 ) inf->ref = strndup(ori, lref);
-    
+        
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
 
@@ -995,12 +1035,15 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
 static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
 {
     // re-alignment of reference and alternative alleles
-    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, &lori, &ori, &lmut, &mut) == 0 ) return 0;
+    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, lalt, ref, alt, &lori, &ori, &lmut, &mut, cod) == 0 ) return 0;
 
     inf->end_loc = inf->loc + lref -1;
 
-    if ( strncmp(ref, ori, lref) != 0 ) inf->ref = strndup(ori, lref);
-    if ( strncmp(alt, mut, lalt) != 0 ) inf->alt = strndup(mut, lalt);
+    type->loc_amino = (inf->loc+2)/3;
+    type->loc_end_amino = (inf->end_loc+2)/3;
+
+    //if ( strncmp(ref, ori, lref) != 0 ) inf->ref = strndup(ori, lref);
+    //if ( strncmp(alt, mut, lalt) != 0 ) inf->alt = strndup(mut, lalt);
     
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
@@ -1028,7 +1071,15 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
         type->n = l2;
         type->aminos = malloc(sizeof(int)*type->n);
         int i;
-        for ( i=0; i<type->n; ++i) type->aminos[i] = mut_aa[i];
+        for ( i=0; i<type->n; ++i) {
+            type->aminos[i] = mut_aa[i];
+            if ( type->aminos[i] == 0 ) { // stop-codon
+                type->con1 = mc_frameshift_truncate;
+                type->fs = i+1;
+                type->n = i+1;
+                type->mut_amino = mut_aa[0];
+            }
+        }
        
     }
     else {
@@ -1051,13 +1102,14 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
 static int predict_molecular_consequence_insertion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
 {
     // re-alignment of reference and alternative alleles
-    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, &lori, &ori, &lmut, &mut) == 0 ) return 0;
+    // inf->loc will be updated in this function
+    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, 0, lalt, NULL, alt, &lori, &ori, &lmut, &mut, cod) == 0 )
+        return 0;
 
-    // c.1_2insXXX
-    inf->end_loc = inf->loc + 1;
-
-    // after realignment, deleted bases has be updated to new position. inf->ref/alt should point to NULL if it is not used.
-    if ( strncmp(alt, mut, lalt) != 0 ) inf->alt = strndup(mut, lalt);
+    inf->end_loc = inf->loc+1;
+    //type->loc_amino = (inf->loc+2)/3;
+    type->loc_amino = inf->loc/3+1;
+    //type->loc_end_amino = type->loc_amino+1; 
     
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
@@ -1073,44 +1125,69 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
         int head, tail;
         trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
         if ( head ) type->loc_amino += head; // if trimmed head, update new location
+        // no end location for frameshift
+        type->loc_end_amino = -1;
+        
         type->ori_amino = ori_aa[0];
-        if ( lmut_aa == 0 ) {
+        if ( lmut_aa == 0 ) { // incase deletion of mutated allele
             type->fs = -1;
             return 0;
-        }        
-        type->mut_amino = mut_aa[0];
+        }
+        type->mut_amino = mut_aa[0];        
         type->fs = mut_aa[lmut_aa-1] == C4_Stop ? lmut_aa : -1;
+        
     }
     else { // inframe Insertion
-        // related amino acid frames
-        int l = (cod + lalt+2)/3*3; // 1 based
-        int head, tail;
-        trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
-        if ( head ) type->loc_amino += head; // if trimmed head, update new location
-
-        type->ori_amino = ori_aa[0];
-
-        type->n = l;
-        type->aminos = malloc(sizeof(int)*type->n);
-        int i;
-        for ( i=0; i<type->n; ++i) type->aminos[i] = mut_aa[i];
-
+        // the start of insertions is the affected amino acids, no capped base consider
         if ( cod == 0 ) { // p.1_2insXXX
+            // related amino acid frames
+            //int l = (cod + lalt+2)/3; // 1 based
             type->con1 = mc_conservation_inframe_insertion;
-            type->loc_amino -= 1;            
-            type->loc_end_amino = type->loc_amino + 1;
-            //type->ori_end_amino = ori_aa[1];
+
+            int head, tail;
+            trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
+            // todo: check duplicate
+            if (head) type->loc_amino += head;           
+
+            type->loc_end_amino = type->loc_amino +1;
+            type->n = lalt/3;
+            type->aminos = malloc(sizeof(int)*type->n);
+            type->ori_amino = -1;
+            type->ori_end_amino = -1;            
+            int i;
+            for ( i=0; i<type->n; ++i) type->aminos[i] = mut_aa[i];
         }
-        else { // p.1Arg_2AlndelinXX
+        else {
             type->con1 = mc_disruption_inframe_insertion;
-            type->ori_end_amino = ori_aa[1];
-            // because header of original and mutated amino acids have been parsed, here we only check the ends
-            if ( type->ori_end_amino == type->aminos[type->n-1] ) { // p.1ArgdelinXX
-                type->loc_end_amino--;
-                type->n--;
+            int head, tail;
+            trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
+            if (head>0) { // insert
+                type->loc_amino += head -1;
+                type->loc_end_amino = type->loc_amino +1;
+                type->n = lalt/3; // disrupted amino acid should be emited
+                type->aminos = malloc(sizeof(int)*type->n);
+                int i;
+                for ( i=0; i < type->n; ++i ) type->aminos[i] = mut_aa[i];                
+            }
+            else { //del-insert                
+                // assume delins first
+                type->n = lalt/3+1;
+                if ( mut_aa[type->n-1] == ori_aa[0]) { // if deleted amino acid is same with inserted tail, convernt to insert
+                    type->loc_end_amino = type->loc_amino;
+                    type->loc_amino --;
+                    type->n--;
+                }
+                else {
+                    type->loc_amino = type->loc_end_amino = (inf->loc+2)/3;
+                    type->ori_amino = ori_aa[0];                    
+                }
+                type->aminos = malloc(sizeof(int)*type->n);
+                int i;
+                for ( i=0; i < type->n; ++i ) type->aminos[i] = mut_aa[i]; 
             }
         }
-    }    
+    }
+
     if ( lori_aa ) free(ori_aa);
     if ( lmut_aa ) free(mut_aa);
     return 0;
@@ -1118,8 +1195,7 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
 
 /*
  * This function used to parse reference allele and alternative allele sequences. Notice that, all the capped codon will be trimmed.
- * Original sequences generated by bounding the reference allele to disrupted codon(s)
- * Mutated sequences reconstruct from original sequences, for frameshift, all remained sequences will be export in this function.
+ * Original sequences generated by bounding the reference allele to disrupted cod   * Mutated sequences reconstruct from original sequences, for frameshift, all remained sequences will be export in this function.
  * For simple case, like SNV, amino acid changes and variant type prediction will be performed in this function; complex case such as
  * frameshift will be consider in compare_reference_and_alternative_amino_acids()
  *
@@ -1133,7 +1209,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     int pos = inf->pos;
     struct gea_coding_transcript *c = &v->c;
 
-    //debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
+    // debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
     
     // For variants in coding region, check the amino acid changes.
     int cds_pos = pos - c->utr5_length;
@@ -1171,7 +1247,14 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     //              a deletion overlapped with two codon will influence two frames, fn_ref == 2 && since new frame will be build fn_alt == 1;
     // int fn_ref, fn_alt;
     construct_alternative_sequence(ref, alt, lref, lalt, cod, *ori, *lori, mut, lmut);
-    
+
+    //static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int *lori, char **ori, int *lmut, char **mut)
+    //if ( mc->type != var_type_snp ) {
+        // consider the offset of bases only when insert or delete
+        //if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lori, ori, lmut, mut, cod) == 0 )
+        //return 0;
+    //}
+
     switch (mc->type) {
         // For SNV, only one codon involved, check the alternative codon and predict the variant type directly.
         case var_type_snp : // fast check SNV, for most cases
@@ -1231,8 +1314,8 @@ static int noncoding_transcript_update_molecular_conseqeunce_state(struct mc_han
 {
     memset(type, 0, sizeof(struct mc_type));
 
-    if ( type->func1 == func_region_cds ) type->func1 = func_region_noncoding;
-    if ( type->func2 == func_region_cds ) type->func2 = func_region_noncoding;
+    if ( type->func1 == func_region_cds ) type->func1 = func_region_noncoding_exon;
+    if ( type->func2 == func_region_cds ) type->func2 = func_region_noncoding_exon;
 
     int i; // exon / intron ID
     int pos = inf->pos;
@@ -1264,9 +1347,6 @@ static int noncoding_transcript_update_molecular_conseqeunce_state(struct mc_han
 
 static int coding_transcript_update_molecular_consequence_state(struct mc_handler *h, struct mc *mc, struct mc_inf *inf, struct mc_type *type, struct gea_record *v, char *ref, int lref, char *alt, int lalt)
 {
-    // clear molecular consequence type structure
-    memset(type, 0, sizeof(struct mc_type));
-    
     // update the protein changes and variant type state
     if ( protein_update_state(h, mc, inf, type, v, lref, lalt, ref, alt ) ) type->con1 = mc_unknown;
 
@@ -1287,15 +1367,24 @@ static int transcript_function_update(struct mc_handler *h, int is_coding, struc
     
     if ( is_coding ) {
         if ( *pos <= c->utr5_length ) {
-            *func = func_region_utr5;
+            /*
+             * Todo: we only checked the edge of exomes, but for position inside it, insertions and deletions should aslo be consider.
+             */
             *loc = c->utr5_length - *pos +1;
-            if (*offset) {
+
+            if (*offset) { 
                 *con1 = mc_utr5_intron;
+                *func = func_region_utr5_intron;
                 // check splice sites
                 if ( *offset < 0 && *offset > -splice_site_options.range ) *con_splice = mc_splice_acceptor;
                 else if ( *offset >0 && *offset < splice_site_options.range ) *con_splice = mc_splice_donor;                
             }
-            else *con1 = mc_utr5_exon; 
+            else {
+                
+                
+                *con1 = mc_utr5_exon;
+                *func = func_region_utr5_exon;
+            }
         }
         else if ( *pos <= c->cds_length ) {
             *loc = *pos - c->utr5_length;
@@ -1311,28 +1400,32 @@ static int transcript_function_update(struct mc_handler *h, int is_coding, struc
             }
         }
         else {
-            *func = func_region_utr3;         
             *loc = *pos - c->cds_length;
             if ( *offset ) {
                 *con1 = mc_utr3_intron;
+                *func = func_region_utr3_intron;
                 // check splice sites
                 if ( *offset < 0 && *offset > -splice_site_options.range ) *con_splice = mc_splice_acceptor;
                 else if (*offset >0 && *offset < splice_site_options.range ) *con_splice = mc_splice_donor;                
             }
             else {
                 *con1 = mc_utr3_exon;
+                *func = func_region_utr3_exon;
             }
         }
     }
     else {
         *loc = *pos;
-        *func = func_region_noncoding;
         if ( *offset ) {
+            *func = func_region_noncoding_intron;
             *con1 = mc_noncoding_intron;
             if ( *offset < 0 && *offset > -splice_site_options.range ) *con_splice = mc_splice_acceptor;
             else if (*offset >0 && *offset < splice_site_options.range ) *con_splice = mc_splice_donor;                
         }
-        else *con1 = mc_noncoding_exon;
+        else {
+            *con1 = mc_noncoding_exon;
+            *func = func_region_noncoding_exon;
+        }
     }
 
     // check splice sites in exon
@@ -1350,6 +1443,7 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     struct mc_inf  *inf = &trans->inf;
     struct mc_type *type = &trans->type;
     const char     *bt = h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;
+    
     assert ( strcmp(bt, "mRNA") == 0 || strcmp(bt, "ncRNA") == 0);
 
     inf->strand = v->strand == strand_is_plus ? '+' : '-';
@@ -1393,6 +1487,7 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
             t = type->func2;
             type->func2 = type->func1;
             type->func1 = t;
+            
         }
         if ( con2 != mc_unknown ) type->con2 = con2;
         if ( type->func1 != type->func2 ) { type->con1 = mc_exon_loss; return 0;}
@@ -1409,7 +1504,21 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
         inf->aa_length = (v->c.cds_length -v->c.utr5_length)/3;
     }
 
-    if ( type->con1 != mc_unknown ) return 0;
+    if ( type->con1 != mc_unknown ) {
+        // for intron in minus strand
+        if ( v->strand == strand_is_minus ) {
+            if ( n->ref ) {
+                inf->ref = safe_duplicate_string(n->ref);
+                compl_seq(inf->ref, strlen(inf->ref));
+            }
+            if (n->alt) {
+                inf->alt = safe_duplicate_string(n->alt);
+                compl_seq(inf->alt, strlen(inf->alt));
+            }
+        }
+        
+        return 0;
+    }
     
     // For variant in coding region, check amino acid(s) changes.
     
@@ -1459,12 +1568,12 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
     if ( last->strand == strand_is_plus ) {
         // forward strand, variant located in the downstream of gene, gene length should be added for TSS 
         inter->gap_length = n->start - last->chromStart;
-        inter->con1 = mc_downstream_1KB;
+        inter->con1 = inter->gap_length <= 1000 ? mc_downstream_1KB : mc_downstream_10KB;
     }
     else {
         // backward strand, var in upstream and treat chromEnd as TSS
         inter->gap_length = n->start - last->chromEnd;
-        inter->con1 = mc_upstream_1KB;
+        inter->con1 = inter->gap_length <= 1000 ? mc_upstream_1KB : mc_upstream_10KB ;
     }
     return 0;
 
@@ -1473,12 +1582,12 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
     if ( next->strand == strand_is_plus ) {
         // forward strand, variant located in the downstream of gene, gene length should be added for TSS 
         inter->gap_length = n->start - next->chromStart;
-        inter->con1 = mc_upstream_1KB;
+        inter->con1 = inter->gap_length <= 1000 ? mc_upstream_1KB : mc_upstream_10KB;
     }
     else {
         // backward strand, var in upstream and treat chromEnd as TSS
         inter->gap_length = n->start - next->chromEnd;
-        inter->con1 = mc_downstream_1KB;
+        inter->con1 = inter->gap_length <= 1000 ? mc_downstream_1KB : mc_downstream_10KB;
     }
     return 0;
 }
@@ -1504,8 +1613,8 @@ static int count_all_overlapped_records(struct mc_handler *h, struct mc *n, int 
     *c = *a = *intragenic_flag = 0;
     
     // check how mang genes and/or motifs overlaped with this variant, it is the first round to check the records, we will check twice
-    //for ( i = h->i_record; i < h->n_record; ++i ) {
-    for ( i = 0; i < h->n_record; ++i ) {
+    for ( i = h->i_record; i < h->n_record; ++i ) {
+    //for ( i = 0; i < h->n_record; ++i ) {
         struct gea_record *v = h->records[i];
 
         // update end_pos_for_skip marker
@@ -1582,8 +1691,8 @@ static int tfbs_variant_state_update(struct mc *n, struct mc_handler *h, struct 
     char *bt = (char*)h->hdr->id[GEA_DT_BIOTYPE][v->biotype].key;
     //inter->con1 =  inter->con2 = mc_unknown;
     if ( strcmp(bt, "TFBS") == 0 ) { 
-        if (n->start <= v->chromStart && n->end >= v->chromEnd ) inter->con2 = mc_tfbs_ablation;
-        else inter->con2 = mc_tfbs_variant;
+        if (n->start <= v->chromStart && n->end >= v->chromEnd ) inter->con1 = mc_tfbs_ablation;
+        else inter->con1 = mc_tfbs_variant;
         return 0; 
     }
     return 1;
@@ -1684,6 +1793,17 @@ int mc_anno_trans_chunk(struct mc *mc, struct mc_handler *h)
     return transcripts_variant_state_update(mc, h, a, n);
 }
 
+// todo: export details of a variant
+/* static int variants_describe_details(struct mc_handler *h, char *chr, int pos, char *ref, char *alt) */
+/* { */
+/*     int lref = strlen(ref); */
+/*     int lalt = strlen(alt); */
+    
+/*     struct mc *mc = mc_init(chr, pos, pos+lref, ref, alt); */
+
+/*     if ( mc_anno_trans_chunk(mc, h) == -1) return -1; */
+    
+/* } */
 /*
   Predefined Tags :
   Gene, Transcript, HGVSnom, ExonIntron, VarType, MC, TFBS, 
@@ -1724,7 +1844,7 @@ struct anno_mc_file {
 
 extern struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const char *data, const char *rna, const char *reference, const char *name_list);
 extern struct anno_mc_file *anno_mc_file_duplicate(struct anno_mc_file *f);
-extern void anno_mc_file_destroy(struct anno_mc_file *f);
+extern void anno_mc_file_destroy(struct anno_mc_file *f, int l);
 extern void anno_mc_core(struct anno_mc_file *f, bcf_hdr_t *hdr, bcf1_t *line);
 extern int anno_mc_chunk(struct anno_mc_file *f, bcf_hdr_t *hdr, struct anno_pool *pool);
 
@@ -1759,20 +1879,13 @@ static char *generate_annovar_name(struct mc *h)
             continue;
         }
                 
-        char *ref, *alt;
-        if ( inf->strand == '+' ) {
-            ref = h->ref ? safe_duplicate_string(h->ref) : NULL;
-            alt = h->alt ? safe_duplicate_string(h->alt) : NULL;
-        }
-        else {
-            ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
-            alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
-        }
+        char *ref = inf->ref != NULL ? inf->ref : mc->ref;
+        char *alt = inf->alt != NULL ? inf->alt : mc->alt;
         
         ksprintf(&str,"%s:%s:", inf->gene, inf->transcript);
         if ( inf->offset != 0 ) ksprintf(&str, "intron%d:", type->count);
         else ksprintf(&str, "exon%d:", type->count);
-        if ( type->func1 == func_region_noncoding ) kputs("n.", &str);
+        if ( type->func1 == func_region_noncoding_exon || type->func1 == func_region_noncoding_intron ) kputs("n.", &str);
         else if ( type->func1 == func_region_cds  ) kputs("c.", &str);
         else if ( type->func1 == func_region_utr5 ) kputs("c.-", &str);
         else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
@@ -1874,148 +1987,163 @@ static void generate_hgvsnom_string_NoncodingExon(struct mc *mc, struct mc_type 
     ksprintf(str, "%s:n.%d", inf->transcript, inf->loc);
     //if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
     //else if ( inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
-    
+    char *ref = inf->ref != NULL ? inf->ref : mc->ref;
+    char *alt = inf->alt != NULL ? inf->alt : mc->alt;
+        
     if ( inf->end_loc != inf->loc ) {
         ksprintf(str, "_%d", inf->end_loc);
         //if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
         //else if ( inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
-        if ( mc->ref == NULL ) { // insertion
-            ksprintf(str, "ins%s", mc->alt);
+        if ( ref == NULL ) { // insertion
+            ksprintf(str, "ins%s", alt);
         }        
         else {
-            if ( mc->alt == NULL ) { // deletion
-                ksprintf(str, "del%s", mc->ref);
+            if ( alt == NULL ) { // deletion
+                ksprintf(str, "del%s", ref);
             }
             else { // del-ins
-                ksprintf(str, "delins%s", mc->alt);
+                ksprintf(str, "delins%s", alt);
             }
         }
     }
     else {
-        if ( mc->ref == NULL ) error("For developer: bad range for noncoding insertion. %s:%d", mc->chr, mc->start);
-        if ( mc->alt == NULL ) kputs("del", str);
+        if ( ref == NULL ) error("For developer: bad range for noncoding insertion. %s:%d", mc->chr, mc->start);
+        if ( alt == NULL ) ksprintf(str, "del%s", ref);
         else {
-            if ( strlen(mc->alt) == 1 ) ksprintf(str, "%s>%s", mc->ref, mc->alt);
-            else ksprintf(str, "del%sins%s", mc->ref, mc->alt);
+            if ( strlen(alt) == 1 ) ksprintf(str, "%s>%s", ref, alt);
+            else ksprintf(str, "del%sins%s", ref, alt);
         }
     }
 }
 static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
-{    
+{
     ksprintf(str, "%s:", inf->transcript);
-    if ( type->func1 == func_region_utr5 ) ksprintf(str, "c.-%d", inf->loc);
-    else if ( type->func1 == func_region_utr3 ) ksprintf(str, "c.*%d", inf->loc);
+    if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "c.-%d", inf->loc);
+    else if ( type->func1 == func_region_utr3_intron ) ksprintf(str, "c.*%d", inf->loc);
     else if ( type->func1 == func_region_intron ) ksprintf(str, "c.%d", inf->loc);
-    else if ( type->func1 == func_region_noncoding) ksprintf(str, "n.%d", inf->loc);
+    else if ( type->func1 == func_region_noncoding_intron) ksprintf(str, "n.%d", inf->loc);
     else error("For developer: only intron region should come here!");
     
     if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
     else if ( inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
     else error("For developer: offset should NOT be 0 for intron.");
+ 
+    char *ref = inf->ref != NULL ? inf->ref : mc->ref;
+    char *alt = inf->alt != NULL ? inf->alt : mc->alt;
     
     if ( inf->end_offset != inf->offset ) { // since this function handler all intron variants, we only need to check the offsets
         kputc('_', str);
-        if ( type->func1 == func_region_utr5 ) ksprintf(str, "-%d", inf->end_loc);
-        else if ( type->func1 == func_region_utr3 ) ksprintf(str, "*%d", inf->end_loc);
+        if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "-%d", inf->end_loc);
+        else if ( type->func1 == func_region_utr3_intron ) ksprintf(str, "*%d", inf->end_loc);
         else if ( type->func1 == func_region_intron ) ksprintf(str, "%d", inf->end_loc);
-        else if ( type->func1 == func_region_noncoding) ksprintf(str, "%d", inf->end_loc);
+        else if ( type->func1 == func_region_noncoding_intron) ksprintf(str, "%d", inf->end_loc);
         else if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
 
         if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
         else if ( inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
-        if ( mc->ref == NULL ) { // insertion
-            ksprintf(str, "ins%s", mc->alt);
+        
+        if ( ref == NULL ) { // insertion
+            ksprintf(str, "ins%s", alt);
         }        
         else {
-            if ( mc->alt == NULL ) { // deletion
-                ksprintf(str, "del%s", mc->ref);
+            if ( alt == NULL ) { // deletion
+                ksprintf(str, "del%s", ref);
             }
             else { // del-ins
-                ksprintf(str, "delins%s", mc->alt);
+                ksprintf(str, "delins%s", alt);
             }
         }
     }
     else {
-        if ( mc->ref == NULL ) error("For developer: bad range for noncoding insertion. %s:%d", mc->chr, mc->start);
-        if ( mc->alt == NULL ) kputs("del", str);
+        if (ref == NULL ) error("For developer: bad range for noncoding insertion. %s:%d", mc->chr, mc->start);
+        if (alt == NULL ) ksprintf(str,"del%s",ref);
         else {
-            if ( strlen(mc->alt) == 1 ) ksprintf(str, "%s>%s", mc->ref, mc->alt);
-            else ksprintf(str, "del%sins%s", mc->ref, mc->alt);
+            if ( strlen(alt) == 1 ) ksprintf(str, "%s>%s", ref, alt);
+            else ksprintf(str, "del%sins%s", ref, alt);
         }
     }
 }
 static void generate_hgvsnom_string_UtrExon(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
-    if ( type->func1 == func_region_utr5 ) ksprintf(str, "c.-%d", inf->loc);
-    else if ( type->func1 == func_region_utr3 ) ksprintf(str, "c.*%d", inf->loc);
+    if ( type->func1 == func_region_utr5_exon ) ksprintf(str, "c.-%d", inf->loc);
+    else if ( type->func1 == func_region_utr3_exon ) ksprintf(str, "c.*%d", inf->loc);
     //else if ( type->func1 == func_region_intron ) ksprintf(str, "c.%d", inf->loc);
     else error("For developer: only UTR region should come here!");
+
+    char *ref = inf->ref == NULL ? mc->ref : inf->ref;
+    char *alt = inf->alt == NULL ? mc->alt : inf->alt;
     
     if ( inf->end_loc != inf->loc ) {
         kputc('_', str);
-        if ( type->func1 == func_region_utr5 ) ksprintf(str, "-%d", inf->end_loc);
-        else if ( type->func1 == func_region_utr3 ) ksprintf(str, "*%d", inf->end_loc);
+
+        if ( type->func1 == func_region_utr5_exon ) ksprintf(str, "-%d", inf->end_loc);
+        else if ( type->func1 == func_region_utr3_exon ) ksprintf(str, "*%d", inf->end_loc);
         else if ( type->func1 == func_region_intron ) ksprintf(str, "%d", inf->end_loc);
         else if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
 
         // end position could cover intron region
         if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
         else if ( inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
+
         if ( mc->ref == NULL ) { // insertion
-            ksprintf(str, "ins%s", mc->alt);
+            ksprintf(str, "ins%s", alt);
         }        
         else {
             if ( mc->alt == NULL ) { // deletion
-                ksprintf(str, "del%s", mc->ref);
+                ksprintf(str, "del%s", ref);
             }
             else { // del-ins
-                ksprintf(str, "delins%s", mc->alt);
+                ksprintf(str, "delins%s", alt);
             }
         }
     }
     else {
-        if ( mc->ref == NULL ) error("For developer: bad range for insertion. %s:%d", mc->chr, mc->start);
-        if ( mc->alt == NULL ) kputs("del", str);
+        if ( ref == NULL ) error("For developer: bad range for insertion. %s:%d", mc->chr, mc->start);
+        if ( alt == NULL ) ksprintf(str, "del%s", ref);
         else {
-            if ( strlen(mc->alt) == 1 ) ksprintf(str, "%s>%s", mc->ref, mc->alt);
-            else ksprintf(str, "del%sins%s", mc->ref, mc->alt);
+            if ( strlen(alt) == 1 ) ksprintf(str, "%s>%s", ref, alt);
+            else ksprintf(str, "del%sins%s", ref, alt);
         }
     }
 }
 static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
+    debug_print("%s:%d", inf->transcript, inf->loc);
     ksprintf(str, "%s:c.%d", inf->transcript, inf->loc);
+
+    char *ref = inf->ref != NULL ? inf->ref : mc->ref;
+    char *alt = inf->alt != NULL ? inf->alt : mc->alt;
     
     if ( inf->end_loc != inf->loc ) {
         kputc('_', str);
-        if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->loc);
-        else if ( type->func1 == func_region_utr3 ) ksprintf(str, "*%d", inf->loc);
+        if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
+        else if ( type->func1 == func_region_utr3_exon ) ksprintf(str, "*%d", inf->end_loc);
         else if ( type->func1 == func_region_intron ) {
-            ksprintf(str, "%d", inf->loc);
+            ksprintf(str, "%d", inf->end_loc);
             // end position could cover intron region
             if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
             else if ( inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
         }
         
-        if ( mc->ref == NULL ) { // insertion
-            ksprintf(str, "ins%s", inf->alt ? inf->alt : mc->alt);
+        if ( inf->ref == NULL ) { // insertion
+            ksprintf(str, "ins%s", alt);
         }        
         else {
-            if ( mc->alt == NULL ) { // deletion
-                ksprintf(str, "del%s", inf->ref ? inf->ref :mc->ref);
+            if ( inf->alt == NULL ) { // deletion
+                ksprintf(str, "del%s",ref);
             }
             else { // del-ins
-                ksprintf(str, "delins%s", inf->alt ? inf->alt : mc->alt);
+                ksprintf(str, "delins%s", alt);
             }
         }
     }
     else {
-        if ( mc->ref == NULL ) error("For developer: bad range for insertion. %s:%d", mc->chr, mc->start);
-        if ( mc->alt == NULL ) kputs("del", str);
+        if ( ref == NULL ) error("For developer: bad range for insertion. %s:%d", mc->chr, mc->start);
+        if ( alt == NULL ) ksprintf(str, "del%s",ref); //`kputs("del", str);
         else {
-            if ( strlen(mc->alt) == 1 ) ksprintf(str, "%s>%s", mc->ref, mc->alt);
-            else ksprintf(str, "del%sins%s", mc->ref, inf->alt ? inf->alt :mc->alt);
+            if ( strlen(inf->alt) == 1 ) ksprintf(str, "%s>%s", ref, alt);
+            else ksprintf(str, "del%sins%s", ref, alt);
         }
     }
 
@@ -2030,8 +2158,9 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
                 int i;
                 ksprintf(str, "(p.%s%ddelins", codon_names[type->ori_amino], type->loc_amino);
                 for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
-                ksprintf(str, "(/p.%s%ddelins)", codon_short_names[type->ori_amino], type->loc_amino);
-                for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
+                kputc(')', str);
+                //ksprintf(str, "(/p.%s%ddelins)", codon_short_names[type->ori_amino], type->loc_amino);
+                //for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
             }
             else {
                 ksprintf(str, "(p.%s%ddel/p.%s%ddel)", codon_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_amino], type->loc_amino);
@@ -2041,21 +2170,23 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
             if ( type->n ) {
                 if (type->con1 == mc_conservation_inframe_insertion ) {
                     int i;
-                    ksprintf(str, "(p.%s%d_%s%dins)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                    ksprintf(str, "(p.%d_%dins", type->loc_amino, type->loc_end_amino);
                     for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
-                    ksprintf(str, "(p.%s%d_%s%dins)", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
-                    for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
+                    kputc(')', str);
+                    //ksprintf(str, "p.%d_%dins)", type->loc_amino, type->loc_end_amino);
+                    //for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
                 }
                 else {
                     int i;
-                    ksprintf(str, "(p.%s%d_%s%ddelins)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
+                    ksprintf(str, "(p.%d_%ddelins", type->loc_amino, type->loc_end_amino);
                     for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
-                    ksprintf(str, "(p.%s%d_%s%ddelins)", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino);
+                    ksprintf(str, "/p.%d_%ddelins", type->loc_amino, type->loc_end_amino);
                     for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
+                    kputc(')', str);
                 }
             }
             else {
-                ksprintf(str, "(p.%s%d_%s%ddel/p.%s%d_%s%ddel", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino,
+                ksprintf(str, "(p.%s%d_%s%ddel/p.%s%d_%s%ddel)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino,
                          codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino
                     );
             }
@@ -2066,7 +2197,10 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
 }
 static void generate_hgvsnom_string_CodingSNV(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
-    ksprintf(str, "%s:c.%d%s>%s(p.%s%d%s/p.%s%d%s)", inf->transcript, inf->loc, mc->ref, mc->alt, codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+    char *ref = inf->ref != NULL ? inf->ref : mc->ref;
+    char *alt = inf->alt != NULL ? inf->alt : mc->alt;
+
+    ksprintf(str, "%s:c.%d%s>%s(p.%s%d%s/p.%s%d%s)", inf->transcript, inf->loc, ref, alt, codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
 }
 static char *generate_hgvsnom_string(struct mc *h)
 {
@@ -2361,6 +2495,10 @@ static char *generate_exonintron_string(struct mc *h)
     }
     return str.s;
 }
+static int generate_upstream_downstream_gap_value(struct mc *h ) {
+    return h->inter.gap_length;
+}
+
 /*
 static char *generate_ivsnom_string(struct hgvs *h)
 {
@@ -2509,7 +2647,7 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
         
         for ( j = 0; j < file->n_col; ++j ) {
             struct anno_col *col = &file->cols[j];
-            if ( strcmp(col->hdr_key, "HGVSnom1") == 0 ) {
+            if ( strcmp(col->hdr_key, "HGVSnom") == 0 ) {
                 char *name = generate_hgvsnom_string(f);
                 if (name) {
                     kputs(name, &str[j]);
@@ -2559,7 +2697,7 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
                     kputs(name, &str[j]);
                     free(name);
                 }
-            }
+            }           
         }
         empty = 0;
     }
@@ -2587,6 +2725,7 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
 struct anno_mc_file *anno_mc_file_duplicate(struct anno_mc_file *f)
 {
     struct anno_mc_file *d = malloc(sizeof(*d));
+    memset(d, 0, sizeof(*d));
     d->h = mc_handler_duplicate(f->h);
     d->n_allele = 0;
     d->files = NULL;
@@ -2597,15 +2736,16 @@ struct anno_mc_file *anno_mc_file_duplicate(struct anno_mc_file *f)
     return d;
 }
 
-void anno_mc_file_destroy(struct anno_mc_file *f)
+void anno_mc_file_destroy(struct anno_mc_file *f, int l)
 {
     int i;
     // clear buffer
     for ( i = 0; i < f->n_allele; ++i ) mc_destroy(f->files[i]);
     if ( f->n_allele ) free(f->files);
-    mc_handler_destroy(f->h);
+    mc_handler_destroy(f->h, l);
     //if ( f->tmps) free(f->tmps);
     for ( i = 0; i < f->n_col; ++i ) free(f->cols[i].hdr_key);
+    free(f->cols);
     free(f);
 }
 
@@ -2622,7 +2762,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
         f->n_col = 6;
         f->cols = malloc(8*sizeof(struct anno_col));
         memset(f->cols, 0, 8*sizeof(struct anno_col));
-        f->cols[0].hdr_key = safe_duplicate_string("HGVSnom1");
+        f->cols[0].hdr_key = safe_duplicate_string("HGVSnom");
         f->cols[1].hdr_key = safe_duplicate_string("Gene");
         f->cols[2].hdr_key = safe_duplicate_string("Transcript");
         f->cols[3].hdr_key = safe_duplicate_string("VarType");
@@ -2652,7 +2792,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
             else if (*ss == '-') { col->replace = REPLACE_EXISTING; ss++; }
             if ( ss[0] == '\0') continue;
             if ( strncmp(ss, "INFO/", 5) == 0 ) ss += 5;
-            if ( strcmp(ss, "HGVSnom1")  && strcmp(ss, "Gene") && strcmp(ss, "Transcript") && strcmp(ss, "VarType") && strcmp(ss, "ExonIntron") && strcmp(ss, "IVSnom")
+            if ( strcmp(ss, "HGVSnom")  && strcmp(ss, "Gene") && strcmp(ss, "Transcript") && strcmp(ss, "VarType") && strcmp(ss, "ExonIntron") && strcmp(ss, "IVSnom")
                  && strcmp(ss, "Oldnom") && strcmp(ss, "AAlength") && strcmp(ss, "ANNOVARname") && strcmp(ss, "MolecularConsequence")){
                 warnings("Do NOT support tag %s.", ss);
                 continue;
@@ -2660,6 +2800,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
             col->hdr_key = safe_duplicate_string(ss);            
             f->n_col++;
         }
+        free(str.s);
         free(s);
     }    
 
@@ -2677,8 +2818,8 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
     int i;
     for ( i = 0; i < f->n_col; ++i ) {
         struct anno_col *col = &f->cols[i];
-        if ( strcmp(col->hdr_key, "HGVSnom1") == 0 ) 
-            BRANCH("HGVSnom1", "##INFO=<ID=HGVSnom1,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
+        if ( strcmp(col->hdr_key, "HGVSnom") == 0 ) 
+            BRANCH("HGVSnom", "##INFO=<ID=HGVSnom,Number=A,Type=String,Description=\"HGVS nomenclature for the description of DNA sequence variants\">");
         else if ( strcmp(col->hdr_key, "ANNOVARname") == 0 )
             BRANCH("ANNOVARname", "##INFO=<ID=ANNOVARname,Number=A,Type=String,Description=\"Variant description in ANNOVAR format.\">");
         else if ( strcmp(col->hdr_key, "Gene") == 0 ) 
@@ -2694,7 +2835,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
         else if ( strcmp(col->hdr_key, "IVSnom") == 0 ) 
             BRANCH("IVSnom", "##INFO=<ID=IVSnom,Number=A,Type=String,Description=\"Old style nomenclature for the description of intron variants. Not recommand to use it.\">");
         else if ( strcmp(col->hdr_key, "Oldnom") == 0 ) 
-            BRANCH("Oldnom", "##INFO=<ID=Oldnom,Number=A,Type=String,Description=\"Old style nomenclature, compared with HGVSnom1 use gene position instead of UTR/coding position.\">");
+            BRANCH("Oldnom", "##INFO=<ID=Oldnom,Number=A,Type=String,Description=\"Old style nomenclature, compared with HGVSnom use gene position instead of UTR/coding position.\">");
         else if ( strcmp(col->hdr_key, "AAlength") == 0 ) 
             BRANCH("AAlength", "##INFO=<ID=AAlength,Number=A,Type=String,Description=\"Amino acid length for each transcript. 0 for noncoding transcript.\">");
     }
@@ -2712,12 +2853,13 @@ int anno_mc_chunk(struct anno_mc_file *f, bcf_hdr_t *hdr, struct anno_pool *pool
     // 2) if partly cover the chunk which could be interpret as start or end record located in intergenic region, update buffer by retrieving the most nearby gene (limited to 10K)
 
     // Notice : Gene, MOTIFs or other regulatory region will be filled in buffer
-    mc_handler_fill_buffer_chunk(f->h, (char*)bcf_seqname(hdr, pool->readers[0]), pool->curr_start, pool->curr_end+1);
+    mc_handler_fill_buffer_chunk(f->h, (char*)bcf_seqname(hdr, pool->readers[pool->i_chunk]), pool->curr_start, pool->curr_end+1);
 
     // annotate each record in the chunk
     int i;
     for ( i = pool->i_chunk; i < pool->n_chunk; ++i ) {
         bcf1_t *line = pool->readers[i];
+
         // Do we need to annotate REF allele ?
         if ( bcf_get_variant_types(line) == VCF_REF ) continue;
         
@@ -2901,7 +3043,7 @@ int bcfanno_mc()
     struct thread_pool_process *q = thread_pool_process_init(p, args.n_thread*2, 0);
     struct thread_pool_result  *r;
     
-    for ( ;; ) {
+    for (;;) {
         struct anno_pool *arg = anno_reader(args.fp_input, args.hdr_out, args.n_record);
         if ( arg->n_reader == 0 )
             break;
@@ -2950,7 +3092,7 @@ void release_memory()
     bcf_hdr_destroy(args.hdr_out);
     int i;
     for ( i = 0; i < args.n_thread; ++i )
-        anno_mc_file_destroy(args.files[i]);
+        anno_mc_file_destroy(args.files[i], i);
     free(args.files);
 }
 
