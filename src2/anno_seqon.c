@@ -1058,7 +1058,7 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
         type->con1 = mc_inframe_indel;
         int l1 = (cod + lref)/3*3+1; // 1 based
         int l2 = (cod + lalt)/3*3+1;
-        assert(lori_aa>l1);
+        //assert(lori_aa>l1);
 
         // stop codon founded the inserted codon when lmut_aa < l2
         
@@ -1074,7 +1074,8 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
         for ( i=0; i<type->n; ++i) {
             type->aminos[i] = mut_aa[i];
             if ( type->aminos[i] == 0 ) { // stop-codon
-                type->con1 = mc_frameshift_truncate;
+                //type->con1 = mc_frameshift_truncate;
+                type->con1 = i == 0 ? mc_stop_gained : mc_frameshift_truncate;
                 type->fs = i+1;
                 type->n = i+1;
                 type->mut_amino = mut_aa[0];
@@ -1089,6 +1090,7 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
         int head, tail;
         trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
         type->loc_amino += head;
+
         type->ori_amino = ori_aa[0];  
         type->mut_amino = mut_aa[0];
         type->fs = mut_aa[lmut_aa-1] == C4_Stop ? lmut_aa : -1;
@@ -1155,7 +1157,16 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
             type->ori_amino = -1;
             type->ori_end_amino = -1;            
             int i;
-            for ( i=0; i<type->n; ++i) type->aminos[i] = mut_aa[i];
+            for ( i=0; i<type->n; ++i) {                
+                type->aminos[i] = mut_aa[i];
+                if ( type->aminos[i] == 0 ) {
+                    //type->con1 = mc_frameshift_truncate; // insert a stop base, transcript truncated
+                    type->con1 = i == 0 ? mc_stop_gained : mc_frameshift_truncate;
+                    type->fs = i+1;
+                    type->mut_amino = mut_aa[0];
+                    break;
+                }
+            }
         }
         else {
             type->con1 = mc_disruption_inframe_insertion;
@@ -1183,7 +1194,16 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
                 }
                 type->aminos = malloc(sizeof(int)*type->n);
                 int i;
-                for ( i=0; i < type->n; ++i ) type->aminos[i] = mut_aa[i]; 
+                for ( i=0; i < type->n; ++i ) {
+                    type->aminos[i] = mut_aa[i];
+                    if ( type->aminos[i] == 0 ) {
+                        //type->con1 = mc_frameshift_truncate; // insert a stop base, transcript truncated
+                        type->con1 = i == 0 ? mc_stop_gained : mc_frameshift_truncate;
+                        type->fs = i+1;
+                        type->mut_amino = mut_aa[0];
+                        break;
+                    }
+                }
             }
         }
     }
@@ -1209,7 +1229,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     int pos = inf->pos;
     struct gea_coding_transcript *c = &v->c;
 
-    // debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
+    debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
     
     // For variants in coding region, check the amino acid changes.
     int cds_pos = pos - c->utr5_length;
@@ -2109,11 +2129,11 @@ static void generate_hgvsnom_string_UtrExon(struct mc *mc, struct mc_type *type,
 }
 static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
-    debug_print("%s:%d", inf->transcript, inf->loc);
-    ksprintf(str, "%s:c.%d", inf->transcript, inf->loc);
 
     char *ref = inf->ref != NULL ? inf->ref : mc->ref;
     char *alt = inf->alt != NULL ? inf->alt : mc->alt;
+
+    ksprintf(str, "%s:c.%d", inf->transcript, inf->loc);
     
     if ( inf->end_loc != inf->loc ) {
         kputc('_', str);
@@ -2142,7 +2162,7 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
         if ( ref == NULL ) error("For developer: bad range for insertion. %s:%d", mc->chr, mc->start);
         if ( alt == NULL ) ksprintf(str, "del%s",ref); //`kputs("del", str);
         else {
-            if ( strlen(inf->alt) == 1 ) ksprintf(str, "%s>%s", ref, alt);
+            if ( strlen(alt) == 1 && strlen(ref) == 1 ) ksprintf(str, "%s>%s", ref, alt);
             else ksprintf(str, "del%sins%s", ref, alt);
         }
     }
@@ -2185,10 +2205,15 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
                     kputc(')', str);
                 }
             }
-            else {
-                ksprintf(str, "(p.%s%d_%s%ddel/p.%s%d_%s%ddel)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino,
+            else { 
+                if (type->con1 == mc_conservation_inframe_deletion ) {
+                    ksprintf(str, "(p.%s%d_%s%ddel/p.%s%d_%s%ddel)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino,
                          codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino
                     );
+                }
+                else {
+                    ksprintf(str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino],codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+                }
             }
         }
     }
@@ -2255,6 +2280,7 @@ static char *generate_hgvsnom_string(struct mc *h)
                 generate_hgvsnom_string_UtrExon(h, type, inf, &str);
                 break;
 
+            case mc_stop_gained:
             case mc_frameshift_truncate:
             case mc_frameshift_elongation:
             case mc_inframe_indel:
@@ -2269,7 +2295,6 @@ static char *generate_hgvsnom_string(struct mc *h)
             case mc_start_loss:
             case mc_start_retained:
             case mc_stop_loss:
-            case mc_stop_gained:
             case mc_stop_retained:
             case mc_missense:
             case mc_synonymous:
