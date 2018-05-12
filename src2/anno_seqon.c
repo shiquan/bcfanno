@@ -702,6 +702,7 @@ static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int 
         else if ( v->strand == strand_is_minus && match + adjust < c->loc[1][b1] ) adjust = 0;
     }
     *pos += adjust;
+    
     return 0;
 }
 static int trim_capped_sequences(char **_ref, char **_alt, int *lr, int *la, int unit)
@@ -827,7 +828,7 @@ static int trim_amino_acid_ends(int *lori_aa, int **ori_aa, int *lmut_aa, int **
 {
     int i;
     for (i = 0 ;; ++i) {
-        if ( *lori_aa -i ==0 || *lmut_aa -i == 0 ) break;
+        if ( *lori_aa == i || *lmut_aa == i) break;
         if ( (*ori_aa)[i] != (*mut_aa)[i] ) break;
     }
             
@@ -890,26 +891,30 @@ static int convert_bases_to_amino_acid(int l, char *s, int *l_aa, int **aa)
 //
 // So only need to update the positions and affected bases
 //
-static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, int lalt, char *ref, char *alt, int *lori, char **ori, int *lmut, char **mut, int cod)
+static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, int lalt, char *ref, char *alt, int *lori, char **ori, int *lmut, char **mut, int *cod, int cap)
 {
     struct gea_coding_transcript *c = &v->c;
     
     // trim Longest Common 3mer Prefixes
     int offset = trim_capped_sequences(ori, mut, lori, lmut, 3);
+    
     if (lref > 0) inf->ref = strdup(ref);
     if (lalt > 0) inf->alt = strdup(alt);
 
-    if (offset) {
+    //if (offset) {
         // adjust offset by trim capped bases, cod is 0 based, convert offset to 0based by -1 
-        offset = offset - cod -1;
+        // offset = offset - cod -1;
 
-        int i;
-        for ( i=0; i<*lmut && i<*lori; ++i) {
-            if ( (*mut)[i] != (*ori)[i] ) break;
-        }
+    int i;
+    for ( i=0; i<*lmut && i<*lori; ++i) {
+        if ( (*mut)[i] != (*ori)[i] ) break;
+    }
+    assert(i<3);
+    offset += i;
 
-        offset += i;
-
+    if ( offset > 0 && offset-*cod > 0) {
+        //
+        offset =cap == 0 ? offset - *cod : offset-*cod -1;
         inf->pos = inf->pos + offset;
         
         if ( inf->pos > c->cds_length ) {
@@ -921,6 +926,24 @@ static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, str
         }
         inf->loc += offset;
         inf->end_loc += offset;
+        inf->pos += offset;
+        inf->end_pos += offset;
+        if ( inf->pos > v->c.cds_length) {
+            type->func1 = type->func2 = func_region_utr3_exon;
+            type->con1 = mc_utr3_exon;
+            inf->loc = inf->pos - v->c.cds_length;
+            inf->end_loc = inf->end_pos - v->c.cds_length;
+            return 0;
+        }
+        else if ( inf->end_pos > v->c.cds_length ) {
+            type->func2 = func_region_utr3_exon;
+            type->con1 = mc_exon_loss;
+            inf->end_loc = inf->end_pos - v->c.cds_length;
+            return 0;
+        }
+        // update cod
+        *cod = (inf->loc-1)%3;
+
         //type->loc_amino = (inf->loc+2)/3;
 
         // update ref and alt sequence
@@ -967,16 +990,18 @@ static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, str
     return 1;
 }
 // For deletion, lmut should always be 0, so no need to check it here
-static int predict_molecular_consequence_deletion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lori, int lmut, char *ori, char *mut, int cod)
+static int predict_molecular_consequence_deletion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lori, int lmut, char *ori, char *mut)
 {
-    // re-alignment of reference and alternative alleles
-    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, 0, ref, NULL, &lori, &ori, &lmut, &mut, cod) == 0 ) return 0;
-
-    // inf->end_loc = inf->loc + lref -1;
-    // location of amino acids
-    type->loc_amino = (inf->loc+2)/3;
-    type->loc_end_amino = (inf->end_loc+2)/3;
+    int cod;
+    cod = (inf->loc-1)%3;
         
+    // re-alignment of reference and alternative alleles
+    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, 0, ref, NULL, &lori, &ori, &lmut, &mut, &cod, 0) == 0 ) return 0;
+    
+    // location of amino acids
+    type->loc_amino = (inf->loc+2)/3; // 1 based
+    type->loc_end_amino = (inf->end_loc+2)/3;
+    
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
 
@@ -1000,31 +1025,87 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
         type->fs = mut_aa[lmut_aa-1] == C4_Stop ? lmut_aa : -1;
     }
     else { // inframe deletion
-
-        // related amino acid frames
-        int l = (cod + lref)/3; // 0 based !!
-
-        int head, tail;
-        trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
-        if ( head ) type->loc_amino += head; // if trimmed head, update new location
-        type->ori_amino = ori_aa[0];
-        //type->loc_end_amino = type->loc_amino + l;
         
         if ( cod == 0 ) {
+            /*
+              For inframe deletions, there is NO need to consider the length of deleted amino acids, since no amino acid codon will be broken during this process. We should only find the first changed
+              codon as start codon, and update the start and end positions on the amino acids if necessary.
+            */
+            int l = lref/3-1; // 0 based
             type->con1 = mc_conservation_inframe_deletion;
-            type->ori_end_amino =ori_aa[l];            
+            int head, tail;
+            trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
+            type->loc_amino += head;
+            type->loc_end_amino = type->loc_amino + l;
+            type->ori_end_amino =ori_aa[l];
+            type->n = 0;
         }
         else {
+            /*
+              For disruptive deletions, original codons will be broken, and a new codon will be create after deletion. So we should consider the deleted codons and mutated codon, check it is a delins
+              or deletion variant.
+             */
             type->con1 = mc_disruption_inframe_deletion;
-            type->ori_end_amino = ori_aa[l];
-            type->mut_amino = mut_aa[0];
-            // because header of original and mutated amino acids have been parsed, here we only check the ends
-            if ( type->ori_end_amino == type->mut_amino ) {
-                type->loc_end_amino--;
-                type->mut_amino = -1;
-                type->ori_end_amino = ori_aa[l-1];
+            int head, tail;
+            trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
+
+            if ( head > 0 ) { // mutated codon has been trimmed, so only treat it as standard deletion, else we should treat it as del-ins
+                type->loc_amino += head;
+                int l = lref/3 -1; // 0 based
+                type->loc_end_amino = type->loc_amino + l;
+                type->ori_amino = ori_aa[0];
+                type->ori_end_amino = ori_aa[l];
+                type->n = 0;
             }
+            else {
+                // now we also should check if mutated codon same with end codon, if it is same, treat it as deletioon else del-ins
+                int l = lref/3; // 0 based
+                if ( ori_aa[l] == mut_aa[0] ) {
+                    l -= 1;
+                    type->loc_end_amino = type->loc_amino +l;
+                    type->ori_amino = ori_aa[0];
+                    type->ori_end_amino = ori_aa[l];
+                    type->n = 0;
+                }
+                else { 
+                    type->loc_end_amino = type->loc_amino +l;
+                    type->ori_amino = ori_aa[0];
+                    type->ori_end_amino = ori_aa[l];
+                    type->n = 1;
+                    type->aminos = calloc(1,sizeof(int));
+                    type->aminos[0] = mut_aa[0];
+                }
+            }
+            // related amino acid frames length
+            // int l = (cod + 2  + lref)/3;
+        
+            /* type->ori_amino = ori_aa[0]; */
+            
+            /* if ( head > 0) { */
+            /*     type->loc_amino += head; // if trimmed head, update new location */
+            /*     type->loc_end_amino = */
+            
+            /* if ( l >= lori_aa ) l = lori_aa-1;             */
+
+            
+            /*     type->ori_end_amino = ori_aa[l]; */
+            /*     type->loc_end_amino = type->loc_amino + l; */
+            /*     if ( head > 0 ) { */
+            
+            /*     } */
+            /*     else { */
+            /*         type->loc_end_amino = type->loc_amino + l; */
+            /*         // type->mut_amino = mut_aa[0]; */
+            /*     } */
+
+            // because header of original and mutated amino acids have been parsed, here we only check the ends
+            /* if ( type->ori_end_amino == type->mut_amino ) { */
+            /*     type->loc_end_amino--; */
+            /*     type->mut_amino = -1; */
+            /*     type->ori_end_amino = ori_aa[l-1]; */
+            /* } */
         }
+
     }
     if ( lori_aa ) free(ori_aa);
     if ( lmut_aa ) free(mut_aa);
@@ -1032,10 +1113,11 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
     return 0;
 }
 
-static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
+static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, char *ref, int lalt, char *alt, int lori, int lmut, char *ori, char *mut)
 {
+    int cod = (inf->loc -1)%3;
     // re-alignment of reference and alternative alleles
-    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, lalt, ref, alt, &lori, &ori, &lmut, &mut, cod) == 0 ) return 0;
+    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, lalt, ref, alt, &lori, &ori, &lmut, &mut, &cod, 0) == 0 ) return 0;
 
     inf->end_loc = inf->loc + lref -1;
 
@@ -1101,11 +1183,18 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
     return 0;
 }
 
-static int predict_molecular_consequence_insertion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lalt, char *alt, int lori, int lmut, char *ori, char *mut, int cod)
+static int predict_molecular_consequence_insertion(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lalt, char *alt, int lori, int lmut, char *ori, char *mut)
 {
+
+    /* 
+       TODO: improve this function!!!!
+    */
+
+    
+    int cod = (inf->loc-1)%3;
     // re-alignment of reference and alternative alleles
     // inf->loc will be updated in this function
-    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, 0, lalt, NULL, alt, &lori, &ori, &lmut, &mut, cod) == 0 )
+    if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, 0, lalt, NULL, alt, &lori, &ori, &lmut, &mut, &cod, 1) == 0 )
         return 0;
 
     inf->end_loc = inf->loc+1;
@@ -1120,7 +1209,7 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
     convert_bases_to_amino_acid(lmut, mut, &lmut_aa, &mut_aa);
 
     assert(lori_aa >0);
-    
+
     if ( lalt%3 ) { // frameshift
         type->con1 = mc_frameshift_elongation;
         
@@ -1128,13 +1217,11 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
         trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
         if ( head ) type->loc_amino += head; // if trimmed head, update new location
         // no end location for frameshift
-        type->loc_end_amino = -1;
-        
+        type->loc_end_amino = -1;        
         type->ori_amino = ori_aa[0];
-        if ( lmut_aa == 0 ) { // incase deletion of mutated allele
-            type->fs = -1;
-            return 0;
-        }
+        // incase deletion of mutated allele
+        if ( lmut_aa <= 1 ) goto insert_a_stop_gained;
+        
         type->mut_amino = mut_aa[0];        
         type->fs = mut_aa[lmut_aa-1] == C4_Stop ? lmut_aa : -1;
         
@@ -1148,22 +1235,30 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
 
             int head, tail;
             trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
-            // todo: check duplicate
-            if (head) type->loc_amino += head;           
 
+            // todo: check duplicate
+
+            if (head) type->loc_amino += head;           
+            type->ori_amino = ori_aa[0];
             type->loc_end_amino = type->loc_amino +1;
             type->n = lalt/3;
+            if ( lori_aa < type->n ) {
+                type->n = lori_aa;
+                if ( type->n <= 1 ) goto insert_a_stop_gained;
+            }
             type->aminos = malloc(sizeof(int)*type->n);
-            type->ori_amino = -1;
+            
             type->ori_end_amino = -1;            
             int i;
             for ( i=0; i<type->n; ++i) {                
                 type->aminos[i] = mut_aa[i];
                 if ( type->aminos[i] == 0 ) {
                     //type->con1 = mc_frameshift_truncate; // insert a stop base, transcript truncated
-                    type->con1 = i == 0 ? mc_stop_gained : mc_frameshift_truncate;
+                    if ( i == 0 ) goto insert_a_stop_gained;
+                    type->con1 = mc_frameshift_truncate;
                     type->fs = i+1;
                     type->mut_amino = mut_aa[0];
+                    type->n = i+1;
                     break;
                 }
             }
@@ -1172,10 +1267,22 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
             type->con1 = mc_disruption_inframe_insertion;
             int head, tail;
             trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
-            if (head>0) { // insert
-                type->loc_amino += head -1;
+            type->ori_amino = ori_aa[0];  
+            type->n = lalt/3; // disrupted amino acid should be emited
+            if ( lmut_aa < type->n ) {
+                type->n = lmut_aa;
+                if ( type->n <= 1 ) goto insert_a_stop_gained;
+            }
+
+            if ( head > 0 ) { // inframe insert, trim start
+                type->loc_amino += head-1;
+                type->loc_end_amino = type->loc_amino+1;
+                type->aminos = malloc(sizeof(int)*type->n);
+                int i, j;
+                for ( i=0; i < type->n; ++i ) type->aminos[i] = mut_aa[i];
+            }
+            else if (mut_aa[lalt/3] == ori_aa[0] ) { // inframe insert, trim end
                 type->loc_end_amino = type->loc_amino +1;
-                type->n = lalt/3; // disrupted amino acid should be emited
                 type->aminos = malloc(sizeof(int)*type->n);
                 int i;
                 for ( i=0; i < type->n; ++i ) type->aminos[i] = mut_aa[i];                
@@ -1183,15 +1290,19 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
             else { //del-insert                
                 // assume delins first
                 type->n = lalt/3+1;
-                if ( mut_aa[type->n-1] == ori_aa[0]) { // if deleted amino acid is same with inserted tail, convernt to insert
-                    type->loc_end_amino = type->loc_amino;
-                    type->loc_amino --;
-                    type->n--;
-                }
-                else {
-                    type->loc_amino = type->loc_end_amino = (inf->loc+2)/3;
-                    type->ori_amino = ori_aa[0];                    
-                }
+
+                /* if ( lmut_aa < type->n ) { */
+                /*     type->n = lmut_aa; */
+                /*     if ( type->n <= 1 ) goto insert_a_stop_gained; */
+                /* } */
+                /* if ( mut_aa[type->n-1] == ori_aa[0]) { // if deleted amino acid is same with inserted tail, convernt to insert */
+                /*     type->loc_end_amino = type->loc_amino; */
+                /*     type->loc_amino --; */
+                /*     type->n--; */
+                /* } */
+                /* else { */
+                type->loc_amino = type->loc_end_amino = (inf->loc+2)/3;
+                type->ori_amino = ori_aa[0];                                    
                 type->aminos = malloc(sizeof(int)*type->n);
                 int i;
                 for ( i=0; i < type->n; ++i ) {
@@ -1210,6 +1321,15 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
 
     if ( lori_aa ) free(ori_aa);
     if ( lmut_aa ) free(mut_aa);
+    return 0;
+
+  insert_a_stop_gained:
+    if ( lori_aa ) free(ori_aa);
+    if ( lmut_aa ) free(mut_aa);
+    type->con1 = mc_stop_gained;
+    type->mut_amino = 0;
+    type->n = 0;
+    type->fs = -1;
     return 0;
 }
 
@@ -1283,15 +1403,15 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
 
             // for complex cases, we will build the alternative allele sequence and the amino acids
         case var_type_del:
-            predict_molecular_consequence_deletion(h, mc, type, inf, v, lref, ref, *lori, *lmut, *ori, *mut, cod);
+            predict_molecular_consequence_deletion(h, mc, type, inf, v, lref, ref, *lori, *lmut, *ori, *mut);
             break;
             
         case var_type_ins:
-            predict_molecular_consequence_insertion(h, mc, type, inf, v, lalt, alt, *lori, *lmut, *ori, *mut, cod);
+            predict_molecular_consequence_insertion(h, mc, type, inf, v, lalt, alt, *lori, *lmut, *ori, *mut);
             break;
             
         case var_type_delins:
-            predict_molecular_consequence_delins(h, mc, type, inf, v, lref, ref, lalt, alt, *lori, *lmut, *ori, *mut, cod);
+            predict_molecular_consequence_delins(h, mc, type, inf, v, lref, ref, lalt, alt, *lori, *lmut, *ori, *mut);
             break;
 
         default:
@@ -2189,14 +2309,29 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
         else {
             if ( type->n ) {
                 if (type->con1 == mc_conservation_inframe_insertion ) {
-                    int i;
+                  inframe_insertion:
                     ksprintf(str, "(p.%d_%dins", type->loc_amino, type->loc_end_amino);
+                    int i;
                     for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
+                    kputc('/', str);
+                    ksprintf(str, "p.%d_%dins", type->loc_amino, type->loc_end_amino);
+                    for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
                     kputc(')', str);
-                    //ksprintf(str, "p.%d_%dins)", type->loc_amino, type->loc_end_amino);
-                    //for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
+                }
+                else if ( type->con1 == mc_disruption_inframe_insertion ) {
+                    if ( type->loc_amino == type->loc_end_amino ) {
+                        int i;
+                        ksprintf(str, "(p.%s%ddelins", codon_names[type->loc_amino], type->loc_amino);
+                        for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
+                        kputc('/', str);
+                        ksprintf(str, "p.%s%ddelins", codon_short_names[type->loc_amino], type->loc_amino);
+                        for ( i = 0; i < type->n; ++i ) kputs(codon_short_names[type->aminos[i]], str);
+                        kputc(')', str);
+                    }
+                    else goto inframe_insertion;                    
                 }
                 else {
+                    // disruption_inframe_deletion
                     int i;
                     ksprintf(str, "(p.%d_%ddelins", type->loc_amino, type->loc_end_amino);
                     for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
@@ -2208,8 +2343,13 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
             else { 
                 if (type->con1 == mc_conservation_inframe_deletion ) {
                     ksprintf(str, "(p.%s%d_%s%ddel/p.%s%d_%s%ddel)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino,
-                         codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino
+                             codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino
                     );
+                }
+                else if ( type->con1 == mc_disruption_inframe_deletion) {
+                    ksprintf(str, "(p.%s%d_%s%ddel/p.%s%d_%s%ddel)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino,
+                                 codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->ori_end_amino], type->loc_end_amino
+                            );
                 }
                 else {
                     ksprintf(str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino],codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
