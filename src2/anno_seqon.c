@@ -1269,7 +1269,7 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
             trim_amino_acid_ends(&lori_aa, &ori_aa, &lmut_aa, &mut_aa, &head, &tail, 1);
             type->ori_amino = ori_aa[0];  
             type->n = lalt/3; // disrupted amino acid should be emited
-            if ( lmut_aa < type->n ) {
+            if ( lmut_aa <= type->n ) {
                 type->n = lmut_aa;
                 if ( type->n <= 1 ) goto insert_a_stop_gained;
             }
@@ -1349,7 +1349,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     int pos = inf->pos;
     struct gea_coding_transcript *c = &v->c;
 
-    debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
+    //debug_print("%s\t%d\t%s\t%s\t%s", mc->chr, mc->start, mc->ref, mc->alt, inf->transcript);
     
     // For variants in coding region, check the amino acid changes.
     int cds_pos = pos - c->utr5_length;
