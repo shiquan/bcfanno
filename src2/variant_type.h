@@ -81,10 +81,10 @@ extern char *rev_seqs(const char *dna_seqs, unsigned long n);
 #define C4_Gly  20
 
 const static char *codon_names[] = {
-    "Stop", "Phe", "Leu", "Ser", "Tyr", "Cys", "Trp", "Pro", "His", "Gln", "Arg", "Ile", "Met", "Thr", "Asn", "Lys", "Val", "Ala", "Asp", "Glu", "Gly",
+    "*", "Phe", "Leu", "Ser", "Tyr", "Cys", "Trp", "Pro", "His", "Gln", "Arg", "Ile", "Met", "Thr", "Asn", "Lys", "Val", "Ala", "Asp", "Glu", "Gly",
 };
 
-const static char *codon_short_names[] = { "X", "F", "L", "S", "Y", "C", "W", "P", "H", "Q", "R", "I", "M", "T", "N", "K", "V", "A", "D", "E", "G", };
+const static char *codon_short_names[] = { "*", "F", "L", "S", "Y", "C", "W", "P", "H", "Q", "R", "I", "M", "T", "N", "K", "V", "A", "D", "E", "G", };
 
 const static int codon_matrix[4][4][4] = {
     { { C4_Lys, C4_Asn, C4_Lys, C4_Asn, }, { C4_Thr, C4_Thr, C4_Thr, C4_Thr, }, { C4_Arg, C4_Ser, C4_Arg, C4_Ser, }, { C4_Ile, C4_Ile, C4_Met, C4_Ile, }, },

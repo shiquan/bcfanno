@@ -1,7 +1,6 @@
 #include "utils.h"
 #include "anno_pool.h"
 #include "anno_bed.h"
-#include "anno_hgvs.h"
 #include "anno_vcf.h"
 #include "anno_col.h"
 #include "anno_thread_pool.h"
@@ -9,9 +8,17 @@
 #include "htslib/hts.h"
 #include "htslib/tbx.h"
 #include "htslib/vcf.h"
-#include "genepred.h"
+
 #include "number.h"
 #include "anno_flank.h"
+
+// for genepredext format, this format has been instead by GenomeElementAnnotation file.
+#include "genepred.h"
+#include "anno_hgvs.h"
+
+// for GenomeElementAnnotation file
+#include "anno_seqon.h"
+
 #include "version.h"
 #include <unistd.h>
 
@@ -24,8 +31,10 @@ struct anno_index {
     // vcf handlers
     int n_vcf;
     struct anno_vcf_file **vcf_files;
-    // hgvs handler
+    // hgvs handler. for genepredext file, will be instead by genome element annotation file
     struct anno_hgvs_file *hgvs;
+    // struct to access GenomeElementAnnotation file.
+    struct anno_mc_file *mc_file;
     // flank sequence
     struct seqidx *seqidx;
 };
@@ -126,6 +135,8 @@ struct args {
     .total_record = 0,
 };
 
+static int annotation_file_is_gea_format = 0;
+
 struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config)
 {
     extern int bcf_header_add_flankseq(bcf_hdr_t *hdr);
@@ -153,10 +164,19 @@ struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config
         idx->n_vcf = vcf_config->n_vcf;
     }
     else idx->n_vcf = 0;
+
+    idx->hgvs = NULL;
+    idx->mc_file = NULL;
     
-    if ( refgene_config->genepred_fname && refgene_config->refseq_fname )
-        idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path, refgene_config->gene_list_fname, refgene_config->trans_list_fname);
-    else idx->hgvs = NULL;
+    if ( refgene_config->genepred_fname && refgene_config->refseq_fname ) {
+        if ( file_is_GEA(refgene_config->genepred_fname) == 0 ) {
+            idx->mc_file = anno_mc_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path, refgene_config->trans_list_fname);
+            annotation_file_is_gea_format = 1;
+        }
+        else {
+            idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path, refgene_config->gene_list_fname, refgene_config->trans_list_fname);
+        }
+    }
     
     if ( config->reference_path ) {
         idx->seqidx = load_sequence_index(config->reference_path);
@@ -183,10 +203,11 @@ struct anno_index *anno_index_duplicate(struct anno_index *idx)
     for ( i = 0; i < d->n_vcf; ++i ) d->vcf_files[i] = anno_vcf_file_duplicate(idx->vcf_files[i]);
     for ( i = 0; i < d->n_bed; ++i ) d->bed_files[i] = anno_bed_file_duplicate(idx->bed_files[i]);
     if ( idx->hgvs ) d->hgvs = anno_hgvs_file_duplicate(idx->hgvs);
+    if ( idx->mc_file ) d->mc_file = anno_mc_file_duplicate(idx->mc_file);
     if ( idx->seqidx ) d->seqidx = sequence_index_duplicate(idx->seqidx);
     return d;
 }
-void anno_index_destroy(struct anno_index *idx)
+void anno_index_destroy(struct anno_index *idx, int l)
 {
     extern void sequence_index_destroy(struct seqidx *idx);
     int i;
@@ -195,6 +216,7 @@ void anno_index_destroy(struct anno_index *idx)
     if ( idx->vcf_files ) free(idx->vcf_files);
     if ( idx->bed_files ) free(idx->bed_files);
     if ( idx->hgvs ) anno_hgvs_file_destroy(idx->hgvs);
+    if ( idx->mc_file) anno_mc_file_destroy(idx->mc_file, l);
     if ( idx->seqidx ) sequence_index_destroy(idx->seqidx);
     free(idx);
 }
@@ -329,8 +351,10 @@ int parse_args(int argc, char **argv)
     // init output file handler
     args.fp_out = args.fname_output == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.fname_output, hts_bcf_wmode(out_type));
 
-    // set genepredExt format
-    set_format_genepredext();
+    if ( annotation_file_is_gea_format == 0 ) { // assume it is genepredext format
+        // set genepredExt format
+        set_format_genepredext();
+    }
     
     // read bcf header from input bcf/vcf
     args.hdr = bcf_hdr_read(args.fp_input);
@@ -369,7 +393,7 @@ void memory_release()
     bcfanno_config_destroy(args.config);
     bcf_hdr_destroy(args.hdr);
     int i;
-    for ( i = 0; i < args.n_thread; ++i ) anno_index_destroy(args.indexs[i]);
+    for ( i = 0; i < args.n_thread; ++i ) anno_index_destroy(args.indexs[i], i);
     free(args.indexs);
 }
 
@@ -390,14 +414,18 @@ void *anno_core(void *arg, int idx)
             bcf1_t *line = pool->readers[i];
             if ( bcf_get_variant_types(line) == VCF_REF )
                 continue;
+
             if ( index->hgvs ) 
-            anno_hgvs_core(index->hgvs, index->hdr_out, line);
+                anno_hgvs_core(index->hgvs, index->hdr_out, line);
+
+            // if ( index->mc_file ) do not support unsorted input
 
             for ( j = 0; j < index->n_vcf; ++j )
                 anno_vcf_core(index->vcf_files[j], index->hdr_out, line);
         
             for ( j = 0; j < index->n_bed; ++j )
                 anno_bed_core(index->bed_files[j], index->hdr_out, line);
+
             if ( args.flank_seq_is_need == 1 && index->seqidx )
                 bcf_add_flankseq(index->seqidx, index->hdr_out, line);
         }
@@ -410,6 +438,9 @@ void *anno_core(void *arg, int idx)
             
             if ( index->hgvs )
                 anno_hgvs_chunk(index->hgvs, index->hdr_out, pool);
+            else if ( index->mc_file )
+                anno_mc_chunk(index->mc_file, index->hdr_out, pool);
+            
             for ( i = 0; i < index->n_vcf; ++i )
                 anno_vcf_chunk(index->vcf_files[i], index->hdr_out, pool);
             for ( i = 0; i < index->n_bed; ++i )                
@@ -435,6 +466,7 @@ int annotate_light()
             args.total_record ++;
             if ( line->rid == -1 ) goto output_line;
             if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
+
             if ( idx->hgvs )
                 anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
             
@@ -458,8 +490,12 @@ int annotate_light()
             for ( ;; ) {
                 if ( pool->n_chunk == pool->n_reader ) break;
                 update_chunk_region(pool);
+
                 if ( idx->hgvs )
                     anno_hgvs_chunk(idx->hgvs, idx->hdr_out, pool);
+                else if ( idx->mc_file )
+                    anno_mc_chunk(idx->mc_file, idx->hdr_out, pool);
+                
                 for ( i = 0; i < idx->n_vcf; ++i )
                     anno_vcf_chunk(idx->vcf_files[i], idx->hdr_out, pool);
                 for ( i = 0; i < idx->n_bed; ++i )                

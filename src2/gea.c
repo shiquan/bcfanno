@@ -20,24 +20,24 @@ extern int gea_hdr_format(const struct gea_hdr *hdr, kstring_t *str);
 extern void gea_clear(struct gea_record *v);
 
 // parse GEA header
-static const char *dump_char(char *buffer, char c)
-{
-    switch (c) {
-    case '\n': strcpy(buffer, "\\n"); break;
-    case '\r': strcpy(buffer, "\\r"); break;
-    case '\t': strcpy(buffer, "\\t"); break;
-    case '\'':
-    case '\"':
-    case '\\':
-        sprintf(buffer, "\\%c", c);
-        break;
-    default:
-        if (isprint_c(c)) sprintf(buffer, "%c", c);
-        else sprintf(buffer, "\\x%02X", (unsigned char) c);
-        break;
-    }
-    return buffer;
-}
+/* static const char *dump_char(char *buffer, char c) */
+/* { */
+/*     switch (c) { */
+/*     case '\n': strcpy(buffer, "\\n"); break; */
+/*     case '\r': strcpy(buffer, "\\r"); break; */
+/*     case '\t': strcpy(buffer, "\\t"); break; */
+/*     case '\'': */
+/*     case '\"': */
+/*     case '\\': */
+/*         sprintf(buffer, "\\%c", c); */
+/*         break; */
+/*     default: */
+/*         if (isprint_c(c)) sprintf(buffer, "%c", c); */
+/*         else sprintf(buffer, "\\x%02X", (unsigned char) c); */
+/*         break; */
+/*     } */
+/*     return buffer; */
+/* } */
 
 static char *find_chrom_header_line(char *s)
 {
@@ -1045,7 +1045,7 @@ int gea_hdr_id2int(const struct gea_hdr *hdr, int which, const char *id)
 int gea_parse(kstring_t *s, const struct gea_hdr *h, struct gea_record *v)
 {
     int i = 0;
-    char *p, *q, *r, *t;
+    char *p, *q, *r;// *t;
     kstring_t *str;
     khint_t k;
     ks_tokaux_t aux;
@@ -1297,7 +1297,7 @@ int gea_parse(kstring_t *s, const struct gea_hdr *h, struct gea_record *v)
             // not support yet
         }
     }
-  end:
+//  end:
     ret = 0;
 
   err:
@@ -1358,7 +1358,7 @@ bcf_info_t *gea_get_info(const struct gea_hdr *hdr, struct gea_record *b, const 
 int gea_unpack(const struct gea_hdr *hdr, struct gea_record *b, int which)
 {
 
-    uint8_t *ptr = (uint8_t*)b->shared.s, *ptr_ori;
+    uint8_t *ptr = (uint8_t*)b->shared.s; //, *ptr_ori;
     struct gea_dec *d = &b->d;
     struct gea_coding_transcript *c = &b->c;
 

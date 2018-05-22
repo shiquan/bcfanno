@@ -1,5 +1,5 @@
 /*  
-    Copyright (C) 2016,2017  BGI Research
+    Copyright (C) 2016,2017,2018  BGI Research
 
     Author: Shi Quan (shiquan@genomics.cn)
 
@@ -49,7 +49,7 @@ int check_if_fullpath(char *file)
     char *path = strdup(file);
     char *dir = dirname(path);
     int ret = 1;
-    if ( dir == NULL || (dir[0] == '.' && dir[1] == '\0')) ret = 0;
+    if ( dir == NULL || dir[0] != '/') ret = 0;
     free(path);
     return ret;
 }
@@ -180,11 +180,6 @@ static int load_config_core(struct bcfanno_config *config, kson_t *json, char *d
 		if ( strcmp(node1->key, "gene_data") == 0 || strcmp(node1->key, "refgene") == 0) {
 		    refgene_config->genepred_fname = BRANCH_INIT(node1);
                     BRANCH(refgene_config->genepred_fname);
-                    /* if ( check_if_fullpath(refgene_config->genepred_fname) ){ */
-                    /*     char *new = generate_fullpath_file(refgene_config->genepred_fname, dir); */
-                    /*     free(refgene_config->genepred_fname); */
-                    /*     refgene_config->genepred_fname = new; */
-                    /* } */
                 }
 		else if ( strcmp(node1->key, "refseq") == 0 || strcmp(node1->key, "transcript") == 0 || strcmp(node1->key, "trans") == 0) {
 		    refgene_config->refseq_fname = BRANCH_INIT(node1);
@@ -377,27 +372,27 @@ int bcfanno_config_debug(struct bcfanno_config *config)
 
     if ( config->refgene.refgene_is_set == 1) {
 	struct refgene_config *refgene = &config->refgene;	
-	LOG_print("[refgene] GenePredext database: %s", refgene->genepred_fname);	
-        LOG_print("[refgene] columns : %s", refgene->columns);
+	LOG_print("[GEA] annotation database: %s", refgene->genepred_fname);	
+        LOG_print("[GEA] columns : %s", refgene->columns);
 	if ( refgene->refseq_fname )
-	    LOG_print("[refgene] transcript fasta : %s", refgene->refseq_fname);
+	    LOG_print("[GEA] transcript fasta : %s", refgene->refseq_fname);
 	if ( refgene->trans_list_fname )
-	    LOG_print("[refgene] trans_list : %s", refgene->trans_list_fname);
-	if ( refgene->gene_list_fname )
-	    LOG_print("[refgene] gene_list : %s", refgene->gene_list_fname);	
+	    LOG_print("[GEA] trans_list : %s", refgene->trans_list_fname);
+	//if ( refgene->gene_list_fname )
+        // LOG_print("[GEA] gene_list : %s", refgene->gene_list_fname);	
     }
     
     for ( i = 0; i < config->vcf.n_vcf; ++i ) {
-	LOG_print("[vcf] %d", i);
-	LOG_print("[vcf] file : %s", config->vcf.files[i].fname);
-	LOG_print("[vcf] columns : %s", config->vcf.files[i].columns);	    
+	LOG_print("[VCF] %d", i);
+	LOG_print("[VCF] file : %s", config->vcf.files[i].fname);
+	LOG_print("[VCF] columns : %s", config->vcf.files[i].columns);	    
     }
     
     for ( i = 0; i < config->bed.n_bed; ++i ) {	
-	LOG_print("[bed] %d", i);
-	LOG_print("[bed] file : %s", config->bed.files[i].fname);
+	LOG_print("[BED] %d", i);
+	LOG_print("[BED] file : %s", config->bed.files[i].fname);
 	if (config->bed.files[i].columns != NULL)
-	    LOG_print("[bed] columns : %s", config->bed.files[i].columns);	    
+	    LOG_print("[BED] columns : %s", config->bed.files[i].columns);	    
     }
     return 0;
 }
