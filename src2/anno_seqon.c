@@ -1965,7 +1965,8 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
         }        
         else {
             if ( inf->alt == NULL ) { // deletion
-                ksprintf(str, "del%s",ref);
+                // ksprintf(str, "del%s",ref);
+                ksprintf(str, "del");
             }
             else { // del-ins
                 ksprintf(str, "delins%s", alt);
@@ -1976,7 +1977,7 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
         if ( ref == NULL ) {
             error("For developer: bad range for insertion. %s:%d", mc->chr, mc->start);
         }
-        else if ( alt == NULL ) ksprintf(str, "del%s",ref); //`kputs("del", str);
+        else if ( alt == NULL ) kputs("del", str); //ksprintf(str, "del%s",ref);
         else {
             if ( strlen(alt) == 1 && strlen(ref) == 1 ) ksprintf(str, "%s>%s", ref, alt);
             else ksprintf(str, "del%sins%s", ref, alt);

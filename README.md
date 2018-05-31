@@ -33,11 +33,10 @@ Run bcfanno with toy data :
 ## Select annotations from result
 **vcf2tsv** is an additional program in bcfanno package, use to convert VCF/BCF file to user-friendly tab-seperated-variants file.
 ```
-./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f CHROM,POS,CytoBand,REF,ALT,GT,SAMPLE,RS,VarType,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid
+./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f CHROM,POS,CytoBand,REF,ALT,GT,SAMPLE,RS,MolecularConsequence,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid
 
 ## Another usage
-./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f BED,CytoBand,TGT,SAMPLE,RS,VarType,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid
-
+./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f BED,CytoBand,TGT,SAMPLE,RS,MolecularConsequence,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid
 ```
 
 ## (Optional) View annotations with Microsoft excel
@@ -54,7 +53,11 @@ Beside the core program ***bcfanno***, belowed programs will also be generated i
 * [***tsv2vcf***]() ,  generate VCF databases from tab-seperated file
 * [***vcf2tsv***](), convert VCF file to tab-separated file with selected tags
 * [***vcf_rename_tags***](), rename tags or contig names in the VCF file, usually used to format the databases
-* [***GenePredExtGen***]() Generate genepredext format with genome annotation and reference databases.
+* ~~[***GenePredExtGen***]() Generate genepredext format with genome annotation and reference databases.~~
+
+
+## Download databases from server
+I have built some commonly used annotations on BGI's server (http://public.genomics.org.cn/bcfanno/databases/hg19/). 
 
 
 ## Bug report or suggestions
@@ -66,7 +69,7 @@ Kindly report bugs and suggestions through github or
 
 
 ## LICENSE
-The full package of bcfanno is distributed by MIT/Expat License, copyright 2016-2018 BGI Research.
+The full package of bcfanno is distributed by MIT License, copyright 2016-2018 BGI Research.
 
 Belowed package or source code used in bcfanno copyrighted by other institution.
 - [htslib1.6](www.htslib.org)  The MIT/Expat License, Copyright (C) 2012-2014 Genome Research Ltd.
