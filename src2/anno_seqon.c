@@ -290,7 +290,16 @@ static int retrieve_gea_records_from_region(struct mc_handler *h, int id, int st
     while ( tbx_itr_next(h->fp_idx, h->idx, itr, &string) >= 0 ) {
         struct gea_record *r = gea_init();
         if ( gea_parse(&string, h->hdr, r) ) continue;
-        
+        const char *type = h->hdr->id[GEA_DT_BIOTYPE][r->biotype].key;
+        if ( h->name_hash) {
+            if (strcmp(type, "mRNA") == 0 || strcmp(type, "ncRNA") == 0 ) {
+                if (!name_hash_key_exists(h->name_hash, r->name)) continue;
+            }
+            else if ( strcmp(type, "gene") == 0 ) {
+                if (!name_hash_key_exists(h->name_hash, r->geneName)) continue;
+            }
+        }
+              
         gea_unpack(h->hdr, r, GEA_UN_TRANS|GEA_UN_CIGAR);
         if ( r->chromEnd > *tail_edge ) *tail_edge = r->chromEnd;
         
@@ -333,6 +342,8 @@ int mc_handler_fill_buffer_chunk(struct mc_handler *h, char* name, int start, in
     struct list_buffer *header = NULL, *tail = NULL;
     int tail_edge;
     l = retrieve_gea_records_from_region(h, id, start, end, &header, &tail, &tail_edge);
+
+    // 2018-08-10, update filter name list    
     
     // if retrieved buffer did NOT cover the chunk, trying to find more upstream records, used to
     // annotate intergenic variants

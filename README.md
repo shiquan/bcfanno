@@ -42,7 +42,7 @@ Run bcfanno with toy data :
 ## (Optional) View annotations with Microsoft excel
 This step is optional, need to install my another program [tsv2excel](https://github.com/shiquan/tsv2excel) first.
 ```
-./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f BED,CytoBand,TGT,SAMPLE,RS,VarType,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid | tsv2excel -o toy.xlsx
+./bcfanno -c toy.json example/toy.vcf.gz -q | ./vcf2tsv -f BED,CytoBand,TGT,SAMPLE,RS,MolecularConsequence,Gene,HGVSnom,ExonIntron,AAlength,HGMD_disease,HGMD_tag,HGMD_pmid | tsv2excel -o toy.xlsx
 ```
 <img src="https://raw.githubusercontent.com/shiquan/bcfanno/master/Documentation/toy_anno.png" width="805" height="483" />
 
@@ -62,10 +62,7 @@ I have built some commonly used annotations on BGI's server (http://public.genom
 
 ## Bug report or suggestions
 
-Kindly report bugs and suggestions through github or
-
- [google groups](https://groups.google.com/forum/#!forum/bcfanno) [![Mailing List](http://www.google.com/images/icons/product/groups-32.png)](https://groups.google.com/forum/#!forum/bcfanno)
-
+Kindly report bugs and suggestions through github.
 
 
 ## LICENSE
@@ -82,4 +79,4 @@ We are trying to publish a paper to describe bcfanno, before that please cite ht
 
 ## Reference
 1. [HGVS nomenclature](http://varnomen.hgvs.org/)
-
+2. [VCF format](http://www.internationalgenome.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41/)

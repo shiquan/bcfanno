@@ -156,6 +156,12 @@ struct gea_hdr {
     int32_t n[GEA_DICT_ALL]; // n : the size of dict block in use
     int32_t m[GEA_DICT_ALL]; // m : allocated size of each dict block
     char *version; // version of gea format, prserved for further update
+
+    // cached id for fast access
+    int mrna_id;
+    int nrna_id;
+    int gene_id;
+    
     struct gea_id_pair *id[GEA_DICT_ALL];
     void *dict[GEA_DICT_ALL];
     char **samples;
