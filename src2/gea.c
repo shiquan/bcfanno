@@ -734,6 +734,11 @@ struct gea_hdr *gea_hdr_init(const char *mode)
     struct gea_hdr *h;
     h = (struct gea_hdr*)calloc(1, sizeof(*h));
     if (!h) return NULL;
+    
+    h->mrna_id = -1;
+    h->nrna_id = -1;
+    h->gene_id = -1;
+    
     for (i = 0; i < GEA_DICT_ALL; ++i)
         if ((h->dict[i] = kh_init(vdict)) == NULL) goto fail;
     if ( strchr(mode,'w') ) 
