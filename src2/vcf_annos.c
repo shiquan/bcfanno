@@ -1,5 +1,5 @@
-// This file include some APIs adapt from vcfannotate.c to update INFO/FORMAT.
-//
+// Please note this code is from BCFtools
+// All credit for this code goes to BCFtools's authors.
 // Original copyright,
 // Copyright (C) 2013-2016 Genome Research Ltd.
 // Author : Petr Danecek <pd3@sanger.ac.uk>

@@ -880,6 +880,7 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
             trim_amino_acid_ends(&lori_aa, ori_aa, &lmut_aa, mut_aa, &head, &tail, 1);
             type->loc_amino += head;
             type->loc_end_amino = type->loc_amino + l;
+            type->ori_amino = ori_aa[0];
             type->ori_end_amino =ori_aa[l];
             type->n = 0;
         }
