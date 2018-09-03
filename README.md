@@ -57,8 +57,11 @@ Beside the core program ***bcfanno***, belowed programs will also be generated i
 
 
 ## Download databases from server
-I have built some commonly used annotations on BGI's server (http://public.genomics.org.cn/bcfanno/databases/hg19/). 
+Please download the GEA databases from
+* http://public.genomics.org.cn/bcfanno/databases/
+* [mirror] https://pan.genomics.cn/ucdisk/s/UbeeIb
 
+** A lot of databases could be download from different institute freely, we are not plan to redistribute these datasets (And of course, some license also require us not to do that). But if you have the database problem with bcfanno, please feel free to give me an email so that we can give you possible assistance. **
 
 ## Bug report or suggestions
 
