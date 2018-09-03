@@ -252,7 +252,7 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
     }
     if ( sum > 0 ) {
         for ( i = 0; i < l->n_allele; ++i ) f[i] = (float)d[i]/sum;
-        bcf_update_format_int32(CAA->bcf_hdr, l, "PeakAF", f, l->n_allele);
+        bcf_update_format_float(CAA->bcf_hdr, l, "PeakAF", f, l->n_allele);
     }
     // printf("%s\t%d\t%s\t%s\t%d\t%d\n", CAA->bcf_hdr->id[BCF_DT_CTG][l->rid].key, l->pos+1, l->d.allele[0],
     // l->n_allele > 1? l->d.allele[1] : ".", d[0], l->n_allele>1? d[1] : 0);
