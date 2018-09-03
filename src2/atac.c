@@ -231,6 +231,8 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
     // chr pos ref alt ref_depth alt_depth
     bcf_unpack(l, BCF_UN_ALL);
     uint32_t *d = calloc(l->n_allele, sizeof(*d));
+    float *f = calloc(l->n_allele, sizeof(*f));
+    uint32_t sum = 0;
     for ( i = 0; i < CAA->n_plp; i++ ) {
         const bam_pileup1_t *p = plp+i;
         if ( !p->is_del ) {
@@ -240,13 +242,17 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
             //debug_print("%d\t%d\t%c",p->b->core.pos,p->qpos,c);
             int j;
             for ( j = 0; j < l->n_allele; ++j ) {
-                if ( c== *l->d.allele[j] ) { d[j]++; break; }
+                if ( c== *l->d.allele[j] ) { d[j]++; sum++; break; }               
             }
         }
         else {
 
             // for indels
         }
+    }
+    if ( sum > 0 ) {
+        for ( i = 0; i < l->n_allele; ++i ) f[i] = (float)d[i]/sum;
+        bcf_update_format_int32(CAA->bcf_hdr, l, "PeakAF", f, l->n_allele);
     }
     // printf("%s\t%d\t%s\t%s\t%d\t%d\n", CAA->bcf_hdr->id[BCF_DT_CTG][l->rid].key, l->pos+1, l->d.allele[0],
     // l->n_allele > 1? l->d.allele[1] : ".", d[0], l->n_allele>1? d[1] : 0);
@@ -383,6 +389,7 @@ int parse_args(int argc, char **argv)
     } while(0)
 
     BRANCH("PeakAC", "##FORMAT=<ID=PeakAC,Number=R,Type=Integer,Description=\"Counts in peak region respect to each allele.\">");
+    BRANCH("PeakAF", "##FORMAT=<ID=PeakAF,Number=R,Type=Float,Description=\"Count frequency in peak region respect to each allele.\">");
 #undef BRANCH
 
     bcf_hdr_write(args.fp_out, args.bcf_hdr);
