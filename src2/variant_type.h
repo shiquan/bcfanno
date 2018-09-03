@@ -87,10 +87,25 @@ const static char *codon_names[] = {
 const static char *codon_short_names[] = { "*", "F", "L", "S", "Y", "C", "W", "P", "H", "Q", "R", "I", "M", "T", "N", "K", "V", "A", "D", "E", "G", };
 
 const static int codon_matrix[4][4][4] = {
-    { { C4_Lys, C4_Asn, C4_Lys, C4_Asn, }, { C4_Thr, C4_Thr, C4_Thr, C4_Thr, }, { C4_Arg, C4_Ser, C4_Arg, C4_Ser, }, { C4_Ile, C4_Ile, C4_Met, C4_Ile, }, },
-    { { C4_Gln, C4_His, C4_Gln, C4_His, }, { C4_Pro, C4_Pro, C4_Pro, C4_Pro, }, { C4_Arg, C4_Arg, C4_Arg, C4_Arg, }, { C4_Leu, C4_Leu, C4_Leu, C4_Leu, }, },
-    { { C4_Glu, C4_Asp, C4_Glu, C4_Asp, }, { C4_Ala, C4_Ala, C4_Ala, C4_Ala, }, { C4_Gly, C4_Gly, C4_Gly, C4_Gly, }, { C4_Val, C4_Val, C4_Val, C4_Val, }, },
-    { { C4_Stop, C4_Tyr, C4_Stop, C4_Tyr, }, { C4_Ser, C4_Ser, C4_Ser, C4_Ser, }, { C4_Stop, C4_Cys, C4_Trp, C4_Cys, }, { C4_Leu, C4_Phe, C4_Leu, C4_Phe, }, },
+    { { C4_Lys, C4_Asn, C4_Lys, C4_Asn, },
+      { C4_Thr, C4_Thr, C4_Thr, C4_Thr, },
+      { C4_Arg, C4_Ser, C4_Arg, C4_Ser, },
+      { C4_Ile, C4_Ile, C4_Met, C4_Ile, }, },
+    
+    { { C4_Gln, C4_His, C4_Gln, C4_His, },
+      { C4_Pro, C4_Pro, C4_Pro, C4_Pro, },
+      { C4_Arg, C4_Arg, C4_Arg, C4_Arg, },
+      { C4_Leu, C4_Leu, C4_Leu, C4_Leu, }, },
+    
+    { { C4_Glu, C4_Asp, C4_Glu, C4_Asp, },
+      { C4_Ala, C4_Ala, C4_Ala, C4_Ala, },
+      { C4_Gly, C4_Gly, C4_Gly, C4_Gly, },
+      { C4_Val, C4_Val, C4_Val, C4_Val, }, },
+    
+    { { C4_Stop, C4_Tyr, C4_Stop, C4_Tyr, },
+      { C4_Ser, C4_Ser, C4_Ser, C4_Ser, },
+      { C4_Stop, C4_Cys, C4_Trp, C4_Cys, },
+      { C4_Leu, C4_Phe, C4_Leu, C4_Phe, }, },
 };
 
 // DNA level
@@ -185,6 +200,11 @@ static inline int check_is_stop(char *codon)
 {
     return codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])] == C4_Stop;
 }
+
+
+
+// Mitochondra::
+// Unlike the universal code, UGA codes for tryptophan instead of termination and AUA codes for methionine instead of isoleucine
 
 
 #endif
