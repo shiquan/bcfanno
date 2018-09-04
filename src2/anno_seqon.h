@@ -194,6 +194,8 @@ struct mc_core {
 struct mc {
     // point to chrom of VCF header, do NOT free it
     const char *chr;
+    // check if it is mitochondrial genes, mito gene use a different genetic code map
+    int is_mito;
     int start;
     int end;
     char *ref;

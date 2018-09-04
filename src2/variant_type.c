@@ -30,7 +30,7 @@
 
 // Return the location of terminal codon on the sequence.
 // Return -1 if no found.
-int check_stop_codon(char *seq, char *p_end )
+int check_stop_codon(char *seq, char *p_end, int mito)
 {
     char *ss = seq;
     char *se = p_end;
@@ -42,7 +42,7 @@ int check_stop_codon(char *seq, char *p_end )
     l /= 3;
     
     for ( i = 0; i < l;  ++i) {
-        if ( codon2aminoid(ss) == C4_Stop ) {
+        if ( codon2aminoid(ss,mito) == C4_Stop ) {
             return i+1;
         }
         ss += 3;
@@ -116,9 +116,12 @@ int same_DNA_seqs(const char *a, const char *b, int l )
 }
 
 // no check the codon length for fast read
-int codon2aminoid(char *codon)
+int codon2aminoid(char *codon, int mito)
 {
-    return codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])];
+    if (mito == 0)
+        return codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])];
+    else
+        return mitomap_codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])];
 }
 
 char *rev_seqs(const char *dna_seqs, unsigned long n)

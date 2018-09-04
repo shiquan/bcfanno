@@ -49,11 +49,11 @@
 typedef char * (*func_dup_seq)(const char *, unsigned long );
 
 extern char *rev_seqs(const char *dna_seqs, unsigned long n);
-extern int check_stop_codon(char *seq, char *p_end);
+extern int check_stop_codon(char *seq, char *p_end, int mito);
 extern void compl_seq(char *seq, int l);
 extern int seq2code4(int seq);
 extern int same_DNA_seqs(const char *a, const char *b, int l );
-extern int codon2aminoid(char *codon);
+extern int codon2aminoid(char *codon,int mito);
 extern char *rev_seqs(const char *dna_seqs, unsigned long n);
 
 #define X_CODO   0
@@ -107,6 +107,35 @@ const static int codon_matrix[4][4][4] = {
       { C4_Stop, C4_Cys, C4_Trp, C4_Cys, },
       { C4_Leu, C4_Phe, C4_Leu, C4_Phe, }, },
 };
+
+/*
+  https://www.mitomap.org/foswiki/bin/view/MITOMAP/HumanMitoCode
+
+  For human mitochondrial genes, unlike the universal code, UGA codes for tryptophan instead of termination and AUA codes for methionine instead of isoleucine.
+ */
+
+const static int mitomap_codon_matrix[4][4][4] = {
+    { { C4_Lys, C4_Asn, C4_Lys, C4_Asn, },
+      { C4_Thr, C4_Thr, C4_Thr, C4_Thr, },
+      { C4_Arg, C4_Ser, C4_Arg, C4_Ser, },
+      { C4_Met, C4_Ile, C4_Met, C4_Ile, }, },
+    
+    { { C4_Gln, C4_His, C4_Gln, C4_His, },
+      { C4_Pro, C4_Pro, C4_Pro, C4_Pro, },
+      { C4_Arg, C4_Arg, C4_Arg, C4_Arg, },
+      { C4_Leu, C4_Leu, C4_Leu, C4_Leu, }, },
+    
+    { { C4_Glu, C4_Asp, C4_Glu, C4_Asp, },
+      { C4_Ala, C4_Ala, C4_Ala, C4_Ala, },
+      { C4_Gly, C4_Gly, C4_Gly, C4_Gly, },
+      { C4_Val, C4_Val, C4_Val, C4_Val, }, },
+    
+    { { C4_Stop, C4_Tyr, C4_Stop, C4_Tyr, },
+      { C4_Ser, C4_Ser, C4_Ser, C4_Ser, },
+      { C4_Trp, C4_Cys, C4_Trp, C4_Cys, },
+      { C4_Leu, C4_Phe, C4_Leu, C4_Phe, }, },
+};
+
 
 // DNA level
 enum variant_type {
@@ -196,15 +225,12 @@ static inline const char *var_type_splice_string(enum var_type_splice type)
 }
 
 // 1 on yes, 0 on no
-static inline int check_is_stop(char *codon)
+static inline int check_is_stop(char *codon, int mito)
 {
-    return codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])] == C4_Stop;
+    if ( mito == 0 ) 
+        return codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])] == C4_Stop;
+    else
+        return mitomap_codon_matrix[seq2code4(codon[0])][seq2code4(codon[1])][seq2code4(codon[2])] == C4_Stop;
 }
-
-
-
-// Mitochondra::
-// Unlike the universal code, UGA codes for tryptophan instead of termination and AUA codes for methionine instead of isoleucine
-
 
 #endif

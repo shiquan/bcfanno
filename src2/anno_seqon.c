@@ -25,7 +25,7 @@ struct MolecularConsequenceTerms {
 };
 
 const struct MolecularConsequenceTerms MCT[] = {
-    { NULL, NULL,},
+    { "unknown", "Unknown",},
     // intergenic variants
     { "intergenic_1KB_variant",                     "Intergenic", },   
     { "upstream_1K_of_gene",                        "Upstream1K", },
@@ -158,6 +158,13 @@ void mc_handler_destroy(struct mc_handler *h, int l)
     free(h);
 }
 
+static int check_mitochondrial_chrom(const char *chrom)
+{
+    const char *mito = getenv("BCFANNO_MITOCHR");
+    if ( mito == NULL ) 
+        error("Failed to get mitochondrail chrom from ENVIR");
+    return strcmp(chrom, mito) == 0;
+}
 /*
   Init variant.
 */
@@ -169,6 +176,8 @@ struct mc *mc_init(const char *chrom, int start, int end, char *ref, char *alt)
     h->chr = chrom;
     h->start = start;
     h->end   = end;
+    h->is_mito = check_mitochondrial_chrom(chrom);
+    
     // if not consider alleles, only convert locations
     if ( ref == NULL && alt == NULL ) return h;
     // trim capped and tails
@@ -614,7 +623,7 @@ static int predict_molecular_consequence_snp(struct mc *mc, struct mc_type *type
     inf->loc = inf->pos - c->utr5_length;
     type->loc_amino = (inf->loc+2)/3;
     // if ( lref == lalt && lref == 1 ) {
-    type->ori_amino = codon2aminoid(ori);
+    type->ori_amino = codon2aminoid(ori,mc->is_mito);
 
     // no-call
     if ( ori[cod] == *alt ) {
@@ -627,8 +636,8 @@ static int predict_molecular_consequence_snp(struct mc *mc, struct mc_type *type
     else if ( ori[cod] != *ref) warnings("Inconsistance nucletide between refenence and transcript: %s,%d,%s,%d,%c,%c ", mc->chr, mc->start, v->name, inf->pos, ori[cod], *ref);
     
     // normal case
-    type->ori_amino = codon2aminoid(ori);
-    type->mut_amino = codon2aminoid(mut);
+    type->ori_amino = codon2aminoid(ori,mc->is_mito);
+    type->mut_amino = codon2aminoid(mut,mc->is_mito);
 
     if ( type->ori_amino == type->mut_amino) {
         type->con1 = mc_synonymous;
@@ -675,14 +684,14 @@ static int trim_amino_acid_ends(int *lori_aa, int *ori_aa, int *lmut_aa, int *mu
     }
     return *head+*tail;
 }
-static int *convert_bases_to_amino_acid(int l, char *s, int *l_aa)
+static int *convert_bases_to_amino_acid(int l, char *s, int *l_aa,int mito)
 {
     int i;
     *l_aa = 0;
     if (l<3) return NULL;
     int *aa = (int*)calloc(l/3,sizeof(int));
     for (i=0; i<l/3; i++) {
-        aa[i] = codon2aminoid(s+i*3);
+        aa[i] = codon2aminoid(s+i*3,mito);
         if ( aa[i] == C4_Stop ) {
             i++; // put stop codon at the end
             break;
@@ -800,7 +809,7 @@ static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, str
                 kstring_t str = {0,0,0};
                 kputs(*mut, &str);
                 kputs(seq, &str);
-                type->mut_amino = codon2aminoid(str.s);
+                type->mut_amino = codon2aminoid(str.s,mc->is_mito);
                 free(str.s);
             }
             
@@ -836,8 +845,8 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
 
-    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa);
-    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa);
+    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito);
+    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito);
 
     if ( lori_aa == 0 ) return 0;
     
@@ -947,8 +956,8 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
 
-    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa);
-    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa);
+    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito);
+    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito);
 
     //assert(lori_aa >0);
     if ( lori_aa == 0 ) return 0;
@@ -1026,8 +1035,8 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
 
-    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa);
-    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa);
+    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito);
+    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito);
 
     if ( lori_aa == 0 ) {
         return 0;
@@ -1195,6 +1204,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     // ori_seq is a temp sequence, will be free before level this function.
 
     *ori = faidx_fetch_seq(h->rna_fai, name, start, start + 10000, lori);
+    
     if ( *ori == NULL || *lori == 0 ) return -1;
     
     // Sometime trancated transcript records will disturb downstream analysis.

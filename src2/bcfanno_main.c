@@ -13,8 +13,8 @@
 #include "anno_flank.h"
 
 // for genepredext format, this format has been instead by GenomeElementAnnotation file.
-#include "genepred.h"
-#include "anno_hgvs.h"
+//#include "genepred.h"
+//#include "anno_hgvs.h"
 
 // for GenomeElementAnnotation file
 #include "anno_seqon.h"
@@ -32,7 +32,7 @@ struct anno_index {
     int n_vcf;
     struct anno_vcf_file **vcf_files;
     // hgvs handler. for genepredext file, will be instead by genome element annotation file
-    struct anno_hgvs_file *hgvs;
+    // struct anno_hgvs_file *hgvs;
     // struct to access GenomeElementAnnotation file.
     struct anno_mc_file *mc_file;
     // flank sequence
@@ -63,6 +63,7 @@ int usage()
     fprintf(stderr, "   -t, --thread                   thread\n");
     fprintf(stderr, "   --unsort                       set if input is not sorted by cooridinate, **bad performance**\n");
     fprintf(stderr, "   --flank                        if set this flag and reference genome specified in configure, FLKSEQ tag will be generated\n");
+    fprintf(stderr, "   --mito                         set the mitochodrial sequence name, default is chrMT. Human mito use a different genetic code map!");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/bcfanno\n");
     fprintf(stderr, "\n");
@@ -165,7 +166,7 @@ struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config
     }
     else idx->n_vcf = 0;
 
-    idx->hgvs = NULL;
+    // idx->hgvs = NULL;
     idx->mc_file = NULL;
     
     if ( refgene_config->genepred_fname && refgene_config->refseq_fname ) {
@@ -174,7 +175,8 @@ struct anno_index *anno_index_init(bcf_hdr_t *hdr, struct bcfanno_config *config
             annotation_file_is_gea_format = 1;
         }
         else {
-            idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path, refgene_config->gene_list_fname, refgene_config->trans_list_fname);
+            // idx->hgvs = anno_hgvs_file_init(hdr, refgene_config->columns, refgene_config->genepred_fname, refgene_config->refseq_fname, config->reference_path, refgene_config->gene_list_fname, refgene_config->trans_list_fname);
+            error("BCFANNO now use Genome Element Annotation database to predict gene and variant types. \nPlease download the updated databses from github.com/shiquan/bcfanno.");
         }
     }
     
@@ -202,7 +204,7 @@ struct anno_index *anno_index_duplicate(struct anno_index *idx)
     d->bed_files = malloc(d->n_bed*sizeof(void*));
     for ( i = 0; i < d->n_vcf; ++i ) d->vcf_files[i] = anno_vcf_file_duplicate(idx->vcf_files[i]);
     for ( i = 0; i < d->n_bed; ++i ) d->bed_files[i] = anno_bed_file_duplicate(idx->bed_files[i]);
-    if ( idx->hgvs ) d->hgvs = anno_hgvs_file_duplicate(idx->hgvs);
+    // if ( idx->hgvs ) d->hgvs = anno_hgvs_file_duplicate(idx->hgvs);
     if ( idx->mc_file ) d->mc_file = anno_mc_file_duplicate(idx->mc_file);
     if ( idx->seqidx ) d->seqidx = sequence_index_duplicate(idx->seqidx);
     return d;
@@ -215,7 +217,7 @@ void anno_index_destroy(struct anno_index *idx, int l)
     for ( i = 0; i < idx->n_bed; ++i ) anno_bed_file_destroy(idx->bed_files[i]);
     if ( idx->vcf_files ) free(idx->vcf_files);
     if ( idx->bed_files ) free(idx->bed_files);
-    if ( idx->hgvs ) anno_hgvs_file_destroy(idx->hgvs);
+    // if ( idx->hgvs ) anno_hgvs_file_destroy(idx->hgvs);
     if ( idx->mc_file) anno_mc_file_destroy(idx->mc_file, l);
     if ( idx->seqidx ) sequence_index_destroy(idx->seqidx);
     free(idx);
@@ -234,6 +236,7 @@ int parse_args(int argc, char **argv)
     const char *output_fname_type = 0;
     const char *thread = 0;
     const char *record = 0;
+    const char *mito = 0;
     for (i = 1; i < argc; ) {
 	const char *a = argv[i++];
 	if ( strcmp(a, "-h") == 0 || strcmp(a, "--help") == 0)
@@ -257,6 +260,7 @@ int parse_args(int argc, char **argv)
             args.flank_seq_is_need = 1;
             continue;
         }
+            
         const char **var = 0;
 	if ( strcmp(a, "-c") == 0 || strcmp(a, "--config") == 0 ) 
 	    var = &args.fname_json;
@@ -268,6 +272,8 @@ int parse_args(int argc, char **argv)
             var = &thread;
         else if ( strcmp(a, "-r") == 0 || strcmp(a, "-record") == 0 )
             var = &record;
+        else if ( strcmp(a, "--mito") == 0 )
+            var = &mito;
         
 	if ( var != 0 ) {
 	    if (i == argc) error("Missing an argument after %s", a);
@@ -351,10 +357,10 @@ int parse_args(int argc, char **argv)
     // init output file handler
     args.fp_out = args.fname_output == 0 ? hts_open("-", hts_bcf_wmode(out_type)) : hts_open(args.fname_output, hts_bcf_wmode(out_type));
 
-    if ( annotation_file_is_gea_format == 0 ) { // assume it is genepredext format
+//    if ( annotation_file_is_gea_format == 0 ) { // assume it is genepredext format
         // set genepredExt format
-        set_format_genepredext();
-    }
+        // set_format_genepredext();
+    //  }
     
     // read bcf header from input bcf/vcf
     args.hdr = bcf_hdr_read(args.fp_input);
@@ -362,6 +368,17 @@ int parse_args(int argc, char **argv)
 	error("Failed to parse header of input.");
 
 
+    // set Mito environment
+    if ( mito == NULL ) 
+        setenv("BCFANNO_MITOCHR", "chrMT", 1);
+    else 
+        setenv("BCFANNO_MITOCHR", mito, 1);
+
+    if ( quiet_mode == 0 ) {
+        const char *mito_par =  getenv("BCFANNO_MITOCHR");
+        LOG_print("Set environment parameter BCFANNO_MITOCHR to %s", mito_par);
+    }
+        
     /******************
          INIT indexs   
      ******************/
@@ -415,8 +432,8 @@ void *anno_core(void *arg, int idx)
             if ( bcf_get_variant_types(line) == VCF_REF )
                 continue;
 
-            if ( index->hgvs ) 
-                anno_hgvs_core(index->hgvs, index->hdr_out, line);
+            // if ( index->hgvs ) 
+            // anno_hgvs_core(index->hgvs, index->hdr_out, line);
 
             // if ( index->mc_file ) do not support unsorted input
 
@@ -436,9 +453,9 @@ void *anno_core(void *arg, int idx)
             if ( pool->n_chunk == pool->n_reader ) break;
             update_chunk_region(pool);
             
-            if ( index->hgvs )
-                anno_hgvs_chunk(index->hgvs, index->hdr_out, pool);
-            else if ( index->mc_file )
+            //if ( index->hgvs )
+            // anno_hgvs_chunk(index->hgvs, index->hdr_out, pool);
+            if ( index->mc_file )
                 anno_mc_chunk(index->mc_file, index->hdr_out, pool);
             
             for ( i = 0; i < index->n_vcf; ++i )
@@ -467,8 +484,8 @@ int annotate_light()
             if ( line->rid == -1 ) goto output_line;
             if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
 
-            if ( idx->hgvs )
-                anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
+            //if ( idx->hgvs )
+            //  anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
             
             for ( j = 0; j < idx->n_vcf; ++j )
                 anno_vcf_core(idx->vcf_files[j], idx->hdr_out, line);
@@ -491,9 +508,9 @@ int annotate_light()
                 if ( pool->n_chunk == pool->n_reader ) break;
                 update_chunk_region(pool);
 
-                if ( idx->hgvs )
-                    anno_hgvs_chunk(idx->hgvs, idx->hdr_out, pool);
-                else if ( idx->mc_file )
+                //  if ( idx->hgvs )
+                //  anno_hgvs_chunk(idx->hgvs, idx->hdr_out, pool);
+                if ( idx->mc_file )
                     anno_mc_chunk(idx->mc_file, idx->hdr_out, pool);
                 
                 for ( i = 0; i < idx->n_vcf; ++i )
@@ -569,6 +586,7 @@ int annotate()
 
     return 0;
 }
+
 #include <time.h>
 
 int main(int argc, char **argv)
