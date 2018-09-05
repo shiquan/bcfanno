@@ -63,7 +63,7 @@ int usage()
     fprintf(stderr, "   -t, --thread                   thread\n");
     fprintf(stderr, "   --unsort                       set if input is not sorted by cooridinate, **bad performance**\n");
     fprintf(stderr, "   --flank                        if set this flag and reference genome specified in configure, FLKSEQ tag will be generated\n");
-    fprintf(stderr, "   --mito                         set the mitochodrial sequence name, default is chrMT. Human mito use a different genetic code map!");
+    fprintf(stderr, "   --mito                         set the mitochodrial sequence name, default is chrM. Human mito use a different genetic code map!\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Homepage: https://github.com/shiquan/bcfanno\n");
     fprintf(stderr, "\n");
@@ -370,7 +370,7 @@ int parse_args(int argc, char **argv)
 
     // set Mito environment
     if ( mito == NULL ) 
-        setenv("BCFANNO_MITOCHR", "chrMT", 1);
+        setenv("BCFANNO_MITOCHR", "chrM", 1);
     else 
         setenv("BCFANNO_MITOCHR", mito, 1);
 
