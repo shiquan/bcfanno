@@ -55,6 +55,9 @@ Beside the core program ***bcfanno***, belowed programs will also be generated i
 * [***vcf_rename_tags***](), rename tags or contig names in the VCF file, usually used to format the databases
 * ~~[***GenePredExtGen***]() Generate genepredext format with genome annotation and reference databases.~~
 
+## Notice
+* I recommend using UCSC released genomes so that you can easily analysis your data later with the UCSC Genome Browser and datasets. Please notice that chr1 != Chr1 != 1. It may not easy for user to generate annotation database manually, I have built GEA databases of hg19 and GRCh38. Please find them at below section.
+
 
 ## Download databases from server
 Please download the GEA databases from
@@ -64,7 +67,7 @@ Please download the GEA databases from
 ** A lot of databases could be download from different institute freely, we are not plan to redistribute these datasets (And of course, some license also require us not to do that). But if you have the database problem with bcfanno, please feel free to give me an email so that we can give you possible assistance. **
 
 ## Update
-- 2018/09/07 Update mitochondria records in GEA database, and update genetic codon map for mitochondria. --mito parameter is also added.
+- 2018/09/07, Update mitochondria records in GEA database, and update genetic codon map for mitochondria. --mito parameter is also added.
 
 ## Bug report or suggestions
 
