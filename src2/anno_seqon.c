@@ -1433,7 +1433,9 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     /* else inf->aa_length = 0;       */
 
     // no matter whole gene/exome deletion, interupt as exon_loss
-    if ( whole_gene_deletion_state_update(n, v) ) { type->con1 = mc_exon_loss; return 0; }    
+    // Update: try to generate HGVS names for exon loss...
+    if ( whole_gene_deletion_state_update(n, v) )  type->con1 = mc_exon_loss;
+    //{ type->con1 = mc_exon_loss; return 0; }    
     
     int is_coding = 0;
     if ( strcmp(bt, "mRNA") == 0 ) is_coding = 1;
@@ -2146,7 +2148,56 @@ static void generate_hgvsnom_string_NoCall(struct mc *mc, struct mc_type *type, 
         kputc('=', str);
     }
 }
+static void generate_hgvsnom_string_exonLoss(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+{
+    if ( type->func1 == func_region_noncoding_exon || type->func1 == func_region_noncoding_intron) {
+        ksprintf(str, "%s:n.%d", inf->transcript, inf->loc);
+        if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
+        else if (inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
+    }    
+    else if ( type->func1 == func_region_cds || type->func1 == func_region_intron) {
+        ksprintf(str, "%s:c.%d", inf->transcript, inf->loc);
+        if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
+        else if (inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
+    }
+    else if ( type->func1 == func_region_utr5_exon || type->func1 == func_region_utr5_intron ) {
+        ksprintf(str, "%s:c.-%d", inf->transcript, inf->loc);
+        if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
+        else if (inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
+    }
+    else if ( type->func1 == func_region_utr3_exon || type->func1 == func_region_utr3_intron ) {
+        ksprintf(str, "%s:c.*%d", inf->transcript, inf->loc);
+        if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
+        else if (inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
+    }
+    else {
+        generate_hgvsnom_string_empty(str);
+        return; // do not generate any nomenclature
+    }
 
+    kputc('_',str);
+    
+    if ( type->func2 == func_region_noncoding_exon || type->func2 == func_region_noncoding_intron ||
+         type->func2 == func_region_cds || type->func2 == func_region_intron ){ 
+        ksprintf(str, "%d", inf->end_loc);
+        if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
+        else if (inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);        
+    }
+    else if ( type->func2 == func_region_utr5_exon || type->func2 == func_region_utr5_intron) {
+        ksprintf(str, "-%d", inf->end_loc);
+        if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
+        else if (inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);        
+    }
+    else if ( type->func1 == func_region_utr3_exon || type->func1 == func_region_utr3_intron ) {
+        ksprintf(str, "*%d", inf->end_loc);
+        if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
+        else if (inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
+    }
+    else {
+        kputc('?', str);
+    }
+    kputs("del", str);
+}
 static char *generate_hgvsnom_string(struct mc *h)
 {
     if ( h->n_tran == 0 ) return NULL;
@@ -2174,11 +2225,11 @@ static char *generate_hgvsnom_string(struct mc *h)
             case mc_tfbs_ablation: //
             case mc_tfbs_variant:
             case mc_intragenic:
-            case mc_exon_loss:
             case mc_whole_gene:
                 generate_hgvsnom_string_empty(&str);
                 break;
 
+            
             case mc_noncoding_splice_region:
             case mc_noncoding_exon:
                 generate_hgvsnom_string_NoncodingExon(h, type, inf, &str);
@@ -2194,12 +2245,15 @@ static char *generate_hgvsnom_string(struct mc *h)
                 generate_hgvsnom_string_intron(h, type, inf, &str);
                 break;
 
-
             case mc_utr5_exon:
             case mc_utr3_exon:
                 generate_hgvsnom_string_UtrExon(h, type, inf, &str);
                 break;
 
+            case mc_exon_loss:
+                generate_hgvsnom_string_exonLoss(h, type, inf, &str);
+                break;
+                
             case mc_stop_gained:
             case mc_frameshift_truncate:
             case mc_frameshift_elongation:

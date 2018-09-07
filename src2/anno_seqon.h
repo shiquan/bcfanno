@@ -153,7 +153,6 @@ struct mc_inf {
     // int version;
     // gene name
     char *gene;
-    
     // Amino acid length, for noncoding transcript should always be 0.
     int aa_length;    
     
