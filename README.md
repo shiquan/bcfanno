@@ -63,6 +63,9 @@ Please download the GEA databases from
 
 ** A lot of databases could be download from different institute freely, we are not plan to redistribute these datasets (And of course, some license also require us not to do that). But if you have the database problem with bcfanno, please feel free to give me an email so that we can give you possible assistance. **
 
+## Update
+- 2018/09/07 Update mitochondria records in GEA database, and update genetic codon map for mitochondria. --mito parameter is also added.
+
 ## Bug report or suggestions
 
 Kindly report bugs and suggestions through github.

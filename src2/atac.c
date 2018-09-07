@@ -1,8 +1,10 @@
-// This atac.c was designed to detect imbalance allele in chromatin accessible regions.
-// Transcription factors bind the open chromatin region and furture influence the histone
-// states and gene regulation (McVicker et al. Science 2013). And the imbalanced motif binding
-// results in unbalanced allele depths.
-//
+// atac.c
+// Transcription factors bind the open chromatin region and may further influence the histone
+// states and gene regulation (McVicker et al. Science 2013). A genetic variant happened at binding 
+// regions may contribute to weakness of motifs binding, this variant 'disrupt' the motif. We will
+// observe mutated alleles disappeared or reduced at genome accessible regions, we call this as allele
+// imbalance or allele specific peak. This program is trying to calculate the allele counts from ATAC
+// reads for each genomic position at ATAC peaks.
 
 
 #include "utils.h"
