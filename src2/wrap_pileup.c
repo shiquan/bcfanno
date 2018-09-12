@@ -12,7 +12,7 @@
 // This function is copied and edited from bam_plcmd.c, all credit of this code
 // goes to Li Heng's samtools.
 //
-int plp_get_ref(struct plp_ref *r, bam_hdr_t *h, faidx_t *fai, int tid, char **ref, int *ref_len)
+int plp_get_ref(struct plp_ref *r, char *seqname, faidx_t *fai, int tid, char **ref, int *ref_len)
 {
     if ( !fai || !r ) {
         ref = NULL;
@@ -48,7 +48,7 @@ int plp_get_ref(struct plp_ref *r, bam_hdr_t *h, faidx_t *fai, int tid, char **r
 
     r->ref_id[0] = tid;
     r->ref[0] = faidx_fetch_seq(fai,
-                                h->target_name[r->ref_id[0]],
+                                seqname,
                                 0,
                                 INT_MAX,
                                 &r->ref_len[0]);

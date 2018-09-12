@@ -295,6 +295,7 @@ int anno_vcf_atac_main(struct CAA *CAA)
         bcf_write1(args.fp_out, args.bcf_hdr, line);
         continue;
     }
+    bcf_destroy(line);
 
     return 0;
 }
