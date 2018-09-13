@@ -17,11 +17,12 @@ struct anno_hgvs;
 typedef int (*setter_vcf)(struct anno_vcf_file*, bcf_hdr_t *hdr, bcf1_t *, struct anno_col *, void *);
 //typedef int (*setter_hgvs)(struct anno_hgvs_file*, bcf_hdr_t *hdr, bcf1_t *, struct anno_col *);
 typedef int (*setter_bed)(struct anno_bed_file*, bcf_hdr_t *hdr, bcf1_t *, struct anno_col *);
-
+typedef int (*setter_motif)(bcf_hdr_t *hdr, bcf1_t *m, struct anno_col *, int n, float *v);
 //typedef int (*setter_pl)(bcf1_t *, struct anno_col*, void*);
 typedef union {
     setter_vcf vcf;
     setter_bed bed;
+    setter_motif pwm;
     //setter_hgvs hgvs;
     //setter_pl pl;
 } setter_func;
