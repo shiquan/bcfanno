@@ -679,6 +679,7 @@ int usage()
     fprintf(stderr, " -o            Output file. Default is stdout.\n");
     fprintf(stderr, " -t            Threads.\n");
     fprintf(stderr, " -min          Mininal PWM score, skip motifs below this value.\n");
+    fprintf(stderr, " -record       Records per thread.\n");
     fprintf(stderr, "\n");
     return 1;
 }
@@ -727,7 +728,7 @@ struct args {
     .fp_out = NULL,
     .pcs_col = NULL,
     .n_thread = 5,
-    .n_record = 10000,
+    .n_record = 1000,
 };
 int parse_args(int argc, char **argv)
 {

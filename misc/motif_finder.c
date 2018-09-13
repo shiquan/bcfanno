@@ -1,37 +1,9 @@
 #include "utils.h"
 #include "number.h"
 #include "htslib/bgzf.h"
+#include "motif.h"
 #include <zlib.h>
 #include <string.h>
-
-#define BASEA 1
-#define BASEC 2
-#define BASEG 4
-#define BASET 8
-
-/*
-  IUPAC nucleotide code
-  R	A or G
-  Y	C or T
-  S	G or C
-  W	A or T
-  K	G or T
-  M	A or C
-  B	C or G or T
-  D	A or G or T
-  H	A or C or T
-  V	A or C or G
-*/
-
-#define BASER 5
-#define BASEY 10
-#define BASES 6
-#define BASEK 12
-#define BASEM (1 | (1<<1))
-#define BASEB ((1<<1) | (1<<2) | (1<<3))
-#define BASED (1 | (1<<2) | (1<<3))
-#define BASEH (1 | (1<<1) | (1<<3))
-#define BASEV (1 | (1<<1) | (1<<3))
 
 int usage()
 {
@@ -41,111 +13,6 @@ int usage()
     fprintf(stderr, " \n");
     return 1;
 }
-unsigned char *base_tab_init()
-{
-    unsigned char *t = malloc(sizeof(char)*256);
-    memset(t, 0, sizeof(char)*256);
-    t['A'] = BASEA;
-    t['C'] = BASEC;
-    t['G'] = BASEG;
-    t['T'] = BASET; 
-    t['a'] = BASEA;
-    t['c'] = BASEC;
-    t['g'] = BASEG;
-    t['t'] = BASET;
-    t['R'] = BASER;
-    t['r'] = BASER;
-    t['Y'] = BASEY;
-    t['y'] = BASEY;
-    t['S'] = BASES;
-    t['s'] = BASES;
-    t['K'] = BASEK;
-    t['k'] = BASEK;
-    t['M'] = BASEM;
-    t['m'] = BASEM;
-    t['B'] = BASEB;
-    t['b'] = BASEB;
-    t['D'] = BASED;
-    t['d'] = BASED;
-    t['H'] = BASEH;
-    t['h'] = BASEH;
-    t['V'] = BASEV;
-    t['v'] = BASEV;
-    return t;
-}
-unsigned char *base_tab_rev_init()
-{
-    unsigned char *t = malloc(sizeof(char)*256);
-    memset(t, 0, sizeof(char)*256);
-    t['A'] = BASET;
-    t['C'] = BASEG;
-    t['G'] = BASEC;
-    t['T'] = BASEA; 
-    t['a'] = BASET;
-    t['c'] = BASEG;
-    t['g'] = BASEC;
-    t['t'] = BASEA;
-
-    t['R'] = BASEY;
-    t['r'] = BASEY;
-    t['Y'] = BASER;
-    t['y'] = BASER;
-    t['S'] = BASES;
-    t['s'] = BASES;
-    t['K'] = BASEM;
-    t['k'] = BASEM;
-    t['M'] = BASEK;
-    t['m'] = BASEK;
-    t['B'] = BASEV;
-    t['b'] = BASEV;
-    t['D'] = BASEH;
-    t['d'] = BASEH;
-    t['H'] = BASED;
-    t['h'] = BASED;
-    t['V'] = BASEB;
-    t['v'] = BASEB;
-
-    return t;
-}
-struct encode {
-    int l;
-    uint64_t x;
-};
-int countbits(uint64_t x, struct encode *enc)
-{
-    int i;
-    int l = 0;
-    x = x & enc->x;
-    for ( i = 0; i < enc->l; i++) {
-        if ( ((x>>(i*4))&0xf) > 0 ) l++;
-    }   
-    return l;
-}
-struct encode *revcode(struct encode *c)
-{
-    struct encode *r = malloc(sizeof(*r));
-    r->l = c->l;
-    r->x = 0;
-    int i;
-    for ( i =0; i < c->l; ++i ) r->x = r->x | ((c->x>>i)&0x1)<<(c->l-i-1);
-    return r;
-};
-struct encode *str_encode(const char *s, unsigned char *tab)
-{
-    int i;
-    int l = strlen(s);
-    struct encode *x = malloc(sizeof(*x));
-    x->x = 0;
-    x->l = 0;
-    // only encode first 16 bases or shorter
-    x->l = l > 16 ? 16 : l;
-    //uint64_t mask = (1ULL<<l*4)-1;
-    for (i = 0; i < x->l; ++i) {
-        x->x = x->x<<4 | (tab[s[i]]&0xf);
-    }
-    return x;
-}
-
 struct args {
     const char *fasta_fname;
     const char *motif;
