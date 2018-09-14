@@ -11,6 +11,7 @@ struct plp_ref {
     int ref_len[2];
 };
 
+extern struct plp_ref *plp_ref_init();
 extern int plp_get_ref(struct plp_ref *r, char *seqname, faidx_t *fai, int tid, char **ref, int *ref_len);
 
 #endif

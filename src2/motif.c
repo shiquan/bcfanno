@@ -339,6 +339,21 @@ static int _enc16_seq_query(struct encode16 *q, const char *s, int l, int m)
 static int _enc32_seq_query(struct encode32 *q, const char *s, int l, int m)
 {
     uint64_t x[2] = {0, 0};
+    int i;
+    // init
+    for ( i =  0; i < 16;   ++i ) x[0] = (x[0]<<4)|(_enc[s[i]]&0xf);
+    for ( i = 16; i < q->l; ++i ) x[1] = (x[1]<<4)|(_enc[s[i]]&0xf);
+
+    
+    // check
+    for ( ; i < l; ++i ) {
+        int b = encode_count_bits(x[0], q->x[0], 16) + encode_count_bits(x[1], q->x[1], q->l-16);
+        if ( b > q->l -m ) return i-q->l;        
+        x[0] = (x[0]<<4)|((x[1]>>((q->l-17)*4))&0xf);
+        x[1] = (x[1]<<4)|(_enc[s[i]]&0xf);
+        //x[1] = x[1]<<((32-q->l)*4)>>((32-q->l)*4);
+    }
+    
     return -1;
 }
 static int _enc64_seq_query(struct encode64 *q, const char *s, int l, int m)
@@ -510,18 +525,71 @@ struct motif **motif_read(const char *fname, int *_n)
     if ( n_motif == 0 ) { free(mm); return NULL; }
     return mm;
 }
-static int test_motif(const char *fname)
+static int test_motif(const char *fasta_fname, const char *motif_fname)
 {
-    int i, n;
-    struct motif **mm = motif_read(fname, &n);
-    for (i = 0; i < n; ++i ) {
+    int i, nm;
+    struct motif **mm = motif_read(motif_fname, &nm);
+    LOG_print("Trying to read MOTIF file.");
+    for (i = 0; i < nm; ++i ) {
         struct motif *m = mm[i];
         int j;
         printf("%s\n", m->name);
         for ( j =0; j < m->n; ++j) {
-            printf("%f\t%f\t%f\t%f\n", m->map[0][j], m->map[1][j], m->map[2][j], m->map[3][j]);
+            LOG_print("%f\t%f\t%f\t%f", m->map[0][j], m->map[1][j], m->map[2][j], m->map[3][j]);
         }
     }
+
+    BGZF *bgzf = bgzf_open(fasta_fname, "r");
+    if ( bgzf == NULL ) error("%s: %s.", fasta_fname, strerror(errno));
+
+    int c;
+    int pos = -1;
+    uint64_t x = 0;
+
+    int n = 0;
+    int l = 0, m = 2;
+    char *name = malloc(2);
+    // uint64_t mask = (1LL<<(enc->l*4)) -1;
+    /*
+    while (1) {
+        c = bgzf_getc(bgzf);
+        if (c < 0 ) break;
+        if ( c == '>') {
+            l = 0; // reset chromosome name
+            while ( (c = bgzf_getc(bgzf))>=0 && c != '\n') {
+                if (l == m) {
+                    m += 10;
+                    name = realloc(name, m);
+                }
+                name[l++] = c;
+            }
+            name[l] = '\0';
+            if (c != '\n') while((c=bgzf_getc(bgzf))>0 && c != '\n');
+            pos = -1; // reset from -1
+        }
+        else {
+            if ( c == '\n'||isspace(c)) continue;
+            pos++; // start from 0
+            if ( c== 'N') { x = 0; n = 0; }
+            else {
+                x = (x<<4)|(tab[c]&0xf);
+                
+                for (j = 0; j
+                if ( ++n >= enc->l ) {
+                    int b = countbits(x, enc);
+                    if (b >= enc->l-args.mis) {
+                        printf("%s\t%d\t%d\n", name, pos-enc->l+1, pos+1);
+                    }
+                }
+            }
+        }
+    }
+    */
+    free(name);
+    bgzf_close(bgzf);
+    
+
+    
     return 0;
 }
 float motif_pwm_score(struct motif *m, char *s, int r)
@@ -544,14 +612,8 @@ struct MTF *MTF_init()
     struct MTF *MTF = malloc(sizeof(struct MTF));
     memset(MTF, 0, sizeof(struct MTF));
     MTF->tid = -1;
-    //static struct plp_ref ref = {{NULL, NULL}, {-1, -1}, {0,0}};
-    MTF->r = malloc(sizeof(struct plp_ref));//  &ref; // this alias will be used only in one thread
-    MTF->r->ref_id[0] = -1;
-    MTF->r->ref_id[1] = -1;
-    MTF->r->ref[0] = NULL;
-    MTF->r->ref[1] = NULL;
-    MTF->r->ref_len[0] = 0;
-    MTF->r->ref_len[1] = 1;
+    // static struct plp_ref ref = {{NULL, NULL}, {-1, -1}, {0,0}};
+    MTF->r = plp_ref_init();
     return MTF;
 }
 void MTF_destory(struct MTF *m)
@@ -652,7 +714,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
             free(alt);
             // looks like a regularory variants?
             if ( (d[0] >= 0 || d[k] >=0) && fabsf(d[k]) > 20.0 )
-                LOG_print("Regulatory variants candidate: %s\t%d\t%s\t%s\t%.4f\n",
+                LOG_print("Regulatory variants candidate: %s\t%d\t%s\t%s\t%.4f",
                           MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1,
                           line->d.allele[k] == NULL ? "." : line->d.allele[k], m->name, d[k-1]);
         }

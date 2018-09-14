@@ -1,6 +1,18 @@
 #include "utils.h"
 #include "wrap_pileup.h"
 #include <limits.h>
+struct plp_ref *plp_ref_init()
+{
+    struct plp_ref *r = malloc(sizeof(struct plp_ref));
+    r->ref_id[0] = -1;
+    r->ref_id[1] = -1;
+    r->ref[0] = NULL;
+    r->ref[1] = NULL;
+    r->ref_len[0] = 0;
+    r->ref_len[1] = 1;
+    return r;
+}
+
 //
 // Assume input bam or VCF records are sorted by chromosome and genomic positions,
 // so we just need load the reference sequence one time, and cached in the memory.
