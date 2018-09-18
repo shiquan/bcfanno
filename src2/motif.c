@@ -693,7 +693,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
         char *ref = MTF->ref + start;
         int strand = 0;
         loc = encode_query_seq_n(m->enc, ref, l, 1);
-        if ( loc == -1 ) { // found
+        if ( loc == -1 ) { // unfound
             loc = encode_query_seq_n(m->rev, ref, l, 1);
             if ( loc != -1) strand = 1;
             else continue;
@@ -701,6 +701,11 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
 
         ref = ref + loc;
         double ref_v = motif_pwm_score(m, ref, strand); // need test
+        kstring_t str1 = {0,0,0};
+        kputsn(ref, m->n, &str1);
+        debug_print("%s\t%d\t%s\t%f\t%s", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1,m->name, ref_v, str1.s);
+        free(str1.s);
+        
         if (ref_v < MTF->min) continue;
         int k;
         float *d = malloc((line->n_allele)*sizeof(float));
