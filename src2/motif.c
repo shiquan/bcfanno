@@ -366,13 +366,21 @@ int encode_query_seq(struct encode *q, const char *s, int m)
 {
     int l;
     l = strlen(s);
+    int i; 
+    for ( i = 0; i < l; ++i )
+        if (_enc[s[i]] == 0 ) return -1; // No Ns allowed
+    
     if (l < q->l )          return -1;
     if ( q->l <= 16 )       return _enc16_seq_query(q->x, s, l, m);
     else if ( q->l <= 32 )  return _enc32_seq_query(q->x, s, l, m);
     else                    return _enc64_seq_query(q->x, s, l, m); 
 }
 int encode_query_seq_n(struct encode *q, const char *s, int l, int m)
-{    
+{
+    int i; 
+    for ( i = 0; i < l; ++i )
+        if (_enc[s[i]] == 0 ) return -1; // No Ns allowed
+
     if (l < q->l )          return -1;
     if ( q->l <= 16 )       return _enc16_seq_query(q->x, s, l, m);
     else if ( q->l <= 32 )  return _enc32_seq_query(q->x, s, l, m);
@@ -601,7 +609,7 @@ float motif_pwm_score(struct motif *m, char *s, int r)
     int i;
     for ( i = 0; i < m->n; ++i ) {
         int b = r == 0 ? B4[s[i]] : 5-B4[s[m->n-i-1]];
-        if ( b == 0 ) error("Unknown base at %s.",s);
+        if ( b == 0 ) error("Unknown base at %s.", *s);
         b -= 1;
         pwm += m->map[b][i];
     }
@@ -655,7 +663,7 @@ int anno_motif_setter_info_float(bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *
 static char *_construct_alt_seq(char *s, int loc, char *ref, char *alt, int l)
 {    
     if (ref != NULL && _enc[s[loc]] != _enc[*ref]) {
-        warnings("Inconsistant ref bases, %c vs %s", s[loc], ref);
+        warnings("Inconsistant ref bases, %c vs %s", s[loc], *ref);
         return NULL;
     }
         
@@ -765,7 +773,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
             if ( is_atcg(line->d.allele[k]) ) continue;
             
             char *alt = _construct_alt_seq(ref, var_loc, line->d.allele[0], line->d.allele[k], m->n);
-            if ( alt == NULL ) error("Failed to construct alternative alleles. %s %d", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+            if ( alt == NULL ) error("Failed to construct alternative alleles. %d %d", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
             //str1.l = 0;
             //kputsn(alt, m->n, &str1);
             //debug_print("%s", str1.s);
@@ -774,10 +782,12 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
             if ( fabsf(change) > fabsf(pwm_change) ) pwm_change = change;
             free(alt);
             // looks like a regularory variants?
+            /*
             if ( (d[0] >= 0 || d[k] >=0) && fabsf(d[k]) > 20.0 )
                 LOG_print("Regulatory variants candidate: %s\t%d\t%s\t%s\t%.4f",
                           MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1,
                           line->d.allele[k] == NULL ? "." : line->d.allele[k], m->name, d[k-1]);
+            */
         }
         //free(str1.s);
         // update INFO MOTIF_PWMscore
