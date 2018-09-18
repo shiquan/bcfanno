@@ -155,7 +155,7 @@ extern int encode_query_seq(struct encode *q, const char *s, int m);
 #define MOTIF_INF 0.0000000001
 #define MOTIF_INF_PWM -3 // <0.01
 #define MOTIF_MAX_PWM 1.386
-#define MOTIF_MIN_PWM -20
+#define MOTIF_MIN_PWM -30
 
 
 struct motif {

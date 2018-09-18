@@ -329,7 +329,7 @@ static int _enc16_seq_query(struct encode16 *q, const char *s, int l, int m)
     uint64_t x = 0;
     for ( i = 0; i < l; ++i ) {
         x = (x<<4)|(_enc[s[i]]&0xf);
-        if ( i > q->l) {
+        if ( i >= q->l) {
             int b = encode_count_bits(x, q->x, q->l);
             if ( b >= q->l-m) return i - q->l;
         }
@@ -667,7 +667,35 @@ static char *_construct_alt_seq(char *s, int loc, char *ref, char *alt, int l)
     kputsn(s, l, &str);
     return str.s;
 }
+float find_best_match(struct motif *m, char *seq, int *loc, int mis, int l, int strand)
+{
+    *loc = encode_query_seq_n(m->enc, seq, l, mis);
+    if ( *loc == -1 ) return -INT_MAX;
+    int best_loc = *loc;
+    float best_value = motif_pwm_score(m, seq+*loc, strand);
+    int ll = *loc; // last offset
+    char *new_seq = seq + ll + 1;
+    int new_l = l - ll -1;
 
+    for (;;) {
+
+        if ( ll + m->n > l ) break;
+
+        int lp = encode_query_seq_n(m->enc, new_seq, new_l, mis);
+        if ( lp == -1 ) break;
+        float s = motif_pwm_score(m, new_seq+lp, strand);
+
+        
+        new_seq = new_seq + lp + 1;
+        new_l = new_l - lp -1;
+
+        ll = new_seq - seq -1;
+
+        if ( s > best_value ) { best_value = s; best_loc = ll; }
+    }
+    *loc = best_loc;
+    return best_value;
+}
 int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
 {    
     if ( MTF_vcf_sync(MTF, line) == 0 ) return 0;
@@ -679,7 +707,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
 
         // motif struct
         struct motif *m = MTF->mm[i];
-        
+        debug_print("%s", m->name);
         // variant must located inside the motif
         int start = line->pos - m->n;        
         int l = m->n*2; // length of scan region
@@ -692,27 +720,43 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
         int loc;
         char *ref = MTF->ref + start;
         int strand = 0;
+        float ref_v = find_best_match(m, ref, &loc, 1, l, 0);
+        
+        if ( loc == -1) {
+            float v = find_best_match(m, ref, &loc, 1, l, 1);            
+            if ( loc != -1 ) {
+                strand = 1;
+                ref_v = v;
+            }
+            else continue;
+        }
+        /*
         loc = encode_query_seq_n(m->enc, ref, l, 1);
         if ( loc == -1 ) { // unfound
             loc = encode_query_seq_n(m->rev, ref, l, 1);
             if ( loc != -1) strand = 1;
             else continue;
         }
-
+        */
         ref = ref + loc;
-        double ref_v = motif_pwm_score(m, ref, strand); // need test
-        kstring_t str1 = {0,0,0};
-        kputsn(ref, m->n, &str1);
-        debug_print("%s\t%d\t%s\t%f\t%s", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1,m->name, ref_v, str1.s);
-        free(str1.s);
         
+        // double ref_v = motif_pwm_score(m, ref, strand); // need test
         if (ref_v < MTF->min) continue;
+        
+        //kstring_t str1 = {0,0,0};
+        //kputsn(ref, m->n, &str1);
+        //debug_print("%s\t%d\t%s\t%f\t%s", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1,m->name, ref_v, str1.s);
+        
+
         int k;
         float *d = malloc((line->n_allele)*sizeof(float));
         d[0] = ref_v;
         int var_loc = line->pos - start - loc;
         for ( k =1; k < line->n_allele; ++k ) {
             char *alt = _construct_alt_seq(ref, var_loc, line->d.allele[0], line->d.allele[k], m->n);
+            //str1.l = 0;
+            //kputsn(alt, m->n, &str1);
+            //debug_print("%s", str1.s);
             d[k] = motif_pwm_score(m, alt, strand);
             float change = d[k] - d[0];
             if ( fabsf(change) > fabsf(pwm_change) ) pwm_change = change;
@@ -723,7 +767,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
                           MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1,
                           line->d.allele[k] == NULL ? "." : line->d.allele[k], m->name, d[k-1]);
         }
-        
+        //free(str1.s);
         // update INFO MOTIF_PWMscore
         MTF->cols[i].func.pwm(MTF->bcf_hdr, line, &MTF->cols[i], line->n_allele, d);
     }
@@ -737,14 +781,14 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
 
 int usage()
 {
-    fprintf(stderr, "pwmscore\n");
+    fprintf(stderr, "PWM_change_score\n");
     fprintf(stderr, " -vcf          Variants in BCF/VCF format.\n");
     fprintf(stderr, " -bed          ATAC peak region in bed format.\n");
     fprintf(stderr, " -motif        Motif file.\n");    
     fprintf(stderr, " -ref          Reference in FASTA format.\n");
     fprintf(stderr, " -O <b|u|z|v>  Output format.\n");
     fprintf(stderr, " -o            Output file. Default is stdout.\n");
-    fprintf(stderr, " -t            Threads.\n");
+    fprintf(stderr, " -t            Threads.[5]\n");
     fprintf(stderr, " -min          Mininal PWM score, skip motifs below this value.\n");
     fprintf(stderr, " -record       Records per thread.\n");
     fprintf(stderr, "\n");
@@ -1030,7 +1074,7 @@ int main(int argc, char **argv)
         }
         thread_pool_process_destroy(q);
         thread_pool_destroy(p);
-        for ( i = 0; i < args.n; ++i ) MTF_destory(M[i]);
+        for ( i = 0; i < args.n_thread; ++i ) MTF_destory(M[i]);
         free(M);
     }
     else {                           
