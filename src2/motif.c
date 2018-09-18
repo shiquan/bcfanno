@@ -707,7 +707,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
 
         // motif struct
         struct motif *m = MTF->mm[i];
-        debug_print("%s", m->name);
+        //debug_print("%s", m->name);
         // variant must located inside the motif
         int start = line->pos - m->n;        
         int l = m->n*2; // length of scan region
