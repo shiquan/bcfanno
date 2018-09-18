@@ -654,7 +654,11 @@ int anno_motif_setter_info_float(bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *
  */
 static char *_construct_alt_seq(char *s, int loc, char *ref, char *alt, int l)
 {    
-    if (ref != NULL && _enc[s[loc]] != _enc[*ref]) error("Inconsistant ref bases, %c vs %s", s[loc], ref);
+    if (ref != NULL && _enc[s[loc]] != _enc[*ref]) {
+        warnings("Inconsistant ref bases, %c vs %s", s[loc], ref);
+        return NULL;
+    }
+        
     kstring_t str = {0,0,0};
     // put capped bases into string
     if (loc) kputsn(s, loc, &str);
@@ -697,7 +701,9 @@ float find_best_match(struct motif *m, char *seq, int *loc, int mis, int l, int 
     return best_value;
 }
 int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
-{    
+{
+    extern int is_atcg(char *s);
+    
     if ( MTF_vcf_sync(MTF, line) == 0 ) return 0;
 
     float pwm_change = 0.0;
@@ -753,7 +759,13 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
         d[0] = ref_v;
         int var_loc = line->pos - start - loc;
         for ( k =1; k < line->n_allele; ++k ) {
+            d[k] = -99999;
+
+            // for complex variants, skip
+            if ( is_atcg(line->d.allele[k]) ) continue;
+            
             char *alt = _construct_alt_seq(ref, var_loc, line->d.allele[0], line->d.allele[k], m->n);
+            if ( alt == NULL ) error("Failed to construct alternative alleles. %s %d", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
             //str1.l = 0;
             //kputsn(alt, m->n, &str1);
             //debug_print("%s", str1.s);

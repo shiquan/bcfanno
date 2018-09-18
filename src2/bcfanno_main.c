@@ -59,7 +59,7 @@ int usage()
     fprintf(stderr, "   -o, --output <file>            write output to a file [standard output]\n");
     fprintf(stderr, "   -O, --output-type <b|u|z|v>    b: compressed BCF, u: uncompressed BCF, z: compressed VCF, v: uncompressed VCF [v]\n");
     fprintf(stderr, "   -q                             quiet mode\n");
-    fprintf(stderr, "   -r  [%d]                       records per thread\n", RECORDS_PER_CHUNK);    
+    fprintf(stderr, "   -r  [number]                   records per thread. Default is %d.\n", RECORDS_PER_CHUNK);    
     fprintf(stderr, "   -t, --thread                   thread\n");
     fprintf(stderr, "   --unsort                       set if input is not sorted by cooridinate, **bad performance**\n");
     fprintf(stderr, "   --flank                        if set this flag and reference genome specified in configure, FLKSEQ tag will be generated\n");
