@@ -773,7 +773,7 @@ int anno_vcf_motif_pwm(struct MTF *MTF, bcf1_t *line)
             if ( is_atcg(line->d.allele[k]) ) continue;
             
             char *alt = _construct_alt_seq(ref, var_loc, line->d.allele[0], line->d.allele[k], m->n);
-            if ( alt == NULL ) error("Failed to construct alternative alleles. %d %d", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
+            if ( alt == NULL ) error("Failed to construct alternative alleles. %s %d", MTF->bcf_hdr->id[BCF_DT_CTG][line->rid].key, line->pos+1);
             //str1.l = 0;
             //kputsn(alt, m->n, &str1);
             //debug_print("%s", str1.s);
