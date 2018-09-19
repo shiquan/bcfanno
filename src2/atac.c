@@ -35,6 +35,8 @@ struct args {
     const char *bed_fname;
     const char *fasta_fname;
     const char *out_fname;
+
+    const char *capped_name;
     
     struct bedaux *bed;
     
@@ -45,6 +47,9 @@ struct args {
     bcf_hdr_t *bcf_hdr;
     int output_type;
     int qual_thres;
+
+    char *af_name;
+    char *ac_name;
     
 } args = {
     .vcf_fname = NULL,
@@ -52,6 +57,8 @@ struct args {
     .bed_fname = NULL,
     .fasta_fname = NULL,
     .out_fname = NULL,
+
+    .capped_name = NULL,
     
     .bed = NULL,
     .fp_input = NULL,
@@ -59,6 +66,9 @@ struct args {
     .bcf_hdr = NULL,
     .output_type = 0,
     .qual_thres = 20,
+
+    .af_name = NULL,
+    .ac_name = NULL,
 };
 
 // Chromatin Accessible Auxiliary, CAA
@@ -89,7 +99,10 @@ struct CAA {
     int last_pos;
     const bam_pileup1_t *last_plp;
     
-    char *name; // sample name in vcf
+    char *smp_name; // sample name in vcf
+
+    char *af_name;
+    char *ac_name;
 };
 
 #define CAA_seqname(_C,_T) _C->sam_hdr->target_name[_T]
@@ -193,7 +206,7 @@ const bam_pileup1_t *CAA_variant_pos(struct CAA *CAA, int _tid, int _pos)
 
     // last position cached
     if ( CAA->last_pos == _pos ) {
-        debug_print("Return last cached plp. No test.");
+        debug_print("Return last cached plp. %s %d", CAA_seqname(CAA,_tid), _pos);
         return CAA->last_plp;
     }
     // if ( CAA->has_ref == 0 ) return NULL;
@@ -254,11 +267,11 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
     }
     if ( sum > 0 ) {
         for ( i = 0; i < l->n_allele; ++i ) f[i] = (float)d[i]/sum;
-        bcf_update_format_float(CAA->bcf_hdr, l, "PeakAF", f, l->n_allele);
+        bcf_update_format_float(CAA->bcf_hdr, l, CAA->af_name, f, l->n_allele);
     }
     // printf("%s\t%d\t%s\t%s\t%d\t%d\n", CAA->bcf_hdr->id[BCF_DT_CTG][l->rid].key, l->pos+1, l->d.allele[0],
     // l->n_allele > 1? l->d.allele[1] : ".", d[0], l->n_allele>1? d[1] : 0);
-    bcf_update_format_int32(CAA->bcf_hdr, l, "PeakAC", d, l->n_allele);
+    bcf_update_format_int32(CAA->bcf_hdr, l, CAA->ac_name, d, l->n_allele);
 
     return 0;
 }
@@ -309,8 +322,9 @@ int usage()
     fprintf(stderr, "  -bed    region.bed\n");
     fprintf(stderr, "  -bam    aln.bam\n");
     fprintf(stderr, "  -vcf    wgs.vcf\n");
+    fprintf(stderr, "  -name   Capped tag name.\n"
     //fprintf(stderr, "  -fasta  ref.fa\n");
-    fprintf(stderr, "  -s      sample name, if not set annotated to first sample in the VCF\n");
+    fprintf(stderr, "  -s      sample name, if not set annotated to first sample in the VCF.\n");
     return 1;
 }
 int parse_args(int argc, char **argv)
@@ -337,6 +351,8 @@ int parse_args(int argc, char **argv)
             var = &output_type;
         else if ( strcmp(a, "-o") == 0 )
             var = &args.out_fname;
+        else if ( strcmp(a, "-name") == 0 )
+            var = &args.capped_name;
         
         if ( var != 0 ) {
             if ( i == argc ) error("Missing an argument after %s.", a);
@@ -391,8 +407,36 @@ int parse_args(int argc, char **argv)
         }                                                               \
     } while(0)
 
-    BRANCH("PeakAC", "##FORMAT=<ID=PeakAC,Number=R,Type=Integer,Description=\"Counts in peak region respect to each allele.\">");
-    BRANCH("PeakAF", "##FORMAT=<ID=PeakAF,Number=R,Type=Float,Description=\"Count frequency in peak region respect to each allele.\">");
+    if ( args.capped_name ) {
+        kstring_t str1 = {0,0,0};
+        kstring_t str2 = {0,0,0};
+        kputs(args.capped_name, &str1);
+        kputs("_PeakAC", &str1);
+        ksprintf(&str2, "##FORMAT=<ID=%s,Number=R,Type=Integer,Description=\"Covered fold in peak region respect to each allele.\">", str1.s);
+        BRANCH(str1.s, str2.s);
+
+        args.ac_name = strdup(str1.s);
+        
+        str1.l = 0;
+        str2.l = 0;
+
+        kputs(args.capped_name, &str1);
+        kputs("_PeakAF", &str1);
+        ksprintf(&str2, "##FORMAT=<ID=%s,Number=R,Type=Integer,Description=\"Count frequency in peak region respect to each allele.\">", str1.s);
+        BRANCH(str1.s, str2.s);
+
+        args.af_name = strdup(str2.s);
+
+        free(str1.s);
+        free(str2.s);
+    }
+    else {
+        BRANCH("PeakAC", "##FORMAT=<ID=PeakAC,Number=R,Type=Integer,Description=\"Covered fold in peak region respect to each allele.\">");
+        BRANCH("PeakAF", "##FORMAT=<ID=PeakAF,Number=R,Type=Float,Description=\"Count frequency in peak region respect to each allele.\">");
+        args.ac_name = strdup("PeakAC");
+        args.af_name = strdup("PeakAF");
+    }
+    
 #undef BRANCH
 
     bcf_hdr_write(args.fp_out, args.bcf_hdr);
@@ -401,6 +445,8 @@ int parse_args(int argc, char **argv)
 }
 void memory_release()
 {
+    free(args.ac_name);
+    free(args.af_name);
     hts_close(args.fp_input);
     hts_close(args.fp_out);
 }
@@ -412,6 +458,8 @@ int main(int argc, char **argv)
     CAA->args = &args;
     CAA->bed = args.bed;
     CAA->bcf_hdr = args.bcf_hdr;
+    CAA->ac_name = args.ac_name;
+    CAA->af_name = args.af_name;
     CAA->id = bcf_hdr_id2int(args.bcf_hdr, BCF_DT_ID, "GT");    
     if ( CAA->id <0 ) error("No GT tag found at input VCF.");
     
