@@ -206,7 +206,7 @@ const bam_pileup1_t *CAA_variant_pos(struct CAA *CAA, int _tid, int _pos)
 
     // last position cached
     if ( CAA->last_pos == _pos ) {
-        debug_print("Return last cached plp. %s %d", CAA_seqname(CAA,_tid), _pos);
+        // debug_print("Return last cached plp. %s %d", CAA_seqname(CAA,_tid), _pos);
         return CAA->last_plp;
     }
     // if ( CAA->has_ref == 0 ) return NULL;
@@ -324,7 +324,8 @@ int usage()
     fprintf(stderr, "  -vcf    wgs.vcf\n");
     fprintf(stderr, "  -name   Capped tag name.\n");
     //fprintf(stderr, "  -fasta  ref.fa\n");
-    fprintf(stderr, "  -s      sample name, if not set annotated to first sample in the VCF.\n");
+    fprintf(stderr, "  -s      Sample name, if not set annotated to first sample in the VCF.\n");
+    fprintf(stderr, "  -q      Mapping quality threshold.\n");
     return 1;
 }
 int parse_args(int argc, char **argv)
@@ -332,7 +333,7 @@ int parse_args(int argc, char **argv)
     int i;
     const char *output_type = 0;
     // if ( argc == 1 ) return usage();
-    
+    const char *qual_thres = 0;
     for ( i = 1; i < argc; ) {
         const char *a = argv[i++];
         const char **var = 0;
@@ -353,6 +354,8 @@ int parse_args(int argc, char **argv)
             var = &args.out_fname;
         else if ( strcmp(a, "-name") == 0 )
             var = &args.capped_name;
+        else if ( strcmp(a, "-q") == 0 )
+            var = &qual_thres;
         
         if ( var != 0 ) {
             if ( i == argc ) error("Missing an argument after %s.", a);
@@ -368,6 +371,10 @@ int parse_args(int argc, char **argv)
     if ( args.bed_fname == NULL ) error("Parameter -bed is required. Use -h for more information");
     //if ( args.fasta_fname == NULL ) error("-fasta is required.");
 
+    if ( qual_thres != NULL) {
+        args.qual_thres = str2int(qual_thres);
+        if (args.qual_thres < 0 ) args.qual_thres = 0;
+    }
     args.bed = bedaux_init();
     bed_read(args.bed, args.bed_fname);
     if ( args.bed->flag & bed_bit_empty) error("Could not load BED file. %s.", args.bed_fname);
@@ -425,7 +432,7 @@ int parse_args(int argc, char **argv)
         ksprintf(&str2, "##FORMAT=<ID=%s,Number=R,Type=Integer,Description=\"Count frequency in peak region respect to each allele.\">", str1.s);
         BRANCH(str1.s, str2.s);
 
-        args.af_name = strdup(str2.s);
+        args.af_name = strdup(str1.s);
 
         free(str1.s);
         free(str2.s);
