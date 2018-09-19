@@ -103,7 +103,7 @@ struct intergenic_core {
     enum mol_con con1; // motifs
     enum mol_con con2; // up/downstream or inside of gene
     char *gene; // up/downstream gene name
-    int gap_length; // gap between up/downstream gene and variant
+    int TSS_dist; // distance bewteen nearby TSS
 };
 
 struct mc_type {

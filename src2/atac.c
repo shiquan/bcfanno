@@ -267,13 +267,37 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
     }
     if ( sum > 0 ) {
         for ( i = 0; i < l->n_allele; ++i ) f[i] = (float)d[i]/sum;
-        bcf_update_format_float(CAA->bcf_hdr, l, CAA->af_name, f, l->n_allele);
     }
+    // also fill with 0 even no coverage
+    bcf_update_format_float(CAA->bcf_hdr, l, CAA->af_name, f, l->n_allele);
     // printf("%s\t%d\t%s\t%s\t%d\t%d\n", CAA->bcf_hdr->id[BCF_DT_CTG][l->rid].key, l->pos+1, l->d.allele[0],
     // l->n_allele > 1? l->d.allele[1] : ".", d[0], l->n_allele>1? d[1] : 0);
     bcf_update_format_int32(CAA->bcf_hdr, l, CAA->ac_name, d, l->n_allele);
-
+    free(d);
+    free(f);
     return 0;
+}
+// There is a bug for bcftools when merge empty FORMAT records, bcftools will fill empty with '.', but do not consider
+// allele number. We fill all empty alleles with 0
+
+int anno_vcf_atac_null(struct CAA *CAA, bcf1_t *l)
+{
+    int i;
+    // char *ref
+    // chr pos ref alt ref_depth alt_depth
+    bcf_unpack(l, BCF_UN_ALL);
+    uint32_t *d = calloc(l->n_allele, sizeof(*d));
+    float *f = calloc(l->n_allele, sizeof(*f));
+
+
+    // do nothing, just fill, FIXME!!!
+    bcf_update_format_float(CAA->bcf_hdr, l, CAA->af_name, f, l->n_allele);
+    bcf_update_format_int32(CAA->bcf_hdr, l, CAA->ac_name, d, l->n_allele);
+
+    free(d);
+    free(f);
+    return 0;
+    
 }
 int bcf2bam_rid(bcf_hdr_t *bcf_hdr, bam_hdr_t *sam_hdr, int tid)
 {
@@ -303,7 +327,8 @@ int anno_vcf_atac_main(struct CAA *CAA)
         const bam_pileup1_t *plp = CAA_variant_pos(CAA, tid, line->pos+1);
         if ( plp != NULL && CAA->n_plp != 0 )
             anno_vcf_atac(CAA, line, plp);
-
+        else
+            anno_vcf_atac_null(CAA,line);
       out:
         bcf_write1(args.fp_out, args.bcf_hdr, line);
         continue;

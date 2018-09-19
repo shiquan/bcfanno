@@ -260,6 +260,7 @@ int mc_destroy(struct mc *h)
         if ( inf->alt ) free(inf->alt);
         if ( type->aminos ) free(type->aminos);        
     }
+    if ( h->inter.gene ) free(h->inter.gene);
     free(h->trans);
     free(h);
 
@@ -1542,13 +1543,13 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
     inter->gene = last->geneName == NULL ? NULL : safe_duplicate_string(last->geneName);
     if ( last->strand == strand_is_plus ) {
         // forward strand, variant located in the downstream of gene, gene length should be added for TSS 
-        inter->gap_length = n->start - last->chromStart;
-        inter->con1 = inter->gap_length <= 1000 ? mc_downstream_1KB : mc_downstream_10KB;
+        inter->TSS_dist = n->start - last->chromStart;
+        inter->con1 = inter->TSS_dist <= 1000 ? mc_downstream_1KB : mc_downstream_10KB;
     }
     else {
         // backward strand, var in upstream and treat chromEnd as TSS
-        inter->gap_length = n->start - last->chromEnd;
-        inter->con1 = inter->gap_length <= 1000 ? mc_upstream_1KB : mc_upstream_10KB ;
+        inter->TSS_dist = n->start - last->chromEnd;
+        inter->con1 = inter->TSS_dist <= 1000 ? mc_upstream_1KB : mc_upstream_10KB ;
     }
     return 0;
 
@@ -1556,13 +1557,13 @@ static int up_downstream_gene_update(struct mc *n, struct gea_record *last, stru
     inter->gene = next->geneName == NULL ? NULL : safe_duplicate_string(next->geneName);
     if ( next->strand == strand_is_plus ) {
         // forward strand, variant located in the downstream of gene, gene length should be added for TSS 
-        inter->gap_length = n->start - next->chromStart;
-        inter->con1 = inter->gap_length <= 1000 ? mc_upstream_1KB : mc_upstream_10KB;
+        inter->TSS_dist = n->start - next->chromStart;
+        inter->con1 = inter->TSS_dist <= 1000 ? mc_upstream_1KB : mc_upstream_10KB;
     }
     else {
         // backward strand, var in upstream and treat chromEnd as TSS
-        inter->gap_length = n->start - next->chromEnd;
-        inter->con1 = inter->gap_length <= 1000 ? mc_downstream_1KB : mc_downstream_10KB;
+        inter->TSS_dist = n->start - next->chromEnd;
+        inter->con1 = inter->TSS_dist <= 1000 ? mc_downstream_1KB : mc_downstream_10KB;
     }
     return 0;
 }
@@ -2461,122 +2462,15 @@ static char *generate_annovar_name(struct mc *h)
     return str.s;
 }
 
-/*        
-        
-        ksprintf(&str, "%s", inf->transcript);
-        int l = strlen (inf->transcript);
-        int k;
-        for ( k = 0; k < l; ++k )
-            if ( inf->transcript[k] == '.') break;
-        //if ( k == l && inf->version > 0 ) ksprintf(&str, ".%d", inf->version);
-        kputc(':', &str);
-        if ( type->func1 == func_region_noncoding ) kputs("n.", &str);
-        else if ( type->func1 == func_region_cds ) kputs("c.", &str);
-        else if ( type->func1 == func_region_utr5 ) kputs("c.-", &str);
-        else if ( type->func1 == func_region_utr3 ) kputs("c.*", &str);
-
-        // for dup 
-        if ( inf->dup_offset > 0 ) {           
-            assert(inf->loc != 0);
-            int len = strlen(h->alt);
-            // inf->loc is the location of capped base
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset-len+1, inf->loc+inf->dup_offset);
-            else ksprintf(&str, "%ddup", inf->loc+inf->dup_offset);
-        }
-        else if ( inf->dup_offset < 0 ) {
-            assert(inf->loc != 0 );
-            int len = strlen(h->alt);
-            if ( len > 1 ) ksprintf(&str, "%d_%ddup", inf->loc+inf->dup_offset+1, inf->loc + inf->dup_offset-len);
-            else {
-                assert(inf->dup_offset == -1);
-                ksprintf(&str, "%ddup", inf->loc);
-            }
-        }
-        else {
-            // for nondup, inf->dup_offset will always be 0
-            if ( inf->loc != 0 ) ksprintf(&str, "%d", inf->loc);
-            else kputc('?', &str);
-            
-            if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
-            else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
-
-            while ( h->start != h->end) {
-                //if ( inf->dup_offset && h->end - h->start == 1 ) break;
-                kputc('_', &str);
-                if ( type->func2 == func_region_utr5 ) kputc('-', &str);
-                else if ( type->func2 == func_region_utr3 ) kputc('*', &str);
-                ksprintf(&str, "%d", inf->end_loc);
-                if ( inf->end_offset > 0 ) ksprintf(&str,"+%d", inf->end_offset);
-                else if ( inf->end_offset < 0 ) ksprintf(&str,"%d", inf->end_offset);
-                break;
-            }
-            char *ref, *alt;
-            if ( inf->strand == '+' ) {
-                ref = h->ref ? safe_duplicate_string(h->ref) : NULL;
-                alt = h->alt ? safe_duplicate_string(h->alt) : NULL;
-            }
-            else {
-                ref = h->ref ? rev_seqs(h->ref, strlen(h->ref)) : NULL;
-                alt = h->alt ? rev_seqs(h->alt, strlen(h->alt)) : NULL;
-            }
-            if ( h->type == var_type_snp ){
-                if ( type->con1 == mc_nocall )  ksprintf(&str, "%s>%s", alt, alt);
-                else ksprintf(&str, "%s>%s", ref, alt);
-            }                    
-            else if ( h->type == var_type_del ) ksprintf(&str, "del%s", ref);
-            else if ( h->type == var_type_ins ) ksprintf(&str, "ins%s", alt);
-            else if ( h->type == var_type_delins ) ksprintf(&str, "delins%s", alt);
-            else error("Failed to parse HGVS nom.");
-
-            if ( ref ) free(ref);
-            if ( alt ) free(alt);
-        }
-
-        // protein code
-        if ( type->loc_amino > 0 && h->type == var_type_snp )
-            if ( type->ori_amino == X_CODO && type->ext > 0 ) ksprintf(&str, "(p.*%d%sext*%d/p.*%d%sext*%d)", type->loc_amino, codon_names[type->mut_amino], type->ext, type->loc_amino, codon_short_names[type->mut_amino], type->ext);
-            else ksprintf(&str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]); 
-                
-        // indels
-        else {
-            int i;
-            if ( type->con1 == mc_conservation_inframe_insertion || type->con1 == mc_disruption_inframe_insertion ) {
-                //assert(type->loc_amino +1 == type->loc_end_amino);
-                ksprintf(&str, "(p.%s%d_%s%dins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
-                for (i = 0; i < type->n; ++i) kputs(codon_names[type->aminos[i]], &str);
-                kputc(')', &str);
-            }
-            else if ( type->con1 == mc_conservation_inframe_deletion || type->con1 == mc_disruption_inframe_deletion ) {
-                assert(type->loc_end_amino != 0);
-                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, "(p.%s%ddel",codon_names[type->ori_amino], type->loc_amino);
-                else  ksprintf(&str, "(p.%s%d_%s%ddel",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino);
-                for (i = 0; i < type->n; ++i) kputs(codon_names[type->aminos[i]], &str);
-                kputc(')', &str);                                         
-            }
-            else if ( type->con1 == mc_inframe_indel ) {
-                if ( type->loc_end_amino == type->loc_amino ) ksprintf(&str, "(p.%s%ddelins",codon_names[type->ori_amino], type->loc_amino);
-                else ksprintf(&str, "(p.%s%d_%s%ddelins",codon_names[type->ori_amino], type->loc_amino, codon_names[type->ori_end_amino], type->loc_end_amino); 
-                for (i = 0; i < type->n; ++i) kputs(codon_names[type->aminos[i]], &str);
-                kputc(')', &str);                                         
-            }
-            else if ( type->con1 == mc_frameshift_truncate || type->con1 == mc_frameshift_elongation ) {
-                ksprintf(&str, "(p.%s%d%s",codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino]);
-                if ( type->fs > 0 ) ksprintf(&str, "fs*%d", type->fs);
-                kputc(')', &str);                                         
-            }
-        }
-    }
-    
-    return str.s;   
-}
-*/
-        
 static char *generate_gene_string(struct mc *h)
 {
     kstring_t str = {0,0,0};
     if ( h->n_tran == 0 ) {
-        //kputs(h->inter.gene, &str);
-        return NULL;    
+        if ( h->inter.gene ) {
+            kputs(h->inter.gene, &str);
+            return str.s;
+        }
+        else return NULL;
     }
     
     int i;
@@ -2585,7 +2479,9 @@ static char *generate_gene_string(struct mc *h)
         struct mc_inf *inf = &h->trans[i].inf;
         if ( inf->gene ) kputs(inf->gene, &str);
         else kputc('.', &str);
-    }   
+    }
+
+    
     return str.s;
 }
 static char *generate_transcript_string(struct mc *h)
@@ -2690,7 +2586,7 @@ static char *generate_exonintron_string(struct mc *h)
     return str.s;
 }
 static int generate_upstream_downstream_gap_value(struct mc *h ) {
-    return h->inter.gap_length;
+    return h->inter.TSS_dist;
 }
 
 /*
@@ -2795,7 +2691,6 @@ static char *generate_oldnom_string(struct hgvs *h)
         if ( alt ) free(alt);
     }
     return str.s;
-
 }
 */
 static char *generate_aalength_string(struct mc *h)
@@ -2807,6 +2702,165 @@ static char *generate_aalength_string(struct mc *h)
         kputw(h->trans[i].inf.aa_length, &str);
     }
     return str.s;
+}
+
+
+#define BRANCH(_f, _h, _l, _c, _func) do {      \
+        int i;                                  \
+        kstring_t str = {0,0,0};                \
+        int empty = 1;                          \
+        for ( i = 0; i < _f->n_allele; ++i ) {  \
+            struct mc *f = _f->files[i];        \
+            if ( i > 0 ) kputc(',', &str);      \
+            if ( f == NULL ) {                  \
+                kputc('.', &str);               \
+                continue;                       \
+            }                                                           \
+            if ( f->type == var_type_unknow || f->type == var_type_nonref ) { \
+                kputc('.', &str);                                       \
+                continue;                                               \
+            }                                                           \
+            char *name = _func(f);                                      \
+            if (name) {                                                 \
+                kputs(name, &str);                                      \
+                free(name);                                             \
+            }                                                           \
+            empty = 0;                                                  \
+        }                                                               \
+        if ( empty ) {                                                  \
+            free(str.s);                                                \
+            return 1;                                                   \
+        }                                                               \
+        int ret;                                                        \
+        if ( _c->replace == REPLACE_MISSING ) {                          \
+            ret = bcf_get_info_string(_h, _l, _c->hdr_key, &_f->tmps, &_f->mtmps); \
+            if ( ret > 0 && (_f->tmps[0]!= '.' || _f->tmps[1] != 0 ) ) return 1; \
+        }                                                               \
+        ret = bcf_update_info_string_fixed(_h, _l, _c->hdr_key, str.s); \
+        free(str.s);                                                    \
+        return ret;                                                     \
+    } while(0)
+
+
+static int anno_hgvs_nom(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_hgvsnom_string);
+}
+static int anno_hgvs_gene(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_gene_string);
+}
+static int anno_hgvs_trans(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_transcript_string);
+}
+static int anno_hgvs_vartype(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_vartype_string);
+}
+static int anno_hgvs_mc(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_molecular_consequence_string);
+}
+static int anno_hgvs_mc1(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_molecular_consequence_string_uniq);
+}
+static int anno_hgvs_exon(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_exonintron_string);
+}
+static int anno_hgvs_aalength(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_aalength_string);
+}
+
+#undef BRANCH
+
+static int anno_hgvs_TSSdist(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    int i;
+    int *d = calloc(file->n_allele, sizeof(int));
+    int empty = 1;
+    for ( i = 0; i < file->n_allele; ++i ) {
+        struct mc *f = file->files[i];
+        struct intergenic_core *inter = &f->inter;
+        d[i] = 0;
+        if (inter->TSS_dist != 0) {
+            d[i] = inter->TSS_dist;
+            empty = 0;
+        }
+    }
+    if ( empty == 1 ) {
+        free(d);
+        return 1;
+    }
+
+    int ret;
+    ret = bcf_update_info_int32_fixed(hdr, line, col->hdr_key, d, file->n_allele);
+    free(d);
+    return ret;
+}
+
+static int anno_mc_setter2(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line)
+{
+    int i;
+
+    // init transcript
+    for (i = 0; i < file->n_allele; ++i ) {
+        struct mc *f = file->files[i];
+        
+        if ( f == NULL ) continue;
+
+        if ( f->type == var_type_unknow || f->type == var_type_nonref ) continue;
+
+        mc_anno_trans_chunk(f, file->h);
+    }
+
+    // annotate attributes
+    for ( i = 0; i < file->n_col; ++i ) {
+        struct anno_col *col = &file->cols[i];
+
+        // HGVS nomenclature, please refer to http://www.hgvs.org/ and http://varnomen.hgvs.org/
+        if ( strcmp(col->hdr_key, "HGVSnom") == 0 )
+            anno_hgvs_nom(file, hdr, line, col);
+
+        // transcript names, seperated by '|'
+        else if ( strcmp(col->hdr_key, "Transcript") == 0 )
+            anno_hgvs_trans(file, hdr, line, col);
+
+        // variant type, not standard
+        else if ( strcmp(col->hdr_key, "VarType") == 0 )
+            anno_hgvs_vartype(file, hdr, line, col);
+
+        // Gene names, respond to transcripts, seperated by '|'
+        else if ( strcmp(col->hdr_key, "Gene") == 0 )
+            anno_hgvs_gene(file, hdr, line, col);
+
+        // molecular consequence, refer to http://www.sequenceontology.org/
+        // report name for each transcript, seperated by '|'
+        else if ( strcmp(col->hdr_key, "MolecularConsequence") == 0 )
+            anno_hgvs_mc(file, hdr, line, col);
+
+        // molecular consequence, but report one value only
+        else if ( strcmp(col->hdr_key, "MC1") == 0 )
+            anno_hgvs_mc1(file, hdr, line, col);
+
+        // exon or intron number for each transcript
+        else if ( strcmp(col->hdr_key, "ExonIntron") == 0 )
+            anno_hgvs_exon(file, hdr, line, col);
+
+        // amino acid length
+        else if ( strcmp(col->hdr_key, "AAlength") == 0 )
+            anno_hgvs_aalength(file, hdr, line, col);
+
+        // distance between intergenic/intragenic variant and nearby TSS
+        else if ( strcmp(col->hdr_key, "TSSdistance") == 0 )
+            anno_hgvs_TSSdist(file, hdr, line, col);
+        
+    }
+
+    return 0;
 }
 //static int anno_hgvs_setter_info(struct anno_hgvs_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
 static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line)
@@ -2905,7 +2959,7 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
                     kputs(name, &str[j]);
                     free(name);
                 }
-            }           
+            }            
         }
         empty = 0;
     }
@@ -3000,8 +3054,19 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
             else if (*ss == '-') { col->replace = REPLACE_EXISTING; ss++; }
             if ( ss[0] == '\0') continue;
             if ( strncmp(ss, "INFO/", 5) == 0 ) ss += 5;
-            if ( strcmp(ss, "HGVSnom")  && strcmp(ss, "Gene") && strcmp(ss, "Transcript") && strcmp(ss, "VarType") && strcmp(ss, "ExonIntron") && strcmp(ss, "IVSnom")
-                 && strcmp(ss, "Oldnom") && strcmp(ss, "AAlength") && strcmp(ss, "ANNOVARname") && strcmp(ss, "MolecularConsequence") && strcmp(ss, "MC1")){
+            if ( strcmp(ss, "HGVSnom")
+                 && strcmp(ss, "Gene")
+                 && strcmp(ss, "Transcript")
+                 && strcmp(ss, "VarType")
+                 && strcmp(ss, "ExonIntron")
+                 && strcmp(ss, "IVSnom")
+                 && strcmp(ss, "Oldnom")
+                 && strcmp(ss, "AAlength")
+                 && strcmp(ss, "ANNOVARname")
+                 && strcmp(ss, "MolecularConsequence")
+                 && strcmp(ss, "MC1")
+                 && strcmp(ss, "TSSdistance")
+                ){
                 warnings("Do NOT support tag %s.", ss);
                 continue;
             }
@@ -3048,6 +3113,8 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
             BRANCH("Oldnom", "##INFO=<ID=Oldnom,Number=A,Type=String,Description=\"Old style nomenclature, compared with HGVSnom use gene position instead of UTR/coding position.\">");
         else if ( strcmp(col->hdr_key, "AAlength") == 0 ) 
             BRANCH("AAlength", "##INFO=<ID=AAlength,Number=A,Type=String,Description=\"Amino acid length for each transcript. 0 for noncoding transcript.\">");
+        else if ( strcmp(col->hdr_key, "TSSdistance") == 0 )
+            BRANCH("TSSdistance", "##INFO=<ID=TSSdistance,Number=A,Type=Integer,Description=\"The distance between noncoding variant to nearby transcription start site. + for downstream, - for upstream.\">");
     }
 #undef BRANCH
 
@@ -3078,7 +3145,7 @@ int anno_mc_chunk(struct anno_mc_file *f, bcf_hdr_t *hdr, struct anno_pool *pool
         anno_mc_update_buffer(f, hdr, line);
         
         // generate tags
-        anno_mc_setter(f, hdr, line);
+        anno_mc_setter2(f, hdr, line);
     }
     
     return 0;
