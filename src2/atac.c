@@ -322,7 +322,7 @@ int usage()
     fprintf(stderr, "  -bed    region.bed\n");
     fprintf(stderr, "  -bam    aln.bam\n");
     fprintf(stderr, "  -vcf    wgs.vcf\n");
-    fprintf(stderr, "  -name   Capped tag name.\n"
+    fprintf(stderr, "  -name   Capped tag name.\n");
     //fprintf(stderr, "  -fasta  ref.fa\n");
     fprintf(stderr, "  -s      sample name, if not set annotated to first sample in the VCF.\n");
     return 1;
