@@ -309,6 +309,52 @@ static int anno_bed_setter_info_string(struct anno_bed_file *file, bcf_hdr_t *hd
     return ret;
 }
 
+static int anno_bed_setter_info_int32(struct anno_bed_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col) {
+    struct anno_bed_buffer *b = file->buffer;
+    int ret;
+    if ( col->replace == REPLACE_MISSING ) {
+        ret = bcf_get_info_string(hdr, line, col->hdr_key, &b->tmps, &b->mtmps);
+        if ( ret > 0 && (b->tmps[0]!='.'||b->tmps[1]!= 0)) return 0;
+    }
+    char *string = func_region_string_generate(file, line, col);
+    if ( string == NULL ) return 0;
+    int v = str2int(string);
+    ret = bcf_update_info_int32_fixed(hdr, line, col->hdr_key, &v, 1);
+    free(string);
+    return ret;
+}
+
+static int anno_bed_setter_info_flag(struct anno_bed_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col) {
+    struct anno_bed_buffer *b = file->buffer;
+    int ret;
+    if ( col->replace == REPLACE_MISSING ) {
+        ret = bcf_get_info_string(hdr, line, col->hdr_key, &b->tmps, &b->mtmps);
+        if ( ret > 0 && (b->tmps[0]!='.'||b->tmps[1]!= 0)) return 0;
+    }
+    char *string = func_region_string_generate(file, line, col);
+    if ( string == NULL ) return 0;
+    if ( string[0] == '.' && string[1] == 0 ) { free(string); return 0; }
+    
+    ret = bcf_update_info_flag(hdr, line, col->hdr_key, NULL, 1);
+    free(string);
+    return ret;
+}
+
+static int anno_bed_setter_info_float(struct anno_bed_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col) {
+    struct anno_bed_buffer *b = file->buffer;
+    int ret;
+    if ( col->replace == REPLACE_MISSING ) {
+        ret = bcf_get_info_string(hdr, line, col->hdr_key, &b->tmps, &b->mtmps);
+        if ( ret > 0 && (b->tmps[0]!='.'||b->tmps[1]!= 0)) return 0;
+    }
+    char *string = func_region_string_generate(file, line, col);
+    if ( string == NULL ) return 0;
+    float v = atof(string);
+    ret = bcf_update_info_float_fixed(hdr, line, col->hdr_key, &v, 1);
+    free(string);
+    return ret;
+}
+
 struct anno_bed_file *anno_bed_file_init(bcf_hdr_t *hdr, const char *fname, char *column)
 {
     struct anno_bed_file *f = malloc(sizeof(*f));
@@ -394,7 +440,7 @@ struct anno_bed_file *anno_bed_file_init(bcf_hdr_t *hdr, const char *fname, char
             }
             else {
                 for ( i = 0; i < f->n_col; ++i ) {
-                    if ( strncmp(f->cols[i].hdr_key, ss, se-ss) == 0 )
+                    if ( strncmp(f->cols[i].hdr_key, ss, se-ss) == 0 && strlen(f->cols[i].hdr_key) == se -ss )
                         break;
                 }
                 // tag is not set in the column, skip this header line 
@@ -402,14 +448,34 @@ struct anno_bed_file *anno_bed_file_init(bcf_hdr_t *hdr, const char *fname, char
                     continue;
                 col = &f->cols[i];
             }
-
-            col->func.bed = anno_bed_setter_info_string;
             col->icol = -1;
             bcf_hdr_append(hdr, string.s);
             bcf_hdr_sync(hdr);
 
             int hdr_id = bcf_hdr_id2int(hdr, BCF_DT_ID, col->hdr_key);
-            assert ( bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, hdr_id) );            
+            int ret = bcf_hdr_idinfo_exists(hdr, BCF_HL_INFO, hdr_id);            
+            if ( ret == 0 ) error("Assert failure %d. %s, %s", ret, col->hdr_key, string.s);
+
+            switch ( bcf_hdr_id2type(hdr, BCF_HL_INFO, hdr_id) ) {
+                case BCF_HT_FLAG:
+                    col->func.bed = anno_bed_setter_info_flag;
+                    break;
+
+                case BCF_HT_INT:
+                    col->func.bed = anno_bed_setter_info_int32;
+                    break;
+                    
+                case BCF_HT_REAL:
+                    col->func.bed = anno_bed_setter_info_float;
+                    break;
+
+                case BCF_HT_STR:
+                    col->func.bed = anno_bed_setter_info_string;
+                    break;
+
+                default:
+                    error("Tag \"%s\" of type not recongized (%d). ", col->hdr_key, bcf_hdr_id2type(hdr, BCF_HL_INFO, hdr_id)); 
+            }
         }
         
         // check the column names
