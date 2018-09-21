@@ -250,8 +250,8 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
     uint32_t sum = 0;
     for ( i = 0; i < CAA->n_plp; i++ ) {
         const bam_pileup1_t *p = plp+i;
+        if ( p->qpos >= p->b->core.l_qseq ) continue;
         if ( !p->is_del ) {
-            if ( p->qpos >= p->b->core.l_qseq ) continue;
             char c = "=ACMGRSVTWYHKDBN"[bam_seqi(bam_get_seq(p->b), p->qpos)];
             if (c == 'N' ) continue;
             //debug_print("%d\t%d\t%c",p->b->core.pos,p->qpos,c);
@@ -260,9 +260,11 @@ int anno_vcf_atac(struct CAA *CAA, bcf1_t *l, const bam_pileup1_t *plp)
                 if ( c== *l->d.allele[j] ) { d[j]++; sum++; break; }               
             }
         }
-        else {
-
+        else {            
             // for indels
+            if ( l->n_allele == 2 ) {
+                d[1]++; sum++; // for most case
+            }
         }
     }
     if ( sum > 0 ) {
