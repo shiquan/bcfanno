@@ -510,6 +510,7 @@ struct motif **motif_read(const char *fname, int *_n)
         if ( *name == '>') { // motif name            
             struct motif *m = motif_init(name);
             m->name = strdup(name+1);
+            if (n == 2 ) m->name2 = strdup(str.s+s[1]);
             mm[n_motif] = m;
             n_motif++;
             if (n_motif == m_motif) {

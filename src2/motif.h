@@ -159,7 +159,8 @@ extern int encode_query_seq(struct encode *q, const char *s, int m);
 
 
 struct motif {
-    char *name;
+    char *name; // Matrix name
+    char *name2; // motif name
     struct encode *enc;
     struct encode *rev;
     int m; // allocated memory

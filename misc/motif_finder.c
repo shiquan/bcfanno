@@ -1,6 +1,7 @@
 #include "utils.h"
 #include "number.h"
 #include "htslib/bgzf.h"
+#include "htslib/faidx.h"
 #include "motif.h"
 #include <zlib.h>
 #include <string.h>
@@ -10,12 +11,14 @@ int usage()
     fprintf(stderr, "motif_finder [options] ref.fa motif_sequence\n");
     fprintf(stderr, " -m [0]  Mismatches.\n");
     fprintf(stderr, " -rev    Count reverse strand also.\n");
+    fprintf(stderr, " -bed    Region to scan in BED format.\n");
     fprintf(stderr, " \n");
     return 1;
 }
 struct args {
     const char *fasta_fname;
     const char *motif;
+    const char *bed_fname;
     int mis;
     int rev;
     unsigned char *tab_encode;
@@ -25,6 +28,7 @@ struct args {
 } args = {
     .fasta_fname = NULL,
     .motif = NULL,
+    .bed_fname = NULL,
     .mis = 0,
     .rev = 0,
     .tab_encode = NULL,
@@ -32,6 +36,7 @@ struct args {
     .motif_encode = NULL,
     .motif_rev_encode = NULL,
 };
+
 int parse_args(int argc, char **argv)
 {
     //if ( argc <= 3) return usage();
@@ -45,6 +50,7 @@ int parse_args(int argc, char **argv)
         if ( strcmp(a, "-h") == 0 ) return usage();
 
         if ( strcmp(a, "-m") == 0 ) var = &mis;
+        if ( strcmp(a, "-bed") == 0 ) var = &args.bed_fname;
         else if ( strcmp(a, "-rev") == 0 ) {
             args.rev = 1;
             continue;
@@ -86,14 +92,6 @@ int parse_args(int argc, char **argv)
             args.mis = cf;
         }
     }
-
-    /* debug_print("%s\t%d\t%u", args.motif, args.motif_encode->l, args.motif_encode->x); */
-    /* uint64_t x = args.motif_encode->x; */
-    /* for ( i = 0; i < args.motif_encode->l; ++i ) { */
-    /*     fprintf(stderr, "%c","NACNGNNNTNN"[x&0xf]); */
-    /*     x = x>>4; */
-    /* } */
-    /* exit(1); */
     
     return 0;
 }
@@ -120,6 +118,7 @@ int main(int argc, char **argv)
     int l = 0, m = 2;
     char *name = malloc(2);
     uint64_t mask = (1LL<<(enc->l*4)) -1;
+
     while (1) {
         c = bgzf_getc(bgzf);
         if (c < 0 ) break;
