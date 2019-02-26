@@ -458,6 +458,7 @@ static int anno_hgvs_setter_hgvsnom(struct anno_hgvs_file *file, bcf_hdr_t *hdr,
         }
         for ( j = 0; j < file->n_col; ++j ) {
             struct anno_col *col = &file->cols[j];
+            debug_print("%s", col->hdr_key);
             if ( strcmp(col->hdr_key, "HGVSnom") == 0 ) {
                 char *name = generate_hgvsnom_string(f);
                 kputs(name, &str[j]);

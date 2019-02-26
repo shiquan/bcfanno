@@ -1874,6 +1874,57 @@ static void generate_hgvsnom_string_NoncodingExon(struct mc *mc, struct mc_type 
 static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
+    /*
+    if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "c.-%d", inf->loc);
+    else if ( type->func1 == func_region_utr3_intron ) ksprintf(str, "c.*%d", inf->loc);
+    else if ( type->func1 == func_region_intron ) ksprintf(str, "c.%d", inf->loc);
+    else if ( type->func1 == func_region_noncoding_intron) ksprintf(str, "n.%d", inf->loc);
+    else error("For developer: only intron region should come here!");
+    */
+    ksprintf(str, "IVS%d", type->count);
+    if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
+    else if ( inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
+    else error("For developer: offset should NOT be 0 for intron.");
+ 
+    char *ref = inf->ref != NULL ? inf->ref : mc->ref;
+    char *alt = inf->alt != NULL ? inf->alt : mc->alt;
+    
+    if ( inf->end_offset != inf->offset ) { // since this function handler all intron variants, we only need to check the offsets
+        kputc('_', str);
+        /*
+        if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "-%d", inf->end_loc);
+        else if ( type->func1 == func_region_utr3_intron ) ksprintf(str, "*%d", inf->end_loc);
+        else if ( type->func1 == func_region_intron ) ksprintf(str, "%d", inf->end_loc);
+        else if ( type->func1 == func_region_noncoding_intron) ksprintf(str, "%d", inf->end_loc);
+        else if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
+        */
+        if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
+        else if ( inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
+        
+        if ( ref == NULL ) { // insertion
+            ksprintf(str, "ins%s", alt);
+        }        
+        else {
+            if ( alt == NULL ) { // deletion
+                ksprintf(str, "del%s", ref);
+            }
+            else { // del-ins
+                ksprintf(str, "delins%s", alt);
+            }
+        }
+    }
+    else {
+        if (ref == NULL ) error("For developer: bad range for noncoding insertion. %s:%d", mc->chr, mc->start);
+        if (alt == NULL ) ksprintf(str,"del%s",ref);
+        else {
+            if ( strlen(alt) == 1 ) ksprintf(str, "%s>%s", ref, alt);
+            else ksprintf(str, "del%sins%s", ref, alt);
+        }
+    }
+}
+static void generate_hgvsnom_string_intron2(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+{
+    ksprintf(str, "%s:", inf->transcript);
     if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "c.-%d", inf->loc);
     else if ( type->func1 == func_region_utr3_intron ) ksprintf(str, "c.*%d", inf->loc);
     else if ( type->func1 == func_region_intron ) ksprintf(str, "c.%d", inf->loc);
@@ -1919,6 +1970,7 @@ static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, 
         }
     }
 }
+
 static void generate_hgvsnom_string_UtrExon(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
@@ -2589,62 +2641,42 @@ static int generate_upstream_downstream_gap_value(struct mc *h ) {
     return h->inter.TSS_dist;
 }
 
-/*
-static char *generate_ivsnom_string(struct hgvs *h)
+static char *generate_ivsnom_string(struct mc *h)
 {
+    if ( h->n_tran == 0) return NULL;
+    
     kstring_t str = {0,0,0};
     int i;
     int empty = 1;
     for ( i = 0; i < h->n_tran; ++i ) {        
-        struct hgvs_type *type = &h->trans[i].type;
-        struct hgvs_inf *inf = &h->trans[i].inf;
         if ( i ) kputc('|', &str);
-        if ( inf->offset == 0 ) { kputc('.', &str); continue; }
-        ksprintf(&str, "c.IVS%d", type->count);
-        if ( inf->offset > 0 ) ksprintf(&str, "+%d", inf->offset);
-        else if ( inf->offset < 0 ) ksprintf(&str, "%d", inf->offset);
-        if ( h->start != h->end ) {
-            kputc('_', &str);
-            if (inf->offset == 0 || inf->end_offset == 0 ) kputc('?', &str);
-            else if ( inf->end_offset > 0 ) ksprintf(&str, "+%d", inf->end_offset);
-            else if ( inf->end_offset < 0 ) ksprintf(&str, "%d", inf->end_offset);
+        struct mc_type *type = &h->trans[i].type;
+        struct mc_inf *inf = &h->trans[i].inf;
+
+        switch (type->con1) {
+            case mc_noncoding_intron:
+            case mc_coding_intron:
+            case mc_utr5_intron:
+            case mc_utr3_intron:
+            case mc_donor_region:
+            case mc_splice_donor:
+            case mc_splice_acceptor:
+                generate_hgvsnom_string_intron2(h, type, inf, &str);
+                break;
+
+            default:
+                generate_hgvsnom_string_empty(&str);
+                break;
         }
-        if ( h->type == var_type_del ) {
-            assert(h->ref);
-            if ( inf->strand == '+' ) ksprintf(&str, "del%s", h->ref);
-            else {
-                char *rev = rev_seqs(h->ref, strlen(h->ref));
-                ksprintf(&str, "del%s", rev);
-                free(rev);
-            }
-        }
-        else if ( h->type == var_type_ins ) {
-            assert(h->alt);
-            if ( inf->strand == '+' ) ksprintf(&str, "ins%s", h->alt);
-            else {
-                char *rev = rev_seqs(h->alt, strlen(h->alt));
-                ksprintf(&str, "ins%s", rev);
-                free(rev);
-            }
-        }
-        else {
-            assert(h->ref && h->alt);
-            if ( inf->strand == '+' ) ksprintf(&str, "%s>%s", h->ref, h->alt);
-            else {
-                char *ref = h->ref == NULL ? NULL : rev_seqs(h->ref, strlen(h->ref));
-                char *alt = h->alt == NULL ? NULL : rev_seqs(h->alt, strlen(h->alt));
-                ksprintf(&str, "%s>%s", ref, alt);
-                free(ref); free(alt);
-            }
-        }
-        empty = 0;
     }
-    if ( empty == 1 ) {
+
+    if (empty_tag_string(&str)) {
         free(str.s);
         return NULL;
     }
     return str.s;
 }
+/*
 static char *generate_oldnom_string(struct hgvs *h)    
 {
     kstring_t str = {0,0,0};
@@ -3030,7 +3062,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
         f->cols[3].hdr_key = safe_duplicate_string("VarType");
         f->cols[4].hdr_key = safe_duplicate_string("ExonIntron");
         f->cols[5].hdr_key = safe_duplicate_string("AAlength");        
-        //f->cols[5].hdr_key = safe_duplicate_string("IVSnom");
+        f->cols[5].hdr_key = safe_duplicate_string("IVSnom");
         //f->cols[6].hdr_key = safe_duplicate_string("Oldnom");
 
     }
