@@ -3062,7 +3062,7 @@ struct anno_mc_file *anno_mc_file_init(bcf_hdr_t *hdr, const char *column, const
         f->cols[3].hdr_key = safe_duplicate_string("VarType");
         f->cols[4].hdr_key = safe_duplicate_string("ExonIntron");
         f->cols[5].hdr_key = safe_duplicate_string("AAlength");        
-        f->cols[5].hdr_key = safe_duplicate_string("IVSnom");
+        //f->cols[5].hdr_key = safe_duplicate_string("IVSnom");
         //f->cols[6].hdr_key = safe_duplicate_string("Oldnom");
 
     }
