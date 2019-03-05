@@ -1871,7 +1871,7 @@ static void generate_hgvsnom_string_NoncodingExon(struct mc *mc, struct mc_type 
         }
     }
 }
-static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_intron2(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
     /*
@@ -1922,7 +1922,7 @@ static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, 
         }
     }
 }
-static void generate_hgvsnom_string_intron2(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
     if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "c.-%d", inf->loc);
@@ -2345,6 +2345,7 @@ static char *generate_hgvsnom_string(struct mc *h)
     
     return str.s;
 }
+
 static int generate_annovar_string(struct mc *h, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     char *ref = inf->ref != NULL ? inf->ref : h->ref;
@@ -2778,6 +2779,10 @@ static int anno_hgvs_nom(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line
 {
     BRANCH(file, hdr, line, col, generate_hgvsnom_string);
 }
+static int anno_hgvs_ivsnom(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+{
+    BRANCH(file, hdr, line, col, generate_ivsnom_string);
+}
 static int anno_hgvs_gene(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
 {
     BRANCH(file, hdr, line, col, generate_gene_string);
@@ -2856,7 +2861,10 @@ static int anno_mc_setter2(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *li
         // HGVS nomenclature, please refer to http://www.hgvs.org/ and http://varnomen.hgvs.org/
         if ( strcmp(col->hdr_key, "HGVSnom") == 0 )
             anno_hgvs_nom(file, hdr, line, col);
-
+        // IVS nomenclature, old style
+        else if ( strcmp(col->hdr_key, "IVSnom") == 0)
+            anno_hgvs_ivsnom(file, hdr, line, col);
+        
         // transcript names, seperated by '|'
         else if ( strcmp(col->hdr_key, "Transcript") == 0 )
             anno_hgvs_trans(file, hdr, line, col);
