@@ -852,7 +852,8 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
     if ( lori_aa == 0 ) return 0;
     
     // check the amino acids length
-    if ( lori < 10000 && ((v->c.cds_length - v->c.utr5_length - inf->loc)/3 +1 > lori_aa )) {
+    //if ( lori < 10000 && ((v->c.cds_length - v->c.utr5_length - inf->loc)/3 +1 > lori_aa )) {
+    if ( lori < 10000 && ((v->c.cds_length - v->c.utr5_length - inf->loc)/3 > lori_aa )) {
         inf->inframe_stop = 1;
         //warnings("In frame stop codon found. %s, %s:%d", inf->transcript, mc->chr, mc->start);
     }
@@ -2077,7 +2078,7 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
                          codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino], type->fs-1);                
             }
             else {
-                ksprintf(str, "(p.%s%d%sfs%d/p.%s%d%sfs%d)",
+                ksprintf(str, "(p.%s%d%sfs*%d/p.%s%d%sfs*%d)",
                          codon_names[type->ori_amino],
                          type->loc_amino,
                          codon_names[type->mut_amino],
@@ -2389,7 +2390,7 @@ static int generate_annovar_string(struct mc *h, struct mc_type *type, struct mc
     // amino acid changes
     else if ( type->con1 == mc_frameshift_truncate || type->con1 == mc_frameshift_elongation ) {
         if ( type->fs > 0) 
-            ksprintf(str, "p.%s%dfs", codon_short_names[type->ori_amino], type->loc_amino);
+            ksprintf(str, "p.%s%dfs*", codon_short_names[type->ori_amino], type->loc_amino);
         else
             ksprintf(str, "p.%s%d%s", codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
     }
