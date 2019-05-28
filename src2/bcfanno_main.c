@@ -19,7 +19,7 @@
 // for GenomeElementAnnotation file
 #include "anno_seqon.h"
 
-#include "version.h"
+#include "bcfanno_version.h"
 #include <unistd.h>
 
 struct anno_index {

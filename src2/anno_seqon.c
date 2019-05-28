@@ -642,14 +642,14 @@ static int predict_molecular_consequence_snp(struct mc *mc, struct mc_type *type
 
     if ( type->ori_amino == type->mut_amino) {
         type->con1 = mc_synonymous;
-        if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_retained;
-        if ( type->loc_amino == 1) type->con1 = mc_start_retained;        
+        // if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_retained;
+        // if ( type->loc_amino == 1) type->con1 = mc_start_retained;        
     }
     else {
         type->con1 = mc_missense;
-        if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_loss;
-        if ( type->mut_amino == C4_Stop ) type->con1 = mc_stop_gained;
-        else if ( type->loc_amino == 1 ) type->con1 = mc_start_loss;
+        // if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_loss;
+        // if ( type->mut_amino == C4_Stop ) type->con1 = mc_stop_gained;
+        // else if ( type->loc_amino == 1 ) type->con1 = mc_start_loss;
     }
 
     if ( *mc->ref != *ref ) inf->ref = safe_duplicate_string(ref);
@@ -1253,7 +1253,17 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
             warnings("Failed to predict molecular conseqeunce because of: Unknown type %d.", mc->type);
             break;
     }
-    
+
+    // check start and stop codon, update variant type
+    if ( type->ori_amino == type->mut_amino) {
+        if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_retained;
+        if ( type->loc_amino == 1) type->con1 = mc_start_retained;
+    }
+    else {
+        if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_loss;
+        if ( type->mut_amino == C4_Stop ) type->con1 = mc_stop_gained;
+        else if ( type->loc_amino == 1 ) type->con1 = mc_start_loss;
+    }
     return 0;
 }
 static int protein_update_state(struct mc_handler *h, struct mc *mc, struct mc_inf *inf, struct mc_type *type, struct gea_record *v, int lref, int lalt, char *ref, char *alt)
@@ -1835,7 +1845,7 @@ static void generate_hgvsnom_string_empty(kstring_t *str)
 {
     kputc('.', str);    
 }
-static void generate_hgvsnom_string_NoncodingExon(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_NoncodingExon(struct mc const *mc, struct mc_type const *type, struct mc_inf const *inf, kstring_t *str)
 {
     ksprintf(str, "%s:n.%d", inf->transcript, inf->loc);
     //if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
@@ -1872,7 +1882,7 @@ static void generate_hgvsnom_string_NoncodingExon(struct mc *mc, struct mc_type 
         }
     }
 }
-static void generate_hgvsnom_string_intron2(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_intron2(struct mc const *mc, struct mc_type const *type, struct mc_inf const *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
     /*
@@ -1923,7 +1933,7 @@ static void generate_hgvsnom_string_intron2(struct mc *mc, struct mc_type *type,
         }
     }
 }
-static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_intron(struct mc const *mc, struct mc_type const *type, struct mc_inf const *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
     if ( type->func1 == func_region_utr5_intron ) ksprintf(str, "c.-%d", inf->loc);
@@ -1972,7 +1982,7 @@ static void generate_hgvsnom_string_intron(struct mc *mc, struct mc_type *type, 
     }
 }
 
-static void generate_hgvsnom_string_UtrExon(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_UtrExon(struct mc const *mc, struct mc_type const *type, struct mc_inf const *inf, kstring_t *str)
 {
     ksprintf(str, "%s:", inf->transcript);
     if ( type->func1 == func_region_utr5_exon ) ksprintf(str, "c.-%d", inf->loc);
@@ -2019,7 +2029,7 @@ static void generate_hgvsnom_string_UtrExon(struct mc *mc, struct mc_type *type,
         }
     }
 }
-static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
+static void generate_hgvsnom_string_CodingDelins(struct mc const *mc, struct mc_type const *type, struct mc_inf const *inf, kstring_t *str)
 {
 
     char *ref = inf->ref != NULL ? inf->ref : mc->ref;
@@ -2096,7 +2106,10 @@ static void generate_hgvsnom_string_CodingDelins(struct mc *mc, struct mc_type *
             
     else { // inframe delins
         if ( type->loc_amino == type->loc_end_amino ) {
-            if ( type->n ) {
+            if ( type->n == 1 ) {
+                ksprintf(str, "(p.%s%d%s/p.%s%d%s)", codon_names[type->ori_amino], type->loc_amino, codon_names[type->mut_amino], codon_short_names[type->ori_amino], type->loc_amino, codon_short_names[type->mut_amino]);
+            }
+            else if ( type->n ) {
                 int i;
                 ksprintf(str, "(p.%s%ddelins", codon_names[type->ori_amino], type->loc_amino);
                 for ( i = 0; i < type->n; ++i ) kputs(codon_names[type->aminos[i]], str);
@@ -2326,7 +2339,8 @@ static char *generate_hgvsnom_string(struct mc *h)
             case mc_stop_retained:
             case mc_missense:
             case mc_synonymous:
-                generate_hgvsnom_string_CodingSNV(h, type, inf, &str);
+                // generate_hgvsnom_string_CodingSNV(h, type, inf, &str);
+                generate_hgvsnom_string_CodingDelins(h, type, inf, &str);
                 break;
 
             case mc_nocall:
