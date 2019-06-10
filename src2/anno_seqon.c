@@ -43,8 +43,8 @@ const struct MolecularConsequenceTerms MCT[] = {
     // intron variant
     { "noncoding_transcript_intron_variant",        "Intron", },
     { "coding_transcript_intron_variant",           "Intron", },
-    { "3_prime_UTR_intron_variant",                 "UTR3", },
-    { "5_prime_UTR_intron_variant",                 "UTR5", },
+    { "3_prime_UTR_intron_variant",                 "Intron", },
+    { "5_prime_UTR_intron_variant",                 "Intron", },
     // splice variant
     { "exonic_splice_region_variant",               "SpliceSites", },
     { "splice_donor_variant",                       "SpliceDonor", },
