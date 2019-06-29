@@ -1250,7 +1250,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
         //return 0;
     //}
 
-    int ret;
+    int ret = -1;
     switch (mc->type) {
         // For SNV, only one codon involved, check the alternative codon and predict the variant type directly.
         case var_type_snp : // fast check SNV, for most cases
@@ -1271,8 +1271,8 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
             break;
 
         default:
-            warnings("Failed to predict molecular conseqeunce because of: Unknown type %d.", mc->type);
-            break;
+            error("Failed to predict molecular conseqeunce because of: Unknown type %d.", mc->type);
+            // break;
     }
 
     if (ret) return ret;

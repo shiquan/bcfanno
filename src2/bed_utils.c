@@ -185,13 +185,13 @@ static int bed_fill(struct bedaux *bed)
   //if (bed->flag & bed_bit_empty) return 1;
   //if (bed->flag ^ bed_bit_cached) return 1;
 
-    reghash_type *hash = (reghash_type*)bed->hash;
+    // reghash_type *hash = (reghash_type*)bed->hash;
     kstring_t string = KSTRING_INIT;
     int dret;
     struct bed_line line = BED_LINE_INIT;
     while ( ks_getuntil(bed->ks, 2, &string, &dret) >= 0) {
-	int start = -1;
-	int end = -1;
+	//int start = -1;
+	//int end = -1;
 	bed->line++;
 	if ( string.l == 0 || string.s[0] == '\n' ) {
 	    warnings("%s : line %d is empty. skip ..", bed->fname, bed->line);
@@ -278,13 +278,13 @@ void bed_cache_update(struct bedaux *bed)
 }
 int bed_fill_bigdata(struct bedaux *bed)
 {
-    reghash_type *hash = (reghash_type*)bed->hash;
+    // reghash_type *hash = (reghash_type*)bed->hash;
     kstring_t string = KSTRING_INIT;
     int dret;
     struct bed_line line = BED_LINE_INIT;
     while ( ks_getuntil(bed->ks, 2, &string, &dret) >= 0) {
-	int start = -1;
-	int end = -1;
+	// int start = -1;
+	// int end = -1;
 	bed->line++;
 	if ( string.l == 0 || string.s[0] ) {
 	    warnings("%s : line %d is empty. skip ..", bed->fname, bed->line);
@@ -701,7 +701,7 @@ static int rloc(uint64_t a, int pos, int *_s, int *_e)
 }
 int bed_position_covered(struct bedaux *bed, char *chr, int pos, int *_start, int *_end)
 {
-    int start, end;
+    // int start, end;
     struct bed_chrom *c = get_chrom(bed, chr);
     if ( c == NULL ) return 0;
 
