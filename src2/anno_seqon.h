@@ -173,6 +173,9 @@ struct mc_inf {
     int offset;
     int end_offset;
 
+    // dist to exon end 
+    int dist_exon;
+    
     // check if repeat sequences(dup), only for insterion
     int is_dup;
     int dup_offset; // delete it

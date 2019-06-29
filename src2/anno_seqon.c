@@ -221,6 +221,7 @@ struct mc *mc_init(const char *chrom, int start, int end, char *ref, char *alt)
     }
     else if ( ref == NULL ) {
         h->type = var_type_ins;
+
         h->alt = safe_duplicate_string(alt);
     }
     else if ( alt == NULL ) {
@@ -443,14 +444,19 @@ int mc_handler_fill_buffer_chunk(struct mc_handler *h, char* name, int start, in
  */
 
 // find the block of variants located, could be overlapped with multiblocks, so both start and end block will be exported
-static int find_the_block(struct gea_record *v, int *s, int *e, int pos)
+// dist: distance to exon edges, 
+static int find_the_block(struct gea_record *v, int *s, int *e, int pos, int32_t *dist)
 {
-    *s = 0; *e = 0;
+    *s = 0; *e = 0; *dist = 0;
     if ( pos < v->chromStart || pos > v->chromEnd ) return 1;
     int i;
+    int left;
+    int right;
     for ( i = 0; i < v->blockCount; ++i ) {
         int start = v->blockPair[0][i];
         int end   = v->blockPair[1][i];
+        left = pos-start;
+        right = end - pos;
         if ( pos < start) { *e = i; break; }
         else {
             *s = i;
@@ -459,12 +465,16 @@ static int find_the_block(struct gea_record *v, int *s, int *e, int pos)
     }
     // out of range
     if ( i == v->blockCount && *s > 0 && *e == 0 ) return 1;
+    if (*s == *e) {
+        assert(left>=0 && right >=0);
+        *dist = left<<16|(uint16_t)right;
+    }
     return 0;
 }
 
 // find the position on the exon region and offset if variant located in the intron region
 // 0 on success, 1 on out of range
-static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int *offset, int start, int *id)
+static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int *offset, int start, int *id, int *dist_exon)
 {
     gea_unpack(hdr, v, GEA_UN_TRANS|GEA_UN_CIGAR);
     
@@ -472,7 +482,7 @@ static int find_locate(struct gea_hdr *hdr, struct gea_record *v, int *pos, int 
     *pos = 0;
     *offset = 0;
     // for location out of range set pos and offset to 0, annotate as '?'
-    if ( find_the_block(v, &b1, &b2, start ) ) { *pos = 0, *offset = 0; return 1;}
+    if ( find_the_block(v, &b1, &b2, start, dist_exon ) ) { *pos = 0, *offset = 0; return 1;}
 
     struct gea_coding_transcript *c = &v->c;
     if ( b1 == b2 ) {
@@ -968,11 +978,14 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
       inframe_indel:
         type->con1 = mc_inframe_indel;
         //int l1 = (cod + lref)/3*3+1; // 1 based
-        int l1 = (cod + lref)/3+1; // 1 based
+        int l1 = (cod + lref-1)/3+1; // 1 based
         //int l2 = (cod + lalt)/3*3+1;
-        int l2 = (cod + lalt)/3+1;
+        int l2 = (cod + lalt-1)/3+1;
         //assert(lori_aa>l1);
-        if ( l1 < lori_aa ) return 0;
+        // update:2019/06/24
+        // l1 is change position, if outrange of coding region, return -1
+        if ( l1 > lori_aa ) return -1;
+        
         // stop codon founded the inserted codon when lmut_aa < l2
         
         int head, tail;
@@ -981,21 +994,27 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
         type->loc_end_amino = type->loc_amino + l1 -1;
         type->ori_amino = ori_aa[0];
         type->ori_end_amino = ori_aa[l1-1];
-        type->n = l2;
-        type->aminos = malloc(sizeof(int)*type->n);
-        int i;
-        for ( i=0; i<type->n; ++i) {
-            type->aminos[i] = mut_aa[i];
-            if ( type->aminos[i] == 0 ) { // stop-codon
-                //type->con1 = mc_frameshift_truncate;
-                type->con1 = i == 0 ? mc_stop_gained : mc_frameshift_truncate;
-                type->fs = i+1;
-                type->n = i+1;
-                type->mut_amino = mut_aa[0];
-                break;
+        // update: inframe delins 2019/06/29
+        if (l1 == 1 && l2 == 1) { // A>B
+            type->n = 1;
+            type->mut_amino = mut_aa[0];
+        }
+        else { // AdelinsB
+            type->n = l2;
+            type->aminos = malloc(sizeof(int)*type->n);
+            int i;
+            for ( i=0; i<type->n; ++i) {
+                type->aminos[i] = mut_aa[i];
+                if ( type->aminos[i] == 0 ) { // stop-codon
+                    //type->con1 = mc_frameshift_truncate;
+                    type->con1 = i == 0 ? mc_stop_gained : mc_frameshift_truncate;
+                    type->fs = i+1;
+                    type->n = i+1;
+                    type->mut_amino = mut_aa[0];
+                    break;
+                }
             }
         }
-       
     }
     else {
         if ( (lref-lalt)%3 == 0 ) goto inframe_indel;
@@ -1203,8 +1222,9 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     *lmut = 0;
     // original sequnence from RNA sequence, start round from first aa changed position;
     // start aa location may be changed becase realignment, but ori_seq will be "stable" (reset if duplicate) in this function;
-    // ori_seq is a temp sequence, will be free before level this function.
-
+    // ori_seq is a temp sequence, will be free before leave this function.
+    //
+    // update 10th Jun. 2019, retrieve orginal sequence of one exon, not adjust across exons
     *ori = faidx_fetch_seq(h->rna_fai, name, start, start + 10000, lori);
     
     if ( *ori == NULL || *lori == 0 ) return -1;
@@ -1230,23 +1250,24 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
         //return 0;
     //}
 
+    int ret;
     switch (mc->type) {
         // For SNV, only one codon involved, check the alternative codon and predict the variant type directly.
         case var_type_snp : // fast check SNV, for most cases
-            predict_molecular_consequence_snp(mc, type, inf, v, cod, ref, alt, *ori, *mut);
+            ret = predict_molecular_consequence_snp(mc, type, inf, v, cod, ref, alt, *ori, *mut);
             break;
 
             // for complex cases, we will build the alternative allele sequence and the amino acids
         case var_type_del:
-            predict_molecular_consequence_deletion(h, mc, type, inf, v, lref, ref, *lori, *lmut, *ori, *mut);
+            ret = predict_molecular_consequence_deletion(h, mc, type, inf, v, lref, ref, *lori, *lmut, *ori, *mut);
             break;
             
         case var_type_ins:
-            predict_molecular_consequence_insertion(h, mc, type, inf, v, lalt, alt, *lori, *lmut, *ori, *mut);
+            ret = predict_molecular_consequence_insertion(h, mc, type, inf, v, lalt, alt, *lori, *lmut, *ori, *mut);
             break;
             
         case var_type_delins:
-            predict_molecular_consequence_delins(h, mc, type, inf, v, lref, ref, lalt, alt, *lori, *lmut, *ori, *mut);
+            ret = predict_molecular_consequence_delins(h, mc, type, inf, v, lref, ref, lalt, alt, *lori, *lmut, *ori, *mut);
             break;
 
         default:
@@ -1254,6 +1275,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
             break;
     }
 
+    if (ret) return ret;
     // check start and stop codon, update variant type
     if ( type->ori_amino == type->mut_amino) {
         if ( type->ori_amino == C4_Stop ) type->con1 = mc_stop_retained;
@@ -1337,9 +1359,9 @@ static int coding_transcript_update_molecular_consequence_state(struct mc_handle
 
     return 0;
 }
-static int transcript_function_update(struct mc_handler *h, int is_coding, struct gea_record *v, int *ex, int *pos, int *offset, int position, enum func_region_type *func, enum mol_con *con1, enum mol_con *con_splice, int *loc)
+static int transcript_function_update(struct mc_handler *h, int is_coding, struct gea_record *v, int *ex, int *pos, int *offset, int position, enum func_region_type *func, enum mol_con *con1, enum mol_con *con_splice, int *loc, int *dist_exon)
 {
-    if ( find_locate(h->hdr, v, pos, offset, position, ex) ) {
+    if ( find_locate(h->hdr, v, pos, offset, position, ex, dist_exon) ) {
         *func = func_region_outrange;
         return 1; // outside of transcripts ??
     }
@@ -1452,7 +1474,7 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     int is_coding = 0;
     if ( strcmp(bt, "mRNA") == 0 ) is_coding = 1;
     
-    transcript_function_update(h, is_coding, v, &ex1, &inf->pos, &inf->offset, n->start, &type->func1, &type->con1, &type->con2, &inf->loc);
+    transcript_function_update(h, is_coding, v, &ex1, &inf->pos, &inf->offset, n->start, &type->func1, &type->con1, &type->con2, &inf->loc, &inf->dist_exon);
     
     type->count = ex1; // For now, count may NOT be the real exome number, considering the backward strand.
     
@@ -1460,8 +1482,8 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
         // unannotated location will export as '?'
         enum mol_con con1 = mc_unknown;
         enum mol_con con2 = mc_unknown;
-
-        transcript_function_update(h, is_coding, v, &ex2, &inf->end_pos, &inf->end_offset, n->end, &type->func2, &con1, &con2, &inf->end_loc);
+        
+        transcript_function_update(h, is_coding, v, &ex2, &inf->end_pos, &inf->end_offset, n->end, &type->func2, &con1, &con2, &inf->end_loc, &inf->dist_exon);
         
         if ( v->strand == strand_is_minus ) {
             int t = inf->pos;
@@ -1476,9 +1498,11 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
             t = type->func2;
             type->func2 = type->func1;
             type->func1 = t;
+            uint16_t x = (uint16_t)inf->dist_exon;
+            inf->dist_exon = ((int32_t)x)<<16|(uint16_t)(inf->dist_exon>>16);
         }
         if ( con2 != mc_unknown ) type->con2 = con2;
-        if ( type->func1 != type->func2 ) { type->con1 = mc_exon_loss; return 0;}
+        if ( type->func1 != type->func2 && n->type != var_type_ins) { type->con1 = mc_exon_loss; return 0;}
     } 
     else {
         inf->end_pos = inf->pos;        
