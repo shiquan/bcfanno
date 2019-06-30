@@ -12,6 +12,8 @@ static char *safe_duplicate_string(char *str)
 }
 
 #define MAX_GAP_GENE_DISTANCE 10000
+#define MAX_TRANSCRIPT_LENGTH 100000
+#define MAX_NORMLIZE_LENGTH   1000 // over 1000? cann't take care it anyway
 
 // molecular consequence
 struct MolecularConsequenceTerms {
@@ -452,20 +454,22 @@ static int find_the_block(struct gea_record *v, int *s, int *e, int pos, int32_t
     int i;
     int left;
     int right;
+    int is_exon = 0;
     for ( i = 0; i < v->blockCount; ++i ) {
         int start = v->blockPair[0][i];
         int end   = v->blockPair[1][i];
         left = pos-start;
         right = end - pos;
+        // update 2019/06/29: intron count should -1 thereafter
         if ( pos < start) { *e = i; break; }
         else {
             *s = i;
-            if ( pos <= end ) { *e = i; break; }
+            if ( pos <= end ) { *e = i; is_exon = 1; break; }
         }
     }
     // out of range
     if ( i == v->blockCount && *s > 0 && *e == 0 ) return 1;
-    if (*s == *e) {
+    if (is_exon) { // check the distance
         assert(left>=0 && right >=0);
         *dist = left<<16|(uint16_t)right;
     }
@@ -695,21 +699,49 @@ static int trim_amino_acid_ends(int *lori_aa, int *ori_aa, int *lmut_aa, int *mu
     }
     return *head+*tail;
 }
-static int *convert_bases_to_amino_acid(int l, char *s, int *l_aa,int mito)
+// todo: consider Selenocysteine!
+// max_len is defined length of coding region, if not set -1, UGA codon will be set to Selenocysteine
+static int *convert_bases_to_amino_acid(int l, char *s, int *l_aa, int mito, int max_len)
 {
-    int i;
     *l_aa = 0;
     if (l<3) return NULL;
-    int *aa = (int*)calloc(l/3,sizeof(int));
-    for (i=0; i<l/3; i++) {
-        aa[i] = codon2aminoid(s+i*3,mito);
-        if ( aa[i] == C4_Stop ) {
-            i++; // put stop codon at the end
-            break;
+    
+    if (max_len == -1) { // do not check Sec
+        int i;
+        int *aa = (int*)calloc(l/3,sizeof(int));
+        for (i=0; i<l/3; i++) {
+            aa[i] = codon2aminoid(s+i*3,mito);
+            if ( aa[i] == C4_Stop ) {
+                i++; // put stop codon at the end
+                break;
+            }
         }
+        *l_aa = i;
+        return aa;
     }
-    *l_aa = i;
-    return aa;
+    else {        
+        assert(max_len <= l);
+        int i;
+        int *aa = (int*)calloc(l/3, sizeof(int));
+        for (i = 0; i < max_len/3-1; i++) {
+            char *cod = s+i*3;
+            aa[i] = codon2aminoid(cod, mito);
+            if (aa[i] == C4_Stop) {
+                if ((*cod == 'T' || *cod == 'U') && *(cod+1) == 'G' && *(cod+2) == 'A') aa[i] = C4_Sec; // Selenocysteine
+                else break;
+            }            
+        }
+        
+        // check stop codon
+        if (i == max_len/3-1) { // todo: confused transcript, need double check here.
+            for (; i < l/3; ++i) {
+                aa[i] = codon2aminoid(s+i*3, mito);
+                if (aa[i] == C4_Stop) break;
+            }
+        }
+        *l_aa = i+1;
+        return aa;
+    }
 }
 //
 // the offset only used to realign the alternative sequence and reference sequence, but would NOT change the state of variant types
@@ -745,7 +777,8 @@ static int *convert_bases_to_amino_acid(int l, char *s, int *l_aa,int mito)
 static int trim_capped_sequences_and_check_mutated_end(struct mc_handler *h, struct mc *mc, struct mc_type *type, struct mc_inf *inf, struct gea_record *v, int lref, int lalt, char *ref, char *alt, int *lori, char **ori, int *lmut, char **mut, int *cod, int cap)
 {
     struct gea_coding_transcript *c = &v->c;
-    
+
+    // transcript level
     // trim Longest Common 3mer Prefixes
     int offset = trim_capped_sequences(ori, mut, lori, lmut, 3);
     
@@ -856,14 +889,20 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
 
-    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito);
-    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito);
-
+    int max_len = v->c.cds_length - v->c.utr5_length; // real cds length
+    max_len = max_len - (type->loc_amino-1)*3;
+    // max_len = (max_len+2)/3*3; // weird adjust
+    // debug_print("%d\t%d\t%d\t%d\t%s", v->c.cds_length, v->c.utr5_length, inf->loc, max_len, v->name);
+    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito, max_len);
+    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito, -1);
+    if (ori_aa == NULL) error("%s", v->name);
     if ( lori_aa == 0 ) return 0;
     
     // check the amino acids length
     //if ( lori < 10000 && ((v->c.cds_length - v->c.utr5_length - inf->loc)/3 +1 > lori_aa )) {
-    if ( lori < 10000 && ((v->c.cds_length - v->c.utr5_length - inf->loc)/3 > lori_aa )) {
+    // debug_print("%d\t%d\t%d\t%d", v->c.cds_length, v->c.utr5_length, inf->loc, lori_aa);
+
+    if ( lori < MAX_GAP_GENE_DISTANCE && (max_len/3 > lori_aa )) {
         inf->inframe_stop = 1;
         //warnings("In frame stop codon found. %s, %s:%d", inf->transcript, mc->chr, mc->start);
     }
@@ -903,7 +942,7 @@ static int predict_molecular_consequence_deletion(struct mc_handler *h, struct m
             type->loc_end_amino = type->loc_amino + l;
             type->ori_amino = ori_aa[0];
             type->ori_end_amino =ori_aa[l];
-            type->n = 0;
+            type->n = 0; // check again?? 2019/07/01
         }
         else {
             /*
@@ -967,9 +1006,9 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
     
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
-
-    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito);
-    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito);
+    int max_len = v->c.cds_length - v->c.utr5_length - inf->loc;
+    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito, max_len);
+    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito, -1);
 
     //assert(lori_aa >0);
     if ( lori_aa == 0 ) return 0;
@@ -1055,9 +1094,9 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
     
     int *ori_aa, *mut_aa;
     int lori_aa, lmut_aa;
-
-    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito);
-    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito);
+    int max_len = v->c.cds_length - v->c.utr5_length - inf->loc;
+    ori_aa = convert_bases_to_amino_acid(lori, ori, &lori_aa, mc->is_mito, max_len);
+    mut_aa = convert_bases_to_amino_acid(lmut, mut, &lmut_aa, mc->is_mito, -1);
 
     if ( lori_aa == 0 ) {
         return 0;
@@ -1225,7 +1264,7 @@ static int compare_reference_and_alternative_allele (struct mc_handler *h,struct
     // ori_seq is a temp sequence, will be free before leave this function.
     //
     // update 10th Jun. 2019, retrieve orginal sequence of one exon, not adjust across exons
-    *ori = faidx_fetch_seq(h->rna_fai, name, start, start + 10000, lori);
+    *ori = faidx_fetch_seq(h->rna_fai, name, start, start + MAX_TRANSCRIPT_LENGTH, lori);
     
     if ( *ori == NULL || *lori == 0 ) return -1;
     
@@ -1458,6 +1497,52 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     inf->transcript = safe_duplicate_string(v->name);
     inf->gene = safe_duplicate_string(v->geneName);
 
+
+    /*
+      Normlise the variant position, some insertion or deletion happened at the tandom repeat regions and cover exon-intron edge, 
+      here trying to normlize the inserted or deleted bases to the last position consider the strand.
+    */
+    // for - strand, already normlized by variantion caller, we just take care of the + strand
+        
+    // init reference sequences and alternative sequences
+    int ref_length = n->ref == NULL ? 0    : strlen(n->ref);
+    int alt_length = n->alt == NULL ? 0    : strlen(n->alt);
+    char *ref_seq  = n->ref == NULL ? NULL : safe_duplicate_string(n->ref);
+    char *alt_seq  = n->alt == NULL ? NULL : safe_duplicate_string(n->alt);
+    // ref_seq and alt_seq will be reverse if - strand
+    // char *ref, *alt, start, end;
+    int start = n->start;
+    int end = n->end;
+    if (n->start != n->end) { // indel, try to normlise
+        if (inf->strand == '+') {
+            faidx_t *fai = fai_load(h->reference_fname);
+            if (fai) {
+                char *seq;
+                int l;
+                seq = faidx_fetch_seq(fai, n->chr, start, MAX_NORMLIZE_LENGTH, &l);
+                if (l < MAX_NORMLIZE_LENGTH) {// too short, escape normlise
+                    free(seq);
+                }
+                else {
+                    kstring_t alt = {0,0,0};
+                    if (alt_length) kputs(alt_seq, &alt);
+                    kputs(seq+ref_length, &alt);
+                    int i;
+                    for (i = 0; i < l && l < alt.l; i++)
+                        if (seq[i] != alt.s[i]) break;
+                    if (i) {
+                        if (ref_length) memcpy(ref_seq, seq+i, ref_length *sizeof(char));
+                        if (alt_length) memcpy(alt_seq, alt.s+i, alt_length*sizeof(char));
+                        start+=i;
+                        end += i;
+                    }
+                    free(alt.s);
+                }
+                fai_destroy(fai);
+            }
+        }
+    }
+    // debug_print("%s\t%s\t%d\t%d", ref_seq, alt_seq, start, end);
     //debug_print("%s\t%d\t%s\t%s\t%s", n->chr, n->start, n->ref, n->alt, inf->transcript);
      
     int ex1 = 0, ex2 = 0;
@@ -1474,16 +1559,21 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     int is_coding = 0;
     if ( strcmp(bt, "mRNA") == 0 ) is_coding = 1;
     
-    transcript_function_update(h, is_coding, v, &ex1, &inf->pos, &inf->offset, n->start, &type->func1, &type->con1, &type->con2, &inf->loc, &inf->dist_exon);
+    // set amino acid length
+    if (is_coding) {
+        inf->aa_length = (v->c.cds_length -v->c.utr5_length)/3-1; // update: 2019/06/29 emit stop codon
+    }
+
+    transcript_function_update(h, is_coding, v, &ex1, &inf->pos, &inf->offset, start, &type->func1, &type->con1, &type->con2, &inf->loc, &inf->dist_exon);
     
     type->count = ex1; // For now, count may NOT be the real exome number, considering the backward strand.
     
-    if ( n->start != n->end ) {
+    if (start != end ) {
         // unannotated location will export as '?'
         enum mol_con con1 = mc_unknown;
         enum mol_con con2 = mc_unknown;
         
-        transcript_function_update(h, is_coding, v, &ex2, &inf->end_pos, &inf->end_offset, n->end, &type->func2, &con1, &con2, &inf->end_loc, &inf->dist_exon);
+        transcript_function_update(h, is_coding, v, &ex2, &inf->end_pos, &inf->end_offset, end, &type->func2, &con1, &con2, &inf->end_loc, &inf->dist_exon);
         
         if ( v->strand == strand_is_minus ) {
             int t = inf->pos;
@@ -1511,19 +1601,14 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
         type->func2 = type->func1;
     }
 
-    // set amino acid length
-    if (is_coding) {
-        inf->aa_length = (v->c.cds_length -v->c.utr5_length)/3;
-    }
-
     if ( type->con1 != mc_unknown ) {
         if ( v->strand == strand_is_minus ) {        
-            if ( n->ref ) {
-                inf->ref = safe_duplicate_string(n->ref);
+            if (ref_length) {
+                inf->ref = safe_duplicate_string(ref_seq);
                 compl_seq(inf->ref, strlen(inf->ref));
             }
-            if (n->alt) {
-                inf->alt = safe_duplicate_string(n->alt);
+            if (alt_length) {
+                inf->alt = safe_duplicate_string(alt_seq);
                 compl_seq(inf->alt, strlen(inf->alt));
             }        
         }
@@ -1532,12 +1617,6 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     }
     
     // For variant in coding region, check amino acid(s) changes.
-    
-    // init reference sequences and alternative sequences
-    int ref_length = n->ref == NULL ? 0    : strlen(n->ref);
-    int alt_length = n->alt == NULL ? 0    : strlen(n->alt);
-    char *ref_seq  = n->ref == NULL ? NULL : safe_duplicate_string(n->ref);
-    char *alt_seq  = n->alt == NULL ? NULL : safe_duplicate_string(n->alt);
     
     // for reverse strand, complent sequence
     if ( inf->strand == '-' ) {        
@@ -1759,6 +1838,8 @@ static int transcripts_variant_state_update(struct mc *n, struct mc_handler *h, 
         if ( transcript_molecular_consequence_update(h, n, trans, v) ) continue;
         if ( v->strand == strand_is_plus ) trans->type.count++;
         else trans->type.count = v->blockCount-trans->type.count;
+        // if intron, count-=1
+        if (trans->inf.offset) trans->type.count--;
         n->n_tran++;
     }
     return n->n_tran;
@@ -2012,7 +2093,8 @@ static void generate_hgvsnom_string_UtrExon(struct mc const *mc, struct mc_type 
     if ( type->func1 == func_region_utr5_exon ) ksprintf(str, "c.-%d", inf->loc);
     else if ( type->func1 == func_region_utr3_exon ) ksprintf(str, "c.*%d", inf->loc);
     //else if ( type->func1 == func_region_intron ) ksprintf(str, "c.%d", inf->loc);
-    else error("For developer: only UTR region should come here!");
+    else kputs("c.?", str);
+        //error("For developer: only UTR region should come here!");
 
     char *ref = inf->ref == NULL ? mc->ref : inf->ref;
     char *alt = inf->alt == NULL ? mc->alt : inf->alt;
@@ -2024,7 +2106,7 @@ static void generate_hgvsnom_string_UtrExon(struct mc const *mc, struct mc_type 
         else if ( type->func1 == func_region_utr3_exon ) ksprintf(str, "*%d", inf->end_loc);
         else if ( type->func1 == func_region_intron ) ksprintf(str, "%d", inf->end_loc);
         else if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
-
+        else kputc('?', str);
         // end position could cover intron region
         if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
         else if ( inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
@@ -2384,7 +2466,7 @@ static char *generate_hgvsnom_string(struct mc *h)
     
     return str.s;
 }
-
+/*
 static int generate_annovar_string(struct mc *h, struct mc_type *type, struct mc_inf *inf, kstring_t *str)
 {
     char *ref = inf->ref != NULL ? inf->ref : h->ref;
@@ -2484,6 +2566,7 @@ static int generate_annovar_string(struct mc *h, struct mc_type *type, struct mc
 }
 // generate variant string in annovar format
 // OR4F5:NM_001005484:exon1:c.T809A:p.V270E
+
 static char *generate_annovar_name(struct mc *h)
 {
     if ( h->n_tran == 0 ) return NULL;
@@ -2553,7 +2636,7 @@ static char *generate_annovar_name(struct mc *h)
     
     return str.s;
 }
-
+*/
 static char *generate_gene_string(struct mc *h)
 {
     kstring_t str = {0,0,0};
@@ -2677,17 +2760,18 @@ static char *generate_exonintron_string(struct mc *h)
     }
     return str.s;
 }
+/*
 static int generate_upstream_downstream_gap_value(struct mc *h ) {
     return h->inter.TSS_dist;
 }
-
+*/
 static char *generate_ivsnom_string(struct mc *h)
 {
     if ( h->n_tran == 0) return NULL;
     
     kstring_t str = {0,0,0};
     int i;
-    int empty = 1;
+    // int empty = 1;
     for ( i = 0; i < h->n_tran; ++i ) {        
         if ( i ) kputc('|', &str);
         struct mc_type *type = &h->trans[i].type;
@@ -2942,6 +3026,7 @@ static int anno_mc_setter2(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *li
     return 0;
 }
 //static int anno_hgvs_setter_info(struct anno_hgvs_file *file, bcf_hdr_t *hdr, bcf1_t *line, struct anno_col *col)
+/*
 static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *line)
 {
     int i, j;
@@ -3062,7 +3147,7 @@ static int anno_mc_setter(struct anno_mc_file *file, bcf_hdr_t *hdr, bcf1_t *lin
     free(str);
     return 0;
 }
-
+*/
 struct anno_mc_file *anno_mc_file_duplicate(struct anno_mc_file *f)
 {
     struct anno_mc_file *d = malloc(sizeof(*d));

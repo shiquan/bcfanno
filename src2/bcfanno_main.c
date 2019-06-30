@@ -252,7 +252,7 @@ int parse_args(int argc, char **argv)
 	    args.test_databases_only = 1;
 	    continue;
 	}
-        if ( strcmp(a, "--unsorted") == 0 ) {
+        if ( strcmp(a, "--unsort") == 0 ) {
             args.input_unsorted = 1;
             continue;
         }
@@ -427,8 +427,8 @@ void *anno_core(void *arg, int idx)
     // based on the start and end of pool will highly improve the performance
     if ( args.input_unsorted == 1 ) {
         for ( i = 0; i < pool->n_reader; ++i ) {
-
             bcf1_t *line = pool->readers[i];
+            debug_print("%d",line->pos);
             if ( bcf_get_variant_types(line) == VCF_REF )
                 continue;
 
@@ -483,7 +483,7 @@ int annotate_light()
             args.total_record ++;
             if ( line->rid == -1 ) goto output_line;
             if ( bcf_get_variant_types(line) == VCF_REF) goto output_line;
-
+            debug_print("%d",line->pos);
             //if ( idx->hgvs )
             //  anno_hgvs_core(idx->hgvs, idx->hdr_out, line);
             

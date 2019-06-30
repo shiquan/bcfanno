@@ -10,8 +10,8 @@ include $(HTSDIR)/htslib.mk
 HTSLIB = $(HTSDIR)/libhts.a
 
 CC       = gcc
-CFLAGS   = -Wall -O3 
-DEBUG_CFLAGS   = -g -Wall -O0 -DDEBUG_MODE
+CFLAGS   = -Wall -O0 -g
+DEBUG_CFLAGS  = -g -Wall -O0 -DDEBUG_MODE
 DFLAGS   =
 INCLUDES = -I src2/ -I. -I$(HTSDIR)/ -I misc/
 LIBS = -lz
@@ -34,10 +34,27 @@ force:
 	$(CC) -c $(CFLAGS) $(DFLAGS) $(INCLUDES) $< -o $@
 
 
-LIB_OBJ = src2/bed_utils.o src2/anno_bed.o src2/anno_col.o src2/anno_pool.o src2/sequence.o src2/gea.o src2/config.o src2/flank_seq.o src2/json_config.o src2/kson.o src2/name_list.o src2/number.o src2/sort_list.o src2/variant_type.o src2/vcf_annos.o src2/vcmp.o src2/anno_seqon.o src2/anno_vcf.o src2/anno_thread_pool.o
+LIB_OBJ = src2/bed_utils.o \
+	src2/anno_bed.o \
+	src2/anno_col.o \
+	src2/anno_pool.o \
+	src2/sequence.o \
+	src2/gea.o \
+	src2/config.o \
+	src2/flank_seq.o \
+	src2/json_config.o \
+	src2/kson.o \
+	src2/name_list.o \
+	src2/number.o \
+	src2/sort_list.o \
+	src2/variant_type.o \
+	src2/vcf_annos.o \
+	src2/vcmp.o \
+	src2/anno_seqon.o \
+	src2/anno_vcf.o \
+	src2/anno_thread_pool.o
 
 src2/bed_utils.o: src2/bed_utils.c
-#src2/table2hash.o: src2/table2hash.c
 src2/anno_bed.o: src2/anno_bed.c
 src2/anno_col.o: src2/anno_col.c
 src2/anno_pool.o: src2/anno_pool.c
@@ -88,12 +105,12 @@ bcfanno: $(HTSLIB) liba.a bcfanno_version.h
 
 
 bcfanno_debug: $(HTSLIB) bcfanno_version.h
-	$(CC) -DDEBUG_MODE $(DEBUG_CFLAGS) $(INCLUDES) -pthread -o $@ src2/bcfanno_main.c src2/liba.a $(HTSLIB) $(LIBS)
+	$(CC) $(DEBUG_CFLAGS) $(INCLUDES) -pthread -o $@ src2/bcfanno_main.c src2/liba.a $(HTSLIB) $(LIBS)
 
 test: $(HTSLIB) bcfanno_version.h
 
 clean: testclean
-	-rm -f gmon.out *.o *~ $(PROG) bcfanno_version.h 
+	-rm -f gmon.out src2/*.o *.o *~ $(PROG) bcfanno_version.h 
 	-rm -rf *.dSYM plugins/*.dSYM test/*.dSYM
 	-rm -f anno_vcf bedadd vcfadd bcfanno anno_bed hgvs_generate hgvs_vcf GenePredExtGen bcfanno_hgvs
 	-rm -f config bcfanno_debug vcf2tsv tsv2vcf vcf_rename_tags
