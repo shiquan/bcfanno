@@ -1838,9 +1838,11 @@ static int transcripts_variant_state_update(struct mc *n, struct mc_handler *h, 
         //int ret;
         if ( transcript_molecular_consequence_update(h, n, trans, v) ) continue;
         if ( v->strand == strand_is_plus ) trans->type.count++;
-        else trans->type.count = v->blockCount-trans->type.count;
-        // if intron, count-=1
-        if (trans->inf.offset) trans->type.count--;
+        else {
+            trans->type.count = v->blockCount-trans->type.count;
+            // if intron, --count
+            if (trans->inf.offset) trans->type.count--;
+        }
         n->n_tran++;
     }
     return n->n_tran;
