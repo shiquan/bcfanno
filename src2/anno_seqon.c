@@ -1558,6 +1558,7 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     
     int is_coding = 0;
     if ( strcmp(bt, "mRNA") == 0 ) is_coding = 1;
+
     
     // set amino acid length
     if (is_coding) {
@@ -1610,7 +1611,7 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
             if (alt_length) {
                 inf->alt = safe_duplicate_string(alt_seq);
                 compl_seq(inf->alt, strlen(inf->alt));
-            }        
+            } 
         }
 
         return 0;
@@ -2361,7 +2362,7 @@ static void generate_hgvsnom_string_exonLoss(struct mc *mc, struct mc_type *type
         if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
         else if (inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);        
     }
-    else if ( type->func1 == func_region_utr3_exon || type->func1 == func_region_utr3_intron ) {
+    else if ( type->func2 == func_region_utr3_exon || type->func2 == func_region_utr3_intron ) {
         ksprintf(str, "*%d", inf->end_loc);
         if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
         else if (inf->end_offset < 0 ) ksprintf(str, "%d", inf->end_offset);
