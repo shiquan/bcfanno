@@ -2658,8 +2658,12 @@ static char *generate_gene_string(struct mc *h)
         if ( inf->gene ) kputs(inf->gene, &str);
         else kputc('.', &str);
     }
-
     
+    if (empty_tag_string(&str)) {
+        free(str.s);
+        return NULL;
+    }
+
     return str.s;
 }
 static char *generate_transcript_string(struct mc *h)
@@ -2674,6 +2678,11 @@ static char *generate_transcript_string(struct mc *h)
         for ( k = 0; k < l; ++k )
             if ( inf->transcript[k] == '.') break;
     }
+    if (empty_tag_string(&str)) {
+        free(str.s);
+        return NULL;
+    }
+
     return str.s;
 }
 static char *generate_vartype_string(struct mc *h)
@@ -2694,6 +2703,11 @@ static char *generate_vartype_string(struct mc *h)
             kputs(MCT[type->con2].sname, &str);
         }
     }
+    if (empty_tag_string(&str)) {
+        free(str.s);
+        return NULL;
+    }
+
     return str.s;    
 }
 static char *generate_molecular_consequence_string(struct mc *h)
@@ -2719,6 +2733,12 @@ static char *generate_molecular_consequence_string(struct mc *h)
         assert(inter->con1 != mc_unknown);
         kputs(MCT[inter->con1].lname, &str);
     }
+
+    if (empty_tag_string(&str)) {
+        free(str.s);
+        return NULL;
+    }
+
     return str.s;
 }
 static char *generate_molecular_consequence_string_uniq(struct mc *h)
