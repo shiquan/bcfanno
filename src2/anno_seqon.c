@@ -996,7 +996,7 @@ static int predict_molecular_consequence_delins(struct mc_handler *h, struct mc 
     // re-alignment of reference and alternative alleles
     if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, lref, lalt, ref, alt, &lori, &ori, &lmut, &mut, &cod, 0) == 0 ) return 0;
 
-    inf->end_loc = inf->loc + lref -1;
+    // inf->end_loc = inf->loc + lref -1;
 
     type->loc_amino = (inf->loc+2)/3;
     type->loc_end_amino = (inf->end_loc+2)/3;
@@ -1087,7 +1087,7 @@ static int predict_molecular_consequence_insertion(struct mc_handler *h, struct 
     if ( trim_capped_sequences_and_check_mutated_end(h, mc, type, inf, v, 0, lalt, NULL, alt, &lori, &ori, &lmut, &mut, &cod, 1) == 0 )
         return 0;
 
-    inf->end_loc = inf->loc+1;
+    // if (inf->end_offset == 0) inf->end_loc = inf->loc+1; // adjust, potential bug
     //type->loc_amino = (inf->loc+2)/3;
     type->loc_amino = inf->loc/3+1;
     //type->loc_end_amino = type->loc_amino+1; 
@@ -1513,33 +1513,33 @@ static int transcript_molecular_consequence_update(struct mc_handler *h, struct 
     // char *ref, *alt, start, end;
     int start = n->start;
     int end = n->end;
-    if (n->start != n->end) { // indel, try to normlise
-        if (inf->strand == '+') {
-            faidx_t *fai = fai_load(h->reference_fname);
-            if (fai) {
-                char *seq;
-                int l;
-                seq = faidx_fetch_seq(fai, n->chr, start, MAX_NORMLIZE_LENGTH, &l);
-                if (l < MAX_NORMLIZE_LENGTH) {// too short, escape normlise
-                    free(seq);
-                }
-                else {
-                    kstring_t alt = {0,0,0};
-                    if (alt_length) kputs(alt_seq, &alt);
-                    kputs(seq+ref_length, &alt);
-                    int i;
-                    for (i = 0; i < l && l < alt.l; i++)
-                        if (seq[i] != alt.s[i]) break;
-                    if (i) {
-                        if (ref_length) memcpy(ref_seq, seq+i, ref_length *sizeof(char));
-                        if (alt_length) memcpy(alt_seq, alt.s+i, alt_length*sizeof(char));
-                        start+=i;
-                        end += i;
-                    }
-                    free(alt.s);
-                }
-                fai_destroy(fai);
+
+    // try to normlise indels on forward strand, for complement strand variant caller usually normalised already
+    if (inf->strand == '+' && (n->type == var_type_del || n->type == var_type_delins || n->type == var_type_ins)) {
+        faidx_t *fai = fai_load(h->reference_fname);
+        if (fai) {
+            char *seq;
+            int l;
+            seq = faidx_fetch_seq(fai, n->chr, start, start+MAX_NORMLIZE_LENGTH, &l);
+            if (l < MAX_NORMLIZE_LENGTH) {// too short, escape normlise
+                free(seq);
             }
+            else {
+                kstring_t alt = {0,0,0};
+                if (alt_length) kputs(alt_seq, &alt);
+                kputs(seq+ref_length, &alt);
+                int i;
+                for (i = 0; i < l && l < alt.l; i++)
+                    if (seq[i] != alt.s[i]) break;
+                if (i) {
+                    if (ref_length) memcpy(ref_seq, seq+i, ref_length *sizeof(char));
+                    if (alt_length) memcpy(alt_seq, alt.s+i, alt_length*sizeof(char));
+                    start+=i;
+                    end += i;
+                }
+                free(alt.s);
+            }
+            fai_destroy(fai);
         }
     }
     // debug_print("%s\t%s\t%d\t%d", ref_seq, alt_seq, start, end);
@@ -2147,11 +2147,11 @@ static void generate_hgvsnom_string_CodingDelins(struct mc const *mc, struct mc_
 
     ksprintf(str, "%s:c.%d", inf->transcript, inf->loc);
     
-    if ( inf->end_loc != inf->loc ) {
+    if ( inf->end_loc != inf->loc || inf->end_offset != inf->offset) {
         kputc('_', str);
-        if ( type->func1 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
-        else if ( type->func1 == func_region_utr3_exon ) ksprintf(str, "*%d", inf->end_loc);
-        else if ( type->func1 == func_region_intron ) {
+        if ( type->func2 == func_region_cds ) ksprintf(str, "%d", inf->end_loc);
+        else if ( type->func2 == func_region_utr3_exon ) ksprintf(str, "*%d", inf->end_loc);
+        else { //if ( type->func1 == func_region_intron ) {
             ksprintf(str, "%d", inf->end_loc);
             // end position could cover intron region
             if ( inf->end_offset > 0 ) ksprintf(str, "+%d", inf->end_offset);
