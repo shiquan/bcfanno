@@ -2048,11 +2048,12 @@ static void generate_hgvsnom_string_intron(struct mc const *mc, struct mc_type c
     else if ( type->func1 == func_region_utr3_intron ) ksprintf(str, "c.*%d", inf->loc);
     else if ( type->func1 == func_region_intron ) ksprintf(str, "c.%d", inf->loc);
     else if ( type->func1 == func_region_noncoding_intron) ksprintf(str, "n.%d", inf->loc);
-    else error("For developer: only intron region should come here!");
+    else if ( type->func1 == func_region_cds) ksprintf(str, "c.%d", inf->loc);
+    else error("For developer: only intron region should come here! %s:%d", mc->chr, mc->start);
     
     if ( inf->offset > 0 ) ksprintf(str, "+%d", inf->offset);
     else if ( inf->offset < 0 ) ksprintf(str, "%d", inf->offset);
-    else error("For developer: offset should NOT be 0 for intron.");
+    // else error("For developer: offset should NOT be 0 for intron."); // delete because insert at splice position
  
     char *ref = inf->ref != NULL ? inf->ref : mc->ref;
     char *alt = inf->alt != NULL ? inf->alt : mc->alt;
