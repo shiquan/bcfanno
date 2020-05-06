@@ -83,7 +83,7 @@ Belowed package or source code used in bcfanno copyrighted by other institution.
 
 ## How to cite bcfanno
 
-We are trying to publish a paper to describe bcfanno, before that please cite https://github.com/shiquan/bcfanno in your work.
+Please cite https://github.com/shiquan/bcfanno.
 
 
 ## Reference
