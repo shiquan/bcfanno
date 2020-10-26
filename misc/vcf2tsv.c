@@ -686,7 +686,7 @@ void setter_zygosity(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *va
 void setter_tgt(bcf_hdr_t *hdr, bcf1_t *line, col_t *c, int ale, mval_t *val)
 {
     if (ale != -1)
-	error ("GT, TGT only used with split-allele mode.");
+	error ("GT/TGT tag can NOT be used with -s ALT mode.");
 
     bcf_fmt_t *fmt = bcf_get_fmt_id(line, c->id);
 
