@@ -539,8 +539,12 @@ int convert_line(bcf_hdr_t *hdr, bcf1_t *line)
 		/* setter function */
 		col->setter(hdr, line, col, iallele, val);
 		if (k) kputc('\t', args.mempool);
-		kputs(val->a.s, args.mempool);
-		//debug_print("%s", val->a.s);
+                //debug_print("%s", val->a.s);
+
+                if (val->a.l)
+                    kputs(val->a.s, args.mempool);
+                else
+                    kputs(".", args.mempool);
 	    } // end cols
 	    kputc('\n', args.mempool);
 
@@ -791,14 +795,15 @@ void process_fmt_array(int iallele, kstring_t *string, int n, int type, void *da
 			  else kputc(*p, string);
 		      }
 		  } else {
-		      //p += iallele;
+
                       for ( ;iallele > 0; ) {
                           while (p < end && *p != ',')
                               p++;
                           p++;
                           --iallele;
                       }
-                      assert(p < end);
+
+                      assert(p <= end);
 		      for ( i = 0; i<n && p < end && *p != ','; ++p,++i) {
 			  if (*p == bcf_str_missing) {
                               kputc('.', string);
